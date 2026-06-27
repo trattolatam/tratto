@@ -1,0 +1,75 @@
+'use client'
+import Link from 'next/link'
+import { useState } from 'react'
+import { useAuthStore } from '@/lib/store'
+
+export function Navbar() {
+  const { user, logout } = useAuthStore()
+  const [menuOpen, setMenuOpen] = useState(false)
+
+  return (
+    <nav className="sticky top-0 z-50 bg-white/95 backdrop-blur border-b border-gray-100">
+      <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between gap-4">
+        <Link href="/" className="flex items-center gap-2 flex-shrink-0">
+          <div className="w-7 h-7 rounded-lg bg-brand-dark flex items-center justify-center">
+            <span className="text-brand-green font-bold text-sm">T</span>
+          </div>
+          <span className="font-bold text-brand-dark text-base tracking-tight">Tratto</span>
+        </Link>
+
+        <div className="hidden md:flex flex-1 max-w-md relative">
+          <i className="ti ti-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-base" />
+          <input type="text" placeholder="Buscar electricistas, peluquerías, psicólogos..." className="input pl-9 py-2 text-sm" />
+        </div>
+
+        <div className="hidden md:flex items-center gap-1">
+          <Link href="/categorias" className="text-sm text-gray-600 hover:text-brand-dark px-3 py-1.5 rounded-lg hover:bg-gray-50 transition-colors">Categorías</Link>
+          <Link href="/como-funciona" className="text-sm text-gray-600 hover:text-brand-dark px-3 py-1.5 rounded-lg hover:bg-gray-50 transition-colors">Cómo funciona</Link>
+          <Link href="/precios" className="text-sm text-gray-600 hover:text-brand-dark px-3 py-1.5 rounded-lg hover:bg-gray-50 transition-colors">Para empresas</Link>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {user ? (
+            <div className="flex items-center gap-2">
+              {user.role === 'BUSINESS' && (
+                <Link href="/panel" className="btn-secondary py-1.5 text-xs hidden md:flex"><i className="ti ti-layout-dashboard text-sm" />Mi panel</Link>
+              )}
+              <div className="relative group">
+                <button className="w-8 h-8 rounded-full bg-brand-green/20 flex items-center justify-center text-brand-green font-semibold text-sm">{user.name.charAt(0).toUpperCase()}</button>
+                <div className="absolute right-0 top-10 w-44 bg-white shadow-card-hover rounded-lg border border-gray-100 py-1 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none group-hover:pointer-events-auto">
+                  <div className="px-3 py-2 border-b border-gray-100">
+                    <p className="text-xs font-semibold text-brand-dark truncate">{user.name}</p>
+                    <p className="text-xs text-gray-400 truncate">{user.email}</p>
+                  </div>
+                  <button onClick={logout} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-brand-red hover:bg-red-50 text-left"><i className="ti ti-logout text-sm" /> Cerrar sesión</button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <>
+              <Link href="/login" className="btn-secondary py-1.5 text-xs hidden sm:flex">Iniciar sesión</Link>
+              <Link href="/registro" className="btn-primary py-1.5 text-xs"><i className="ti ti-pencil text-sm" />Escribir reseña</Link>
+            </>
+          )}
+          <button className="md:hidden w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100" onClick={() => setMenuOpen(!menuOpen)}>
+            <i className={`ti ${menuOpen ? 'ti-x' : 'ti-menu-2'} text-lg`} />
+          </button>
+        </div>
+      </div>
+
+      {menuOpen && (
+        <div className="md:hidden border-t border-gray-100 bg-white px-4 py-3 space-y-1">
+          <Link href="/categorias" className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 rounded-lg hover:bg-gray-50" onClick={() => setMenuOpen(false)}><i className="ti ti-category text-base" /> Categorías</Link>
+          <Link href="/como-funciona" className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 rounded-lg hover:bg-gray-50" onClick={() => setMenuOpen(false)}><i className="ti ti-help text-base" /> Cómo funciona</Link>
+          <Link href="/precios" className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 rounded-lg hover:bg-gray-50" onClick={() => setMenuOpen(false)}><i className="ti ti-building-store text-base" /> Para empresas</Link>
+          {!user && (
+            <div className="pt-2 border-t border-gray-100 flex gap-2">
+              <Link href="/login" className="btn-secondary flex-1 py-2 text-sm" onClick={() => setMenuOpen(false)}>Iniciar sesión</Link>
+              <Link href="/registro" className="btn-primary flex-1 py-2 text-sm" onClick={() => setMenuOpen(false)}>Registrarse</Link>
+            </div>
+          )}
+        </div>
+      )}
+    </nav>
+  )
+}

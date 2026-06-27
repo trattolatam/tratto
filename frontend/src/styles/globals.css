@@ -1,0 +1,35 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+
+:root { --font-jakarta: 'Plus Jakarta Sans', system-ui, sans-serif; }
+
+@layer base {
+  html { scroll-behavior: smooth; }
+  body { font-family: var(--font-jakarta); background: #F7F9FC; color: #0F1B2D; -webkit-font-smoothing: antialiased; }
+  * { box-sizing: border-box; }
+}
+
+@layer components {
+  .badge-verified { @apply inline-flex items-center gap-1.5 text-xs font-semibold bg-brand-green-dim text-brand-green-text px-2.5 py-1 rounded-full; }
+  .badge-verified-dot { @apply w-1.5 h-1.5 rounded-full bg-brand-green animate-pulse-green; }
+  .badge-pro { @apply inline-flex items-center gap-1 text-xs font-semibold bg-brand-green-dim text-brand-green-text px-2 py-0.5 rounded-full; }
+  .badge-premium { @apply inline-flex items-center gap-1 text-xs font-semibold bg-brand-blue-dim text-brand-blue px-2 py-0.5 rounded-full; }
+  .badge-free { @apply inline-flex items-center gap-1 text-xs font-medium bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full; }
+  .stars { @apply flex gap-0.5; }
+  .star-filled { @apply text-brand-amber text-sm; }
+  .star-empty { @apply text-gray-200 text-sm; }
+  .card { @apply bg-white rounded-lg shadow-card transition-shadow duration-200; }
+  .card-hover { @apply hover:shadow-card-hover hover:-translate-y-0.5 transition-all duration-200; }
+  .btn-primary { @apply inline-flex items-center justify-center gap-2 bg-brand-green text-brand-dark font-semibold text-sm px-5 py-2.5 rounded-lg hover:bg-brand-green/90 active:scale-95 transition-all duration-150 whitespace-nowrap; }
+  .btn-secondary { @apply inline-flex items-center justify-center gap-2 bg-transparent border border-gray-200 text-gray-700 font-medium text-sm px-5 py-2.5 rounded-lg hover:bg-gray-50 active:scale-95 transition-all duration-150 whitespace-nowrap; }
+  .btn-dark { @apply inline-flex items-center justify-center gap-2 bg-brand-dark text-white font-semibold text-sm px-5 py-2.5 rounded-lg hover:bg-brand-dark/90 active:scale-95 transition-all duration-150 whitespace-nowrap; }
+  .btn-outline-green { @apply inline-flex items-center justify-center gap-2 border border-brand-green text-brand-green font-semibold text-sm px-5 py-2.5 rounded-lg hover:bg-brand-green hover:text-brand-dark transition-all duration-150 whitespace-nowrap; }
+  .input { @apply w-full px-3.5 py-2.5 text-sm border border-gray-200 rounded-lg bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-green/30 focus:border-brand-green transition-colors duration-150; }
+  .label { @apply block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide; }
+  .section-title { @apply text-xl font-bold text-brand-dark tracking-tight; }
+  .section-sub { @apply text-sm text-brand-slate mt-1; }
+  .divider { @apply border-t border-gray-100; }
+}

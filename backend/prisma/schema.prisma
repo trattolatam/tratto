@@ -1,0 +1,531 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ─── ENUMS ────────────────────────────────────────────────────────────────────
+
+enum UserRole {
+  USER
+  BUSINESS
+  ADMIN
+}
+
+enum CompanyPlan {
+  FREE
+  PROFESSIONAL
+  PREMIUM
+  ENTERPRISE
+}
+
+enum ReviewStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  REPORTED
+}
+
+enum AdStatus {
+  PENDING
+  ACTIVE
+  PAUSED
+  REJECTED
+  EXHAUSTED
+}
+
+enum AdModel {
+  CPC
+  CPM
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  PAUSED
+  CANCELLED
+  PAST_DUE
+}
+
+enum PaymentProvider {
+  STRIPE
+  MERCADOPAGO
+  PAYPAL
+}
+
+enum MedalType {
+  TOP_CATEGORY
+  FIFTY_REVIEWS
+  CONSISTENT_12M
+  TRENDING_UP
+  HIGHLY_RECOMMENDED
+  CHOICE_OF_YEAR
+}
+
+enum NotificationType {
+  NEW_REVIEW
+  REVIEW_RESPONSE
+  MEDAL_EARNED
+  MEDAL_ALMOST
+  MONTHLY_REPORT
+  SUBSCRIPTION_RENEWAL
+  AD_APPROVED
+  AD_REJECTED
+  LEAD_RECEIVED
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+}
+
+// ─── USUARIOS ─────────────────────────────────────────────────────────────────
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  passwordHash  String
+  name          String
+  role          UserRole  @default(USER)
+  country       String
+  city          String?
+  phone         String?
+  avatarUrl     String?
+  isVerified    Boolean   @default(false)
+  verifiedAt    DateTime?
+
+  // Verificación de email
+  emailVerificationToken      String?
+  emailVerificationExpiresAt  DateTime?
+
+  // Tier 2 — Pro user
+  isPro         Boolean   @default(false)
+  proSince      DateTime?
+  referralCode  String?   @unique
+  referredById  String?
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  reviews        Review[]
+  reviewHelpful  ReviewHelpful[]
+  company        Company?         @relation("CompanyOwner")
+  notifications  Notification[]
+  bookings       Booking[]
+  referredBy     User?            @relation("Referrals", fields: [referredById], references: [id])
+  referrals      User[]           @relation("Referrals")
+  adAccounts     AdAccount[]
+
+  @@map("users")
+}
+
+// ─── CATEGORÍAS ───────────────────────────────────────────────────────────────
+
+model Category {
+  id          String    @id @default(uuid())
+  name        String    @unique
+  slug        String    @unique
+  emoji       String
+  phase       Int       @default(1)
+  priority    Boolean   @default(false)
+  parentId    String?
+
+  createdAt   DateTime  @default(now())
+
+  companies   Company[]
+  adTargets   AdTargetCategory[]
+  parent      Category?  @relation("Subcategories", fields: [parentId], references: [id])
+  children    Category[] @relation("Subcategories")
+
+  @@map("categories")
+}
+
+// ─── EMPRESAS ─────────────────────────────────────────────────────────────────
+
+model Company {
+  id            String      @id @default(uuid())
+  name          String
+  slug          String      @unique
+  description   String?
+  categoryId    String
+  country       String
+  city          String
+  address       String?
+  phone         String?
+  website       String?
+  email         String?
+
+  taxId         String?
+  taxIdType     String?
+
+  claimedById   String?     @unique
+  claimedAt     DateTime?
+
+  plan          CompanyPlan @default(FREE)
+  isVerified    Boolean     @default(false)
+  verifiedAt    DateTime?
+
+  ratingAvg     Float       @default(0)
+  reviewCount   Int         @default(0)
+  verifiedReviewCount Int   @default(0)
+
+  logoUrl       String?
+  coverUrl      String?
+  photos        String[]    @default([])
+
+  bookingEnabled  Boolean   @default(false)
+  insuranceActive Boolean   @default(false)
+
+  metaTitle       String?
+  metaDescription String?
+
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  category      Category    @relation(fields: [categoryId], references: [id])
+  owner         User?       @relation("CompanyOwner", fields: [claimedById], references: [id])
+  reviews       Review[]
+  medals        Medal[]
+  subscription  Subscription?
+  boosts        ProfileBoost[]
+  leads         Lead[]
+  aiSummary     AiSummary?
+  bookingSlots  BookingSlot[]
+  bookings      Booking[]
+
+  @@index([country, city, categoryId])
+  @@index([ratingAvg])
+  @@map("companies")
+}
+
+// ─── RESEÑAS ──────────────────────────────────────────────────────────────────
+
+model Review {
+  id            String        @id @default(uuid())
+  companyId     String
+  userId        String
+  rating        Int
+  title         String?
+  body          String
+  proofUrl      String?
+  proofType     String?
+  isVerified    Boolean       @default(false)
+  verifiedAt    DateTime?
+  status        ReviewStatus  @default(PENDING)
+  moderatedById String?
+  moderatedAt   DateTime?
+  moderationNote String?
+
+  helpfulCount  Int           @default(0)
+  aiSummaryId   String?
+
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  company       Company       @relation(fields: [companyId], references: [id])
+  user          User          @relation(fields: [userId], references: [id])
+  response      ReviewResponse?
+  helpful       ReviewHelpful[]
+
+  @@index([companyId, status])
+  @@index([userId])
+  @@map("reviews")
+}
+
+model ReviewResponse {
+  id          String    @id @default(uuid())
+  reviewId    String    @unique
+  body        String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  review      Review    @relation(fields: [reviewId], references: [id])
+
+  @@map("review_responses")
+}
+
+model ReviewHelpful {
+  userId    String
+  reviewId  String
+  createdAt DateTime @default(now())
+
+  user      User    @relation(fields: [userId], references: [id])
+  review    Review  @relation(fields: [reviewId], references: [id])
+
+  @@id([userId, reviewId])
+  @@map("review_helpful")
+}
+
+// ─── MEDALLAS ─────────────────────────────────────────────────────────────────
+
+model Medal {
+  id          String      @id @default(uuid())
+  companyId   String
+  type        MedalType
+  awardedAt   DateTime    @default(now())
+  expiresAt   DateTime?
+  visible     Boolean     @default(true)
+  year        Int
+
+  company     Company     @relation(fields: [companyId], references: [id])
+
+  @@unique([companyId, type, year])
+  @@map("medals")
+}
+
+// ─── SUSCRIPCIONES ────────────────────────────────────────────────────────────
+
+model Subscription {
+  id                String              @id @default(uuid())
+  companyId         String              @unique
+  plan              CompanyPlan
+  provider          PaymentProvider
+  providerSubId     String              @unique
+  status            SubscriptionStatus  @default(ACTIVE)
+  amountUsd         Float
+  currentPeriodEnd  DateTime
+  cancelAtPeriodEnd Boolean             @default(false)
+  trialEndsAt       DateTime?
+
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  company           Company             @relation(fields: [companyId], references: [id])
+  payments          Payment[]
+
+  @@map("subscriptions")
+}
+
+model Payment {
+  id              String          @id @default(uuid())
+  subscriptionId  String?
+  adAccountId     String?
+  provider        PaymentProvider
+  providerPayId   String          @unique
+  amountUsd       Float
+  status          String
+  description     String?
+  createdAt       DateTime        @default(now())
+
+  subscription    Subscription?   @relation(fields: [subscriptionId], references: [id])
+  adAccount       AdAccount?      @relation(fields: [adAccountId], references: [id])
+
+  @@map("payments")
+}
+
+// ─── PUBLICIDAD ───────────────────────────────────────────────────────────────
+
+model AdAccount {
+  id          String    @id @default(uuid())
+  userId      String
+  companyName String
+  balance     Float     @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  user        User      @relation(fields: [userId], references: [id])
+  ads         Ad[]
+  payments    Payment[]
+
+  @@map("ad_accounts")
+}
+
+model Ad {
+  id            String    @id @default(uuid())
+  adAccountId   String
+  title         String
+  description   String
+  imageUrl      String
+  price         Float?
+  ctaText       String    @default("Consultar precio")
+  ctaUrl        String?
+  model         AdModel   @default(CPC)
+  cpcUsd        Float     @default(0.35)
+  cpmUsd        Float?
+  dailyBudget   Float
+  totalSpent    Float     @default(0)
+  status        AdStatus  @default(PENDING)
+  targetCountries String[] @default([])
+  rejectionNote String?
+  approvedAt    DateTime?
+  approvedById  String?
+
+  impressions   Int       @default(0)
+  clicks        Int       @default(0)
+  conversions   Int       @default(0)
+
+  startsAt      DateTime?
+  endsAt        DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  adAccount     AdAccount         @relation(fields: [adAccountId], references: [id])
+  targetCategories AdTargetCategory[]
+  adEvents      AdEvent[]
+
+  @@map("ads")
+}
+
+model AdTargetCategory {
+  adId        String
+  categoryId  String
+
+  ad          Ad        @relation(fields: [adId], references: [id])
+  category    Category  @relation(fields: [categoryId], references: [id])
+
+  @@id([adId, categoryId])
+  @@map("ad_target_categories")
+}
+
+model AdEvent {
+  id        String    @id @default(uuid())
+  adId      String
+  type      String
+  country   String?
+  city      String?
+  createdAt DateTime  @default(now())
+
+  ad        Ad        @relation(fields: [adId], references: [id])
+
+  @@index([adId, type])
+  @@map("ad_events")
+}
+
+// ─── LEADS ────────────────────────────────────────────────────────────────────
+
+model Lead {
+  id          String    @id @default(uuid())
+  companyId   String
+  name        String
+  email       String?
+  phone       String?
+  message     String?
+  source      String    @default("profile")
+  chargedAt   DateTime?
+  amountUsd   Float?    @default(5)
+
+  createdAt   DateTime  @default(now())
+
+  company     Company   @relation(fields: [companyId], references: [id])
+
+  @@map("leads")
+}
+
+// ─── BOOST DE PERFIL ──────────────────────────────────────────────────────────
+
+model ProfileBoost {
+  id          String    @id @default(uuid())
+  companyId   String
+  amountUsd   Float
+  daysCount   Int
+  startsAt    DateTime
+  endsAt      DateTime
+  isActive    Boolean   @default(true)
+
+  createdAt   DateTime  @default(now())
+
+  company     Company   @relation(fields: [companyId], references: [id])
+
+  @@map("profile_boosts")
+}
+
+// ─── NOTIFICACIONES ───────────────────────────────────────────────────────────
+
+model Notification {
+  id        String            @id @default(uuid())
+  userId    String
+  type      NotificationType
+  title     String
+  body      String
+  data      Json?
+  isRead    Boolean           @default(false)
+  sentEmail Boolean           @default(false)
+  sentWhatsapp Boolean        @default(false)
+  createdAt DateTime          @default(now())
+
+  user      User              @relation(fields: [userId], references: [id])
+
+  @@index([userId, isRead])
+  @@map("notifications")
+}
+
+// ─── IA RESÚMENES (Tier 2) ────────────────────────────────────────────────────
+
+model AiSummary {
+  id            String    @id @default(uuid())
+  companyId     String    @unique
+  summaryText   String
+  insightBars   Json
+  reviewsCount  Int
+  generatedAt   DateTime  @default(now())
+
+  company       Company   @relation(fields: [companyId], references: [id])
+
+  @@map("ai_summaries")
+}
+
+// ─── API KEYS (Tier 2) ────────────────────────────────────────────────────────
+
+model ApiKey {
+  id          String    @id @default(uuid())
+  name        String
+  keyHash     String    @unique
+  companyId   String?
+  planTier    String    @default("basic")
+  monthlyLimit Int      @default(1000)
+  usageCount  Int       @default(0)
+  lastUsedAt  DateTime?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+
+  @@map("api_keys")
+}
+
+// ─── RESERVAS (Tier 3) ────────────────────────────────────────────────────────
+
+model BookingSlot {
+  id          String    @id @default(uuid())
+  companyId   String
+  startsAt    DateTime
+  endsAt      DateTime
+  isAvailable Boolean   @default(true)
+  price       Float?
+  service     String?
+
+  company     Company   @relation(fields: [companyId], references: [id])
+  booking     Booking?
+
+  @@index([companyId, startsAt])
+  @@map("booking_slots")
+}
+
+model Booking {
+  id              String        @id @default(uuid())
+  companyId       String
+  userId          String
+  slotId          String        @unique
+  serviceAmount   Float
+  commissionPct   Float         @default(0.06)
+  commissionUsd   Float
+  status          BookingStatus @default(PENDING)
+  notes           String?
+
+  insuranceId     String?
+  insurancePolicyUrl String?
+
+  confirmedAt     DateTime?
+  completedAt     DateTime?
+  cancelledAt     DateTime?
+  createdAt       DateTime      @default(now())
+
+  company         Company       @relation(fields: [companyId], references: [id])
+  user            User          @relation(fields: [userId], references: [id])
+  slot            BookingSlot   @relation(fields: [slotId], references: [id])
+
+  @@map("bookings")
+}

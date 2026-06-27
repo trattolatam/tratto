@@ -1,0 +1,38 @@
+{
+  "name": "tratto-backend",
+  "version": "1.0.0",
+  "description": "Tratto API — Plataforma de reseñas verificadas para LATAM",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "ts-node src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "db:push": "prisma db push",
+    "db:migrate": "prisma migrate dev",
+    "db:studio": "prisma studio",
+    "db:generate": "prisma generate",
+    "seed": "ts-node src/seed/seed.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.32.1",
+    "@fastify/cors": "^9.0.1",
+    "@fastify/jwt": "^8.0.1",
+    "@fastify/multipart": "^8.3.0",
+    "@fastify/rate-limit": "^10.1.1",
+    "@prisma/client": "^5.22.0",
+    "@supabase/supabase-js": "^2.45.4",
+    "bcryptjs": "^2.4.3",
+    "dotenv": "^16.4.5",
+    "fastify": "^4.28.1",
+    "mercadopago": "^2.0.15",
+    "stripe": "^17.3.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/node": "^22.9.0",
+    "prisma": "^5.22.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.6.3"
+  }
+}
