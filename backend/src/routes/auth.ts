@@ -23,7 +23,6 @@ const loginSchema = z.object({
 
 export default async function authRoutes(app: FastifyInstance) {
 
-  // ─── POST /api/auth/register — con rate limit estricto ────────────────────
   app.post('/register', { config: { rateLimit: authRateLimit } }, async (request, reply) => {
     const body = registerSchema.safeParse(request.body)
     if (!body.success) {
@@ -44,7 +43,6 @@ export default async function authRoutes(app: FastifyInstance) {
       select: { id: true, email: true, name: true, role: true, country: true, createdAt: true },
     })
 
-    // Enviar email de verificación (no bloqueante)
     sendVerificationEmail(user.id, user.email, user.name).catch(err =>
       app.log.error(`Error enviando email de verificación: ${err.message}`)
     )
@@ -61,7 +59,6 @@ export default async function authRoutes(app: FastifyInstance) {
     })
   })
 
-  // ─── POST /api/auth/login — con rate limit estricto ────────────────────────
   app.post('/login', { config: { rateLimit: authRateLimit } }, async (request, reply) => {
     const body = loginSchema.safeParse(request.body)
     if (!body.success) {
@@ -95,9 +92,8 @@ export default async function authRoutes(app: FastifyInstance) {
     })
   })
 
-  // ─── GET /api/auth/me ──────────────────────────────────────────────────────
   app.get('/me', { preHandler: requireAuth }, async (request, reply) => {
-    const user = await prisma.user.findUnique({
+    const me = await prisma.user.findUnique({
       where: { id: request.user.userId },
       select: {
         id: true, email: true, name: true, role: true,
@@ -109,11 +105,10 @@ export default async function authRoutes(app: FastifyInstance) {
       },
     })
 
-    if (!user) return reply.status(404).send({ error: true, message: 'Usuario no encontrado' })
-    return reply.send({ user })
+    if (!me) return reply.status(404).send({ error: true, message: 'Usuario no encontrado' })
+    return reply.send({ user: me })
   })
 
-  // ─── GET /api/auth/verify-email?token=xxx ──────────────────────────────────
   app.get('/verify-email', async (request, reply) => {
     const query = z.object({ token: z.string() }).safeParse(request.query)
     if (!query.success) return reply.status(400).send({ error: true, message: 'Token requerido' })
@@ -124,7 +119,6 @@ export default async function authRoutes(app: FastifyInstance) {
     return reply.send({ message: result.message })
   })
 
-  // ─── POST /api/auth/resend-verification — con rate limit ───────────────────
   app.post('/resend-verification', { config: { rateLimit: passwordResetRateLimit } }, async (request, reply) => {
     const body = z.object({ email: z.string().email() }).safeParse(request.body)
     if (!body.success) return reply.status(400).send({ error: true, message: 'Email inválido' })
@@ -133,7 +127,6 @@ export default async function authRoutes(app: FastifyInstance) {
     return reply.send({ message: result.message })
   })
 
-  // ─── POST /api/auth/change-password ────────────────────────────────────────
   app.post('/change-password', { preHandler: requireAuth }, async (request, reply) => {
     const body = z.object({
       currentPassword: z.string(),
@@ -142,13 +135,13 @@ export default async function authRoutes(app: FastifyInstance) {
 
     if (!body.success) return reply.status(400).send({ error: true, message: 'Datos inválidos' })
 
-    const user = await prisma.user.findUnique({ where: { id: request.user.userId } })
-    if (!user || !(await bcrypt.compare(body.data.currentPassword, user.passwordHash))) {
+    const existingUser = await prisma.user.findUnique({ where: { id: request.user.userId } })
+    if (!existingUser || !(await bcrypt.compare(body.data.currentPassword, existingUser.passwordHash))) {
       return reply.status(401).send({ error: true, message: 'Contraseña actual incorrecta' })
     }
 
     const newHash = await bcrypt.hash(body.data.newPassword, 12)
-    await prisma.user.update({ where: { id: user.id }, data: { passwordHash: newHash } })
+    await prisma.user.update({ where: { id: existingUser.id }, data: { passwordHash: newHash } })
 
     return reply.send({ message: 'Contraseña actualizada correctamente' })
   })

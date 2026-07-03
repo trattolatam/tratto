@@ -9,8 +9,7 @@ export interface JwtPayload {
 
 export async function requireAuth(request: FastifyRequest, reply: FastifyReply) {
   try {
-    const payload = await request.jwtVerify<JwtPayload>()
-    request.user = payload
+    await request.jwtVerify()
   } catch {
     reply.status(401).send({ error: true, message: 'Token inválido o expirado' })
   }
@@ -18,11 +17,11 @@ export async function requireAuth(request: FastifyRequest, reply: FastifyReply) 
 
 export async function requireAdmin(request: FastifyRequest, reply: FastifyReply) {
   try {
-    const payload = await request.jwtVerify<JwtPayload>()
+    await request.jwtVerify()
+    const payload = request.user as JwtPayload
     if (payload.role !== 'ADMIN') {
       return reply.status(403).send({ error: true, message: 'Acceso denegado' })
     }
-    request.user = payload
   } catch {
     reply.status(401).send({ error: true, message: 'Token inválido o expirado' })
   }
@@ -30,11 +29,11 @@ export async function requireAdmin(request: FastifyRequest, reply: FastifyReply)
 
 export async function requireBusinessOwner(request: FastifyRequest, reply: FastifyReply) {
   try {
-    const payload = await request.jwtVerify<JwtPayload>()
+    await request.jwtVerify()
+    const payload = request.user as JwtPayload
     if (payload.role !== 'BUSINESS' && payload.role !== 'ADMIN') {
       return reply.status(403).send({ error: true, message: 'Solo empresas pueden acceder' })
     }
-    request.user = payload
   } catch {
     reply.status(401).send({ error: true, message: 'Token inválido o expirado' })
   }
@@ -45,7 +44,9 @@ export function requirePlan(minPlan: 'PROFESSIONAL' | 'PREMIUM' | 'ENTERPRISE') 
 
   return async (request: FastifyRequest, reply: FastifyReply) => {
     try {
-      const payload = await request.jwtVerify<JwtPayload>()
+      await request.jwtVerify()
+      const payload = request.user as JwtPayload
+
       if (!payload.companyId) {
         return reply.status(403).send({ error: true, message: 'Sin empresa asociada' })
       }
@@ -64,16 +65,17 @@ export function requirePlan(minPlan: 'PROFESSIONAL' | 'PREMIUM' | 'ENTERPRISE') 
           requiredPlan: minPlan,
         })
       }
-
-      request.user = payload
     } catch {
       reply.status(401).send({ error: true, message: 'Token inválido o expirado' })
     }
   }
 }
 
-declare module 'fastify' {
-  interface FastifyRequest {
+// ─── Declaración de tipos para @fastify/jwt ───────────────────────────────────
+// Este es el mecanismo correcto que provee fastify-jwt para tipar request.user,
+// en lugar de redeclarar la propiedad directamente en FastifyRequest.
+declare module '@fastify/jwt' {
+  interface FastifyJWT {
     user: JwtPayload
   }
 }

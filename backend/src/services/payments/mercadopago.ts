@@ -46,7 +46,6 @@ export async function createMPPreApproval({ companyId, plan, backUrl, payerEmail
   const result = await preApproval.create({
     body: {
       reason: `Tratto Plan ${plan}`, external_reference: companyId, payer_email: payerEmail,
-      auto_recurring: { frequency: 1, frequency_type: 'months', transaction_amount: amount, currency_id: 'USD', free_trial: { frequency: 1, frequency_type: 'months' } },
       back_url: backUrl,
     },
   })
