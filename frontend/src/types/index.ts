@@ -12,7 +12,7 @@ export interface CompanyBasic { id: string; name: string; slug: string; plan: Co
 
 export interface Company extends CompanyBasic {
   description?: string; categoryId: string; category: Category; country: string; city: string
-  address?: string; phone?: string; website?: string; email?: string; taxId?: string
+  address?: string; phone?: string; website?: string; email?: string; taxId?: string; taxIdType?: string
   logoUrl?: string; coverUrl?: string; photos: string[]; verifiedReviewCount: number
   medals: Medal[]; aiSummary?: AiSummary; claimedById?: string; claimedAt?: string; bookingEnabled: boolean
 }
