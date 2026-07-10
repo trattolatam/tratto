@@ -23,7 +23,12 @@ export default function RegistroClient() {
     try {
       await auth.register(form)
       await login(form.email, form.password)
-      router.push(form.role === 'BUSINESS' ? '/reclamar' : '/')
+      if (form.role === 'BUSINESS') {
+        const empresa = searchParams.get('empresa')
+        router.push(empresa ? `/reclamar?empresa=${encodeURIComponent(empresa)}` : '/reclamar')
+      } else {
+        router.push('/')
+      }
     }
     catch (err: any) { setError(err.message || 'Error al registrarse') }
     finally { setLoading(false) }

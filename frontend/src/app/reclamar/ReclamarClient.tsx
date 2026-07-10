@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { useAuthStore } from '@/lib/store'
 import { companies, categories } from '@/lib/api'
@@ -18,6 +18,7 @@ const TAX_IDS = [
 export default function ReclamarClient() {
   const { user } = useAuthStore()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [step, setStep] = useState<'search' | 'form' | 'create' | 'success'>('search')
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCompany, setSelectedCompany] = useState<any>(null)
@@ -36,16 +37,29 @@ export default function ReclamarClient() {
 
   useEffect(() => { categories.list().then(d => setCategoryList(d.categories)).catch(() => {}) }, [])
 
-  const handleSearch = async () => {
-    if (searchTerm.length < 3) return
+  useEffect(() => {
+    const preset = searchParams.get('empresa')
+    if (preset) { setSearchTerm(preset); handleSearchTerm(preset) }
+  }, [])
+
+  const handleSearchTerm = async (term: string) => {
+    if (term.length < 3) return
     setSearching(true); setSearched(false)
-    try { const data = await companies.list({ search: searchTerm, limit: '5' }); setSearchResults(data.companies) }
+    try { const data = await companies.list({ search: term, limit: '5' }); setSearchResults(data.companies) }
     catch (e) { console.error(e) } finally { setSearching(false); setSearched(true) }
   }
 
-  const handleSelect = (company: any) => { setSelectedCompany(company); setForm(f => ({ ...f, country: company.country })); setStep('form') }
+  const handleSearch = () => handleSearchTerm(searchTerm)
 
-  const handleStartCreate = () => { setCreateForm(f => ({ ...f, name: searchTerm })); setStep('create') }
+  const handleSelect = (company: any) => {
+    if (!user) { router.push(`/registro?role=BUSINESS&empresa=${encodeURIComponent(searchTerm)}`); return }
+    setSelectedCompany(company); setForm(f => ({ ...f, country: company.country })); setStep('form')
+  }
+
+  const handleStartCreate = () => {
+    if (!user) { router.push(`/registro?role=BUSINESS&empresa=${encodeURIComponent(searchTerm)}`); return }
+    setCreateForm(f => ({ ...f, name: searchTerm })); setStep('create')
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
