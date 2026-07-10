@@ -7,6 +7,7 @@ import { useAuthStore } from '@/lib/store'
 
 export function CompanyProfile({ company, ads }: { company: Company; ads: Ad[] }) {
   const { user } = useAuthStore()
+  const isOwner = user?.company?.id === company.id
   const [activeTab, setActiveTab] = useState<'reviews' | 'info'>('reviews')
   const [showLeadForm, setShowLeadForm] = useState(false)
   const [leadSent, setLeadSent] = useState(false)
@@ -115,7 +116,7 @@ export function CompanyProfile({ company, ads }: { company: Company; ads: Ad[] }
                 ) : (
                   <>
                     <button onClick={() => setShowLeadForm(true)} className="btn-primary w-full py-3 text-sm mb-2"><i className="ti ti-message text-base" />Solicitar presupuesto</button>
-                    <Link href={`/escribir-resena?empresa=${company.id}`} className="btn-secondary w-full py-2.5 text-sm text-center block"><i className="ti ti-pencil text-sm mr-1" />Escribir reseña</Link>
+                    {!isOwner && <Link href={`/escribir-resena?empresa=${company.id}`} className="btn-secondary w-full py-2.5 text-sm text-center block"><i className="ti ti-pencil text-sm mr-1" />Escribir reseña</Link>}
                   </>
                 )}
               </div>
@@ -123,7 +124,7 @@ export function CompanyProfile({ company, ads }: { company: Company; ads: Ad[] }
               <div className="card p-4 border border-brand-amber/30 bg-brand-amber-dim/30">
                 <p className="text-xs font-semibold text-brand-amber mb-2">Perfil no reclamado</p>
                 <p className="text-xs text-brand-slate mb-3">Esta empresa aún no gestionó su perfil. Podés dejar tu reseña igualmente.</p>
-                <Link href={`/escribir-resena?empresa=${company.id}`} className="btn-secondary w-full py-2 text-xs text-center block">Escribir reseña</Link>
+                {!isOwner && <Link href={`/escribir-resena?empresa=${company.id}`} className="btn-secondary w-full py-2 text-xs text-center block">Escribir reseña</Link>}
               </div>
             )}
 

@@ -52,6 +52,7 @@ export default async function reviewRoutes(app: FastifyInstance) {
 
     const company = await prisma.company.findUnique({ where: { id: body.data.companyId } })
     if (!company) return reply.status(404).send({ error: true, message: 'Empresa no encontrada' })
+    if (company.claimedById === request.user.userId) return reply.status(403).send({ error: true, message: 'No podés reseñar tu propia empresa' })
 
     const existing = await prisma.review.findFirst({ where: { companyId: body.data.companyId, userId: request.user.userId } })
     if (existing) return reply.status(409).send({ error: true, message: 'Ya dejaste una reseña para esta empresa' })
