@@ -1,11 +1,19 @@
 'use client'
 import Link from 'next/link'
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/lib/store'
 
 export function Navbar() {
   const { user, logout } = useAuthStore()
   const [menuOpen, setMenuOpen] = useState(false)
+  const router = useRouter()
+
+  const handleLogout = () => {
+    logout()
+    setMenuOpen(false)
+    router.push('/')
+  }
 
   return (
     <nav className="sticky top-0 z-50 bg-white/95 backdrop-blur border-b border-gray-100">
@@ -42,7 +50,7 @@ export function Navbar() {
                     <p className="text-xs text-gray-400 truncate">{user.email}</p>
                   </div>
                   <Link href="/perfil" className="w-full flex items-center gap-2 px-3 py-2 text-xs text-brand-dark hover:bg-gray-50 text-left"><i className="ti ti-user-circle text-sm" /> Mi perfil</Link>
-                  <button onClick={logout} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-brand-red hover:bg-red-50 text-left"><i className="ti ti-logout text-sm" /> Cerrar sesión</button>
+                  <button onClick={handleLogout} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-brand-red hover:bg-red-50 text-left"><i className="ti ti-logout text-sm" /> Cerrar sesión</button>
                 </div>
               </div>
             </div>
