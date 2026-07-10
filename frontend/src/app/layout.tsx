@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import '../styles/globals.css'
 import { Navbar } from '@/components/layout/Navbar'
 import { Footer } from '@/components/layout/Footer'
+import { AuthHydrator } from '@/components/AuthHydrator'
 
 export const metadata: Metadata = {
   title: { template: '%s | Tratto', default: 'Tratto — Reseñas verificadas para LATAM' },
@@ -20,6 +21,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css" />
       </head>
       <body>
+        <AuthHydrator />
         <Navbar />
         <main>{children}</main>
         <Footer />

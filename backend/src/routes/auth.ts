@@ -70,7 +70,7 @@ export default async function authRoutes(app: FastifyInstance) {
     const user = await prisma.user.findUnique({
       where: { email },
       include: {
-        company: { select: { id: true, name: true, plan: true, isVerified: true } },
+        company: { select: { id: true, name: true, slug: true, plan: true, isVerified: true, ratingAvg: true, reviewCount: true, logoUrl: true } },
       },
     })
 
@@ -86,7 +86,8 @@ export default async function authRoutes(app: FastifyInstance) {
     return reply.send({
       user: {
         id: user.id, email: user.email, name: user.name, role: user.role,
-        country: user.country, isVerified: user.isVerified, company: user.company,
+        country: user.country, city: user.city, phone: user.phone, avatarUrl: user.avatarUrl,
+        isVerified: user.isVerified, isPro: user.isPro, company: user.company,
       },
       token,
     })

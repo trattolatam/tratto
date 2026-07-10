@@ -101,7 +101,7 @@ export default function PanelPage() {
       {stats && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
           {[
-            { label: 'Calificación', value: company.ratingAvg.toFixed(1), icon: 'ti-star', color: 'text-brand-amber' },
+            { label: 'Calificación', value: (company.ratingAvg ?? 0).toFixed(1), icon: 'ti-star', color: 'text-brand-amber' },
             { label: 'Reseñas totales', value: stats.totalReviews, icon: 'ti-message', color: 'text-brand-blue' },
             { label: 'Verificadas', value: `${stats.verifiedPct}%`, icon: 'ti-shield-check', color: 'text-brand-green' },
             { label: 'Leads este mes', value: stats.leads, icon: 'ti-user-check', color: 'text-brand-dark' },
