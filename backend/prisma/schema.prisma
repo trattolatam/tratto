@@ -133,6 +133,7 @@ model Category {
   emoji       String
   phase       Int       @default(1)
   priority    Boolean   @default(false)
+  isHidden    Boolean   @default(false)
   parentId    String?
 
   createdAt   DateTime  @default(now())
@@ -143,6 +144,25 @@ model Category {
   children    Category[] @relation("Subcategories")
 
   @@map("categories")
+}
+
+enum SuggestionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model CategorySuggestion {
+  id            String            @id @default(uuid())
+  companyId     String            @unique
+  suggestedName String
+  status        SuggestionStatus  @default(PENDING)
+  createdAt     DateTime          @default(now())
+  reviewedAt    DateTime?
+
+  company       Company           @relation(fields: [companyId], references: [id])
+
+  @@map("category_suggestions")
 }
 
 // ─── EMPRESAS ─────────────────────────────────────────────────────────────────
@@ -188,6 +208,7 @@ model Company {
   updatedAt     DateTime    @updatedAt
 
   category      Category    @relation(fields: [categoryId], references: [id])
+  categorySuggestion CategorySuggestion?
   owner         User?       @relation("CompanyOwner", fields: [claimedById], references: [id])
   reviews       Review[]
   medals        Medal[]

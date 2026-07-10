@@ -90,7 +90,8 @@ export default async function companyRoutes(app: FastifyInstance) {
   app.post('/', { preHandler: requireAuth }, async (request, reply) => {
     const schema = z.object({
       name: z.string().min(2),
-      categoryId: z.string().uuid(),
+      categoryId: z.string().uuid().optional(),
+      categorySuggestion: z.string().min(2).optional(),
       country: z.string(),
       city: z.string(),
       address: z.string().optional(),
@@ -100,6 +101,8 @@ export default async function companyRoutes(app: FastifyInstance) {
       description: z.string().optional(),
       taxId: z.string().optional(),
       taxIdType: z.string().optional(),
+    }).refine(d => d.categoryId || d.categorySuggestion, {
+      message: 'Elegí un rubro de la lista o sugerí uno nuevo',
     })
 
     const body = schema.safeParse(request.body)
@@ -108,11 +111,29 @@ export default async function companyRoutes(app: FastifyInstance) {
     const existingClaim = await prisma.company.findFirst({ where: { claimedById: request.user.userId } })
     if (existingClaim) return reply.status(409).send({ error: true, message: 'Ya tenés una empresa registrada' })
 
-    const slug = generateSlug(body.data.name, body.data.city)
+    const { categorySuggestion, ...companyData } = body.data
+    let categoryId = companyData.categoryId
+
+    if (!categoryId && categorySuggestion) {
+      const placeholder = await prisma.category.upsert({
+        where: { slug: 'pendiente-clasificacion' },
+        update: {},
+        create: { name: 'Pendiente de clasificación', slug: 'pendiente-clasificacion', emoji: '🕓', isHidden: true },
+      })
+      categoryId = placeholder.id
+    }
+
+    if (!categoryId) return reply.status(400).send({ error: true, message: 'Rubro inválido' })
+
+    const slug = generateSlug(companyData.name, companyData.city)
     const company = await prisma.company.create({
-      data: { ...body.data, slug, claimedById: request.user.userId, claimedAt: new Date() },
+      data: { ...companyData, categoryId, slug, claimedById: request.user.userId, claimedAt: new Date() },
       include: { category: true },
     })
+
+    if (categorySuggestion) {
+      await prisma.categorySuggestion.create({ data: { companyId: company.id, suggestedName: categorySuggestion } })
+    }
 
     await prisma.user.update({ where: { id: request.user.userId }, data: { role: 'BUSINESS' } })
 

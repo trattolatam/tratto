@@ -27,6 +27,8 @@ export default function ReclamarClient() {
   const [categoryList, setCategoryList] = useState<any[]>([])
   const [form, setForm] = useState({ country: 'UY', taxId: '', phone: '', email: '' })
   const [createForm, setCreateForm] = useState({ name: '', categoryId: '', country: 'UY', city: '', address: '', phone: '', email: '', taxId: '' })
+  const [suggestingCategory, setSuggestingCategory] = useState(false)
+  const [categorySuggestion, setCategorySuggestion] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const taxIdConfig = TAX_IDS.find(t => t.country === form.country) || TAX_IDS[0]
@@ -63,7 +65,8 @@ export default function ReclamarClient() {
     try {
       await companies.create({
         name: createForm.name,
-        categoryId: createForm.categoryId,
+        categoryId: suggestingCategory ? undefined : createForm.categoryId,
+        categorySuggestion: suggestingCategory ? categorySuggestion : undefined,
         country: createForm.country,
         city: createForm.city,
         address: createForm.address || undefined,
@@ -133,12 +136,23 @@ export default function ReclamarClient() {
           {error && <div className="bg-red-50 border border-red-100 rounded-lg p-3 mb-4 text-sm text-brand-red">{error}</div>}
           <form onSubmit={handleCreateSubmit} className="space-y-4">
             <div><label className="label">Nombre de la empresa</label><input type="text" required className="input" value={createForm.name} onChange={e => setCreateForm(f => ({ ...f, name: e.target.value }))} /></div>
-            <div><label className="label">Rubro</label>
-              <select required className="input" value={createForm.categoryId} onChange={e => setCreateForm(f => ({ ...f, categoryId: e.target.value }))}>
-                <option value="">Seleccioná un rubro</option>
-                {categoryList.map(c => <option key={c.id} value={c.id}>{c.emoji} {c.name}</option>)}
-              </select>
-            </div>
+            {!suggestingCategory ? (
+              <div>
+                <label className="label">Rubro</label>
+                <select required className="input" value={createForm.categoryId} onChange={e => setCreateForm(f => ({ ...f, categoryId: e.target.value }))}>
+                  <option value="">Seleccioná un rubro</option>
+                  {categoryList.map(c => <option key={c.id} value={c.id}>{c.emoji} {c.name}</option>)}
+                </select>
+                <button type="button" onClick={() => { setSuggestingCategory(true); setCreateForm(f => ({ ...f, categoryId: '' })) }} className="text-xs text-brand-green mt-2">¿No encontrás tu rubro? Sugerilo</button>
+              </div>
+            ) : (
+              <div>
+                <label className="label">Sugerí tu rubro</label>
+                <input type="text" required placeholder="Ej: Instalador de paneles solares" className="input" value={categorySuggestion} onChange={e => setCategorySuggestion(e.target.value)} />
+                <p className="text-xs text-brand-slate mt-1">Tu empresa queda creada igual — revisaremos el rubro y te la clasificamos en 24-48hs.</p>
+                <button type="button" onClick={() => { setSuggestingCategory(false); setCategorySuggestion('') }} className="text-xs text-brand-slate mt-2">Volver a elegir de la lista</button>
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-4">
               <div><label className="label">País</label><select className="input" value={createForm.country} onChange={e => setCreateForm(f => ({ ...f, country: e.target.value, taxId: '' }))}>{TAX_IDS.map(t => <option key={t.country} value={t.country}>{t.country}</option>)}</select></div>
               <div><label className="label">Ciudad</label><input type="text" required className="input" value={createForm.city} onChange={e => setCreateForm(f => ({ ...f, city: e.target.value }))} /></div>
@@ -149,7 +163,7 @@ export default function ReclamarClient() {
               <div><label className="label">Email (opcional)</label><input type="email" className="input" value={createForm.email} onChange={e => setCreateForm(f => ({ ...f, email: e.target.value }))} /></div>
             </div>
             <div><label className="label">{createTaxIdConfig.label} (opcional, acelera la verificación)</label><input type="text" placeholder={createTaxIdConfig.placeholder} className="input" value={createForm.taxId} onChange={e => setCreateForm(f => ({ ...f, taxId: e.target.value }))} /></div>
-            <button type="submit" disabled={submitting || !createForm.name || !createForm.categoryId || !createForm.city} className="btn-primary w-full py-3 text-sm disabled:opacity-50">
+            <button type="submit" disabled={submitting || !createForm.name || !createForm.city || (suggestingCategory ? !categorySuggestion : !createForm.categoryId)} className="btn-primary w-full py-3 text-sm disabled:opacity-50">
               {submitting ? 'Creando...' : 'Crear perfil gratis'}
             </button>
             <button type="button" onClick={() => setStep('search')} className="w-full text-xs text-brand-slate text-center">Volver a buscar</button>

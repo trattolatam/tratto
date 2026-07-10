@@ -4,6 +4,7 @@ import { prisma } from '../index'
 export default async function categoryRoutes(app: FastifyInstance) {
   app.get('/', async (_req, reply) => {
     const cats = await prisma.category.findMany({
+      where: { isHidden: false },
       orderBy: [{ phase: 'asc' }, { priority: 'desc' }, { name: 'asc' }],
       include: { _count: { select: { companies: true } } },
     })
