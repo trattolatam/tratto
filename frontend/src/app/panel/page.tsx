@@ -68,7 +68,8 @@ export default function PanelPage() {
       if (!body.email) delete body.email
       const { company: updated } = await companiesApi.update(user.company.id, body)
       setCompanyDetails(updated)
-      setEditMsg('Perfil de empresa actualizado.')
+      setEditMsg('Perfil actualizado con éxito.')
+      setTimeout(() => router.push(`/empresa/${user.company!.slug}`), 1200)
     } catch (err: any) { setEditErr(err.message || 'Error actualizando el perfil') }
     finally { setSavingEdit(false) }
   }
