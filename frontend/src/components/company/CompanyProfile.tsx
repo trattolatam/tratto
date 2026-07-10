@@ -99,7 +99,7 @@ export function CompanyProfile({ company, ads }: { company: Company; ads: Ad[] }
           </div>
 
           <div className="space-y-4">
-            {company.claimedById ? (
+            {!isOwner && (company.claimedById ? (
               <div className="card p-4">
                 {leadSent ? (
                   <div className="text-center py-4"><i className="ti ti-circle-check text-3xl text-brand-green block mb-2" /><p className="text-sm font-semibold text-brand-dark">¡Consulta enviada!</p><p className="text-xs text-brand-slate mt-1">La empresa te contactará pronto.</p></div>
@@ -116,7 +116,7 @@ export function CompanyProfile({ company, ads }: { company: Company; ads: Ad[] }
                 ) : (
                   <>
                     <button onClick={() => setShowLeadForm(true)} className="btn-primary w-full py-3 text-sm mb-2"><i className="ti ti-message text-base" />Solicitar presupuesto</button>
-                    {!isOwner && <Link href={`/escribir-resena?empresa=${company.id}`} className="btn-secondary w-full py-2.5 text-sm text-center block"><i className="ti ti-pencil text-sm mr-1" />Escribir reseña</Link>}
+                    <Link href={`/escribir-resena?empresa=${company.id}`} className="btn-secondary w-full py-2.5 text-sm text-center block"><i className="ti ti-pencil text-sm mr-1" />Escribir reseña</Link>
                   </>
                 )}
               </div>
@@ -124,9 +124,9 @@ export function CompanyProfile({ company, ads }: { company: Company; ads: Ad[] }
               <div className="card p-4 border border-brand-amber/30 bg-brand-amber-dim/30">
                 <p className="text-xs font-semibold text-brand-amber mb-2">Perfil no reclamado</p>
                 <p className="text-xs text-brand-slate mb-3">Esta empresa aún no gestionó su perfil. Podés dejar tu reseña igualmente.</p>
-                {!isOwner && <Link href={`/escribir-resena?empresa=${company.id}`} className="btn-secondary w-full py-2 text-xs text-center block">Escribir reseña</Link>}
+                <Link href={`/escribir-resena?empresa=${company.id}`} className="btn-secondary w-full py-2 text-xs text-center block">Escribir reseña</Link>
               </div>
-            )}
+            ))}
 
             {ads.length > 0 && (
               <div>
