@@ -1,17 +1,35 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuthStore } from '@/lib/store'
-import { companies as companiesApi, reviews as reviewsApi } from '@/lib/api'
+import { companies as companiesApi, reviews as reviewsApi, upload } from '@/lib/api'
 
 export default function PanelPage() {
-  const { user } = useAuthStore()
+  const { user, fetchMe } = useAuthStore()
   const router = useRouter()
   const [stats, setStats] = useState<any>(null)
   const [pendingReviews, setPendingReviews] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<'overview' | 'reviews' | 'leads'>('overview')
+  const [uploadingLogo, setUploadingLogo] = useState(false)
+  const [logoError, setLogoError] = useState('')
+  const logoInputRef = useRef<HTMLInputElement>(null)
+
+  const handleLogoClick = () => logoInputRef.current?.click()
+
+  const handleLogoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) { setLogoError('Solo se aceptan imágenes JPG, PNG o WEBP'); return }
+    if (file.size > 5 * 1024 * 1024) { setLogoError('El archivo supera el límite de 5MB'); return }
+    setUploadingLogo(true); setLogoError('')
+    try {
+      await upload.companyLogo(file)
+      await fetchMe()
+    } catch (err: any) { setLogoError(err.message || 'Error subiendo el logo') }
+    finally { setUploadingLogo(false); if (logoInputRef.current) logoInputRef.current.value = '' }
+  }
 
   useEffect(() => {
     if (!user) { router.push('/login'); return }
@@ -32,11 +50,14 @@ export default function PanelPage() {
   return (
     <div className="max-w-5xl mx-auto px-4 py-8">
       <div className="flex items-start justify-between gap-4 mb-6">
-        <div>
-          <h1 className="text-xl font-bold text-brand-dark">{company.name}</h1>
-          <div className="flex items-center gap-2 mt-1">
-            {isPro ? <span className="badge-pro"><i className="ti ti-shield-check text-xs" /> {company.plan}</span> : <span className="badge-free">Plan Gratuito</span>}
-            {company.isVerified && <span className="badge-verified text-xs"><span className="badge-verified-dot" />Verificada</span>}
+        <div className="flex items-center gap-3">
+          {company.logoUrl ? <img src={company.logoUrl} alt={company.name} className="w-12 h-12 rounded-xl object-cover flex-shrink-0" /> : <div className="w-12 h-12 rounded-xl bg-brand-green/20 flex items-center justify-center text-brand-green font-bold text-lg flex-shrink-0">{company.name.charAt(0)}</div>}
+          <div>
+            <h1 className="text-xl font-bold text-brand-dark">{company.name}</h1>
+            <div className="flex items-center gap-2 mt-1">
+              {isPro ? <span className="badge-pro"><i className="ti ti-shield-check text-xs" /> {company.plan}</span> : <span className="badge-free">Plan Gratuito</span>}
+              {company.isVerified && <span className="badge-verified text-xs"><span className="badge-verified-dot" />Verificada</span>}
+            </div>
           </div>
         </div>
         <div className="flex gap-2">
@@ -91,7 +112,15 @@ export default function PanelPage() {
             <h2 className="text-sm font-semibold text-brand-dark mb-3 flex items-center gap-2"><i className="ti ti-bolt text-brand-amber" /> Acciones rápidas</h2>
             <div className="space-y-2">
               <Link href={`/empresa/${company.slug}`} className="flex items-center gap-2 p-2.5 rounded-lg hover:bg-gray-50 transition-colors text-sm text-brand-dark"><i className="ti ti-eye text-brand-slate" /> Ver mi perfil público</Link>
-              {isPro && <button className="w-full flex items-center gap-2 p-2.5 rounded-lg hover:bg-gray-50 transition-colors text-sm text-brand-dark text-left"><i className="ti ti-upload text-brand-slate" /> Subir logo</button>}
+              {isPro && (
+                <>
+                  <input ref={logoInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleLogoChange} />
+                  <button onClick={handleLogoClick} disabled={uploadingLogo} className="w-full flex items-center gap-2 p-2.5 rounded-lg hover:bg-gray-50 transition-colors text-sm text-brand-dark text-left disabled:opacity-50">
+                    <i className={`ti ${uploadingLogo ? 'ti-loader-2 animate-spin' : 'ti-upload'} text-brand-slate`} /> {uploadingLogo ? 'Subiendo...' : 'Subir logo'}
+                  </button>
+                  {logoError && <p className="text-xs text-brand-red px-2.5">{logoError}</p>}
+                </>
+              )}
             </div>
           </div>
         </div>

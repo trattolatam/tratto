@@ -100,7 +100,7 @@ export default async function authRoutes(app: FastifyInstance) {
         country: true, city: true, phone: true, avatarUrl: true,
         isVerified: true, isPro: true, createdAt: true,
         company: {
-          select: { id: true, name: true, slug: true, plan: true, isVerified: true, ratingAvg: true, reviewCount: true },
+          select: { id: true, name: true, slug: true, plan: true, isVerified: true, ratingAvg: true, reviewCount: true, logoUrl: true },
         },
       },
     })

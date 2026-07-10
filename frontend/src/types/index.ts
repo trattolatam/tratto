@@ -8,7 +8,7 @@ export interface User {
   avatarUrl?: string; isVerified: boolean; isPro: boolean; company?: CompanyBasic
 }
 
-export interface CompanyBasic { id: string; name: string; slug: string; plan: CompanyPlan; isVerified: boolean; ratingAvg: number; reviewCount: number }
+export interface CompanyBasic { id: string; name: string; slug: string; plan: CompanyPlan; isVerified: boolean; ratingAvg: number; reviewCount: number; logoUrl?: string }
 
 export interface Company extends CompanyBasic {
   description?: string; categoryId: string; category: Category; country: string; city: string
