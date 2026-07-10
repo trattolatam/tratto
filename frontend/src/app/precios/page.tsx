@@ -21,8 +21,8 @@ export default function PreciosPage() {
   const [loading, setLoading] = useState<string | null>(null)
 
   const handlePlan = async (planId: 'PROFESSIONAL' | 'PREMIUM') => {
-    if (!user) { router.push('/registro'); return }
-    if (user.role !== 'BUSINESS') { router.push('/registro?role=BUSINESS'); return }
+    if (!user) { router.push('/registro?role=BUSINESS'); return }
+    if (user.role !== 'BUSINESS' || !user.company) { router.push('/reclamar'); return }
     setLoading(planId)
     try { const data = await subscriptions.checkout(planId, provider) as any; window.location.href = data.checkoutUrl }
     catch (err: any) { alert(err.message); setLoading(null) }
@@ -37,7 +37,7 @@ export default function PreciosPage() {
 
       <div className="flex justify-center mb-8">
         <div className="inline-flex items-center bg-gray-100 rounded-xl p-1 gap-1">
-          {([{ id: 'STRIPE', label: 'Tarjeta internacional', flag: '💳' }, { id: 'DLOCALGO', label: 'dLocal Go', flag: '🇦🇷' }] as const).map(p => (
+          {([{ id: 'STRIPE', label: 'Tarjeta internacional', flag: '💳' }, { id: 'DLOCALGO', label: 'dLocal Go', flag: '🇺🇾' }] as const).map(p => (
             <button key={p.id} onClick={() => setProvider(p.id)} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${provider === p.id ? 'bg-white shadow text-brand-dark' : 'text-brand-slate hover:text-brand-dark'}`}><span>{p.flag}</span> {p.label}</button>
           ))}
         </div>
@@ -56,7 +56,13 @@ export default function PreciosPage() {
               </div>
             </div>
             <div className="p-5 pt-0">
-              {plan.id === 'FREE' ? <div className="w-full text-center py-2.5 rounded-lg border border-gray-200 text-sm font-medium text-gray-400">{plan.btn}</div> : (
+              {plan.id === 'FREE' ? (
+                !user?.company ? (
+                  <Link href="/reclamar" className="w-full text-center block py-2.5 rounded-lg border border-brand-green text-brand-green text-sm font-semibold hover:bg-brand-green-dim transition-colors">Crear mi empresa gratis</Link>
+                ) : (
+                  <div className="w-full text-center py-2.5 rounded-lg border border-gray-200 text-sm font-medium text-gray-400">{user.company.plan === 'FREE' ? 'Plan actual' : 'Plan gratuito'}</div>
+                )
+              ) : (
                 <button onClick={() => handlePlan(plan.id as 'PROFESSIONAL' | 'PREMIUM')} disabled={loading === plan.id} className={`w-full py-2.5 rounded-lg text-sm font-semibold transition-all disabled:opacity-60 flex items-center justify-center gap-2 ${plan.btnClass}`}>
                   {loading === plan.id ? <><i className="ti ti-loader-2 animate-spin text-base" /> Redirigiendo...</> : <>{plan.btn}</>}
                 </button>
