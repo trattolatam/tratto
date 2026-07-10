@@ -105,8 +105,16 @@ export default async function companyRoutes(app: FastifyInstance) {
     const body = schema.safeParse(request.body)
     if (!body.success) return reply.status(400).send({ error: true, message: 'Datos inválidos', details: body.error.issues })
 
+    const existingClaim = await prisma.company.findFirst({ where: { claimedById: request.user.userId } })
+    if (existingClaim) return reply.status(409).send({ error: true, message: 'Ya tenés una empresa registrada' })
+
     const slug = generateSlug(body.data.name, body.data.city)
-    const company = await prisma.company.create({ data: { ...body.data, slug }, include: { category: true } })
+    const company = await prisma.company.create({
+      data: { ...body.data, slug, claimedById: request.user.userId, claimedAt: new Date() },
+      include: { category: true },
+    })
+
+    await prisma.user.update({ where: { id: request.user.userId }, data: { role: 'BUSINESS' } })
 
     return reply.status(201).send({ company })
   })

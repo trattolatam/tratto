@@ -22,6 +22,7 @@ export const auth = {
 export const companies = {
   list: (params: Record<string, string> = {}) => apiFetch<{ companies: any[]; pagination: any }>(`/api/companies?${new URLSearchParams(params).toString()}`),
   get: (slug: string) => apiFetch<{ company: any; ads: any[] }>(`/api/companies/${slug}`),
+  create: (body: any) => apiFetch<{ company: any }>('/api/companies', { method: 'POST', body: JSON.stringify(body) }),
   claim: (id: string, body: any) => apiFetch(`/api/companies/${id}/claim`, { method: 'POST', body: JSON.stringify(body) }),
   update: (id: string, body: any) => apiFetch(`/api/companies/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
   stats: (id: string) => apiFetch<any>(`/api/companies/${id}/stats`),

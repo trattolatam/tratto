@@ -1,9 +1,9 @@
 'use client'
-import { useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuthStore } from '@/lib/store'
-import { companies } from '@/lib/api'
+import { companies, categories } from '@/lib/api'
 
 const TAX_IDS = [
   { country: 'UY', label: 'RUT', placeholder: 'Ej: 21-234567-0001' },
@@ -18,25 +18,32 @@ const TAX_IDS = [
 export default function ReclamarClient() {
   const { user } = useAuthStore()
   const router = useRouter()
-  const searchParams = useSearchParams()
-  const [step, setStep] = useState<'search' | 'form' | 'success'>('search')
+  const [step, setStep] = useState<'search' | 'form' | 'create' | 'success'>('search')
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCompany, setSelectedCompany] = useState<any>(null)
   const [searchResults, setSearchResults] = useState<any[]>([])
+  const [searched, setSearched] = useState(false)
   const [searching, setSearching] = useState(false)
+  const [categoryList, setCategoryList] = useState<any[]>([])
   const [form, setForm] = useState({ country: 'UY', taxId: '', phone: '', email: '' })
+  const [createForm, setCreateForm] = useState({ name: '', categoryId: '', country: 'UY', city: '', address: '', phone: '', email: '', taxId: '' })
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const taxIdConfig = TAX_IDS.find(t => t.country === form.country) || TAX_IDS[0]
+  const createTaxIdConfig = TAX_IDS.find(t => t.country === createForm.country) || TAX_IDS[0]
+
+  useEffect(() => { categories.list().then(d => setCategoryList(d.categories)).catch(() => {}) }, [])
 
   const handleSearch = async () => {
     if (searchTerm.length < 3) return
-    setSearching(true)
+    setSearching(true); setSearched(false)
     try { const data = await companies.list({ search: searchTerm, limit: '5' }); setSearchResults(data.companies) }
-    catch (e) { console.error(e) } finally { setSearching(false) }
+    catch (e) { console.error(e) } finally { setSearching(false); setSearched(true) }
   }
 
   const handleSelect = (company: any) => { setSelectedCompany(company); setForm(f => ({ ...f, country: company.country })); setStep('form') }
+
+  const handleStartCreate = () => { setCreateForm(f => ({ ...f, name: searchTerm })); setStep('create') }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -49,12 +56,32 @@ export default function ReclamarClient() {
     } catch (err: any) { setError(err.message) } finally { setSubmitting(false) }
   }
 
+  const handleCreateSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!user) { router.push('/registro?role=BUSINESS'); return }
+    setSubmitting(true); setError('')
+    try {
+      await companies.create({
+        name: createForm.name,
+        categoryId: createForm.categoryId,
+        country: createForm.country,
+        city: createForm.city,
+        address: createForm.address || undefined,
+        phone: createForm.phone || undefined,
+        email: createForm.email || undefined,
+        taxId: createForm.taxId || undefined,
+        taxIdType: createForm.taxId ? createTaxIdConfig.label : undefined,
+      })
+      setStep('success')
+    } catch (err: any) { setError(err.message) } finally { setSubmitting(false) }
+  }
+
   if (step === 'success') {
     return (
       <div className="max-w-lg mx-auto px-4 py-16 text-center">
         <div className="w-16 h-16 rounded-full bg-brand-green-dim flex items-center justify-center mx-auto mb-4"><i className="ti ti-circle-check text-3xl text-brand-green" /></div>
-        <h1 className="text-xl font-bold text-brand-dark mb-2">¡Perfil reclamado!</h1>
-        <p className="text-sm text-brand-slate mb-8">Verificaremos tu {taxIdConfig.label} en las próximas 24hs.</p>
+        <h1 className="text-xl font-bold text-brand-dark mb-2">¡Perfil listo!</h1>
+        <p className="text-sm text-brand-slate mb-8">Verificaremos tus datos en las próximas 24hs.</p>
         <div className="flex gap-3 justify-center"><Link href="/panel" className="btn-primary px-6 py-2.5">Ir a mi panel</Link><Link href="/precios" className="btn-secondary px-6 py-2.5">Ver planes</Link></div>
       </div>
     )
@@ -64,7 +91,7 @@ export default function ReclamarClient() {
     <div className="max-w-2xl mx-auto px-4 py-10">
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-brand-dark mb-2">Reclamar perfil de empresa</h1>
-        <p className="text-sm text-brand-slate leading-relaxed">Tu empresa puede que ya aparezca en Tratto. Reclamá el perfil gratis.</p>
+        <p className="text-sm text-brand-slate leading-relaxed">Tu empresa puede que ya aparezca en Tratto. Buscala primero — si no está, la creamos gratis.</p>
       </div>
       {step === 'search' && (
         <div className="card p-6">
@@ -80,6 +107,12 @@ export default function ReclamarClient() {
               {company.claimedById ? <span className="text-xs text-brand-amber bg-brand-amber-dim px-2 py-0.5 rounded-full">Ya reclamado</span> : <span className="text-xs text-brand-green bg-brand-green-dim px-2 py-0.5 rounded-full">Disponible</span>}
             </button>
           ))}
+          {searched && !searching && (
+            <div className="mt-4 pt-4 border-t border-gray-100 text-center">
+              <p className="text-xs text-brand-slate mb-3">{searchResults.length > 0 ? '¿No es ninguna de estas?' : 'No encontramos tu empresa.'}</p>
+              <button onClick={handleStartCreate} className="btn-secondary px-5 py-2 text-sm">Crear perfil nuevo</button>
+            </div>
+          )}
         </div>
       )}
       {step === 'form' && selectedCompany && (
@@ -91,6 +124,35 @@ export default function ReclamarClient() {
             <button type="submit" disabled={submitting || !form.taxId || !user} className="btn-primary w-full py-3 text-sm disabled:opacity-50">
               {submitting ? 'Enviando...' : 'Reclamar perfil gratis'}
             </button>
+            <button type="button" onClick={() => setStep('search')} className="w-full text-xs text-brand-slate text-center">Volver a buscar</button>
+          </form>
+        </div>
+      )}
+      {step === 'create' && (
+        <div className="card p-6">
+          {error && <div className="bg-red-50 border border-red-100 rounded-lg p-3 mb-4 text-sm text-brand-red">{error}</div>}
+          <form onSubmit={handleCreateSubmit} className="space-y-4">
+            <div><label className="label">Nombre de la empresa</label><input type="text" required className="input" value={createForm.name} onChange={e => setCreateForm(f => ({ ...f, name: e.target.value }))} /></div>
+            <div><label className="label">Rubro</label>
+              <select required className="input" value={createForm.categoryId} onChange={e => setCreateForm(f => ({ ...f, categoryId: e.target.value }))}>
+                <option value="">Seleccioná un rubro</option>
+                {categoryList.map(c => <option key={c.id} value={c.id}>{c.emoji} {c.name}</option>)}
+              </select>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div><label className="label">País</label><select className="input" value={createForm.country} onChange={e => setCreateForm(f => ({ ...f, country: e.target.value, taxId: '' }))}>{TAX_IDS.map(t => <option key={t.country} value={t.country}>{t.country}</option>)}</select></div>
+              <div><label className="label">Ciudad</label><input type="text" required className="input" value={createForm.city} onChange={e => setCreateForm(f => ({ ...f, city: e.target.value }))} /></div>
+            </div>
+            <div><label className="label">Dirección (opcional)</label><input type="text" className="input" value={createForm.address} onChange={e => setCreateForm(f => ({ ...f, address: e.target.value }))} /></div>
+            <div className="grid grid-cols-2 gap-4">
+              <div><label className="label">Teléfono (opcional)</label><input type="text" className="input" value={createForm.phone} onChange={e => setCreateForm(f => ({ ...f, phone: e.target.value }))} /></div>
+              <div><label className="label">Email (opcional)</label><input type="email" className="input" value={createForm.email} onChange={e => setCreateForm(f => ({ ...f, email: e.target.value }))} /></div>
+            </div>
+            <div><label className="label">{createTaxIdConfig.label} (opcional, acelera la verificación)</label><input type="text" placeholder={createTaxIdConfig.placeholder} className="input" value={createForm.taxId} onChange={e => setCreateForm(f => ({ ...f, taxId: e.target.value }))} /></div>
+            <button type="submit" disabled={submitting || !createForm.name || !createForm.categoryId || !createForm.city} className="btn-primary w-full py-3 text-sm disabled:opacity-50">
+              {submitting ? 'Creando...' : 'Crear perfil gratis'}
+            </button>
+            <button type="button" onClick={() => setStep('search')} className="w-full text-xs text-brand-slate text-center">Volver a buscar</button>
           </form>
         </div>
       )}
