@@ -3,12 +3,12 @@ import { z } from 'zod'
 import { prisma } from '../../index'
 import { requireAuth, requireBusinessOwner } from '../../middleware/auth'
 import { createCheckoutSession, createAdRechargeSession, cancelSubscription, handleStripeWebhook } from './stripe'
-import { createMPPreApproval, createMPAdRechargePreference, handleMPWebhook } from './mercadopago'
+import { createDLPayment, createDLAdRechargePayment, handleDLWebhook } from './dlocalgo'
 
 export async function paymentRoutes(app: FastifyInstance) {
 
   app.post('/checkout', { preHandler: requireBusinessOwner }, async (request, reply) => {
-    const schema = z.object({ plan: z.enum(['PROFESSIONAL', 'PREMIUM']), provider: z.enum(['STRIPE', 'MERCADOPAGO']) })
+    const schema = z.object({ plan: z.enum(['PROFESSIONAL', 'PREMIUM']), provider: z.enum(['STRIPE', 'DLOCALGO']) })
     const body = schema.safeParse(request.body)
     if (!body.success) return reply.status(400).send({ error: true, message: 'Datos inválidos' })
 
@@ -23,14 +23,14 @@ export async function paymentRoutes(app: FastifyInstance) {
     if (body.data.provider === 'STRIPE') {
       checkoutUrl = await createCheckoutSession({ companyId: user.company.id, plan: body.data.plan, successUrl, cancelUrl, customerEmail: user.email })
     } else {
-      checkoutUrl = await createMPPreApproval({ companyId: user.company.id, plan: body.data.plan, backUrl: successUrl, payerEmail: user.email })
+      checkoutUrl = await createDLPayment({ companyId: user.company.id, plan: body.data.plan, successUrl, failureUrl: cancelUrl, payerEmail: user.email, payerName: user.email })
     }
 
     return reply.send({ checkoutUrl, provider: body.data.provider })
   })
 
   app.post('/ads/recharge', { preHandler: requireAuth }, async (request, reply) => {
-    const schema = z.object({ amountUsd: z.number().min(20).max(500), provider: z.enum(['STRIPE', 'MERCADOPAGO']) })
+    const schema = z.object({ amountUsd: z.number().min(20).max(500), provider: z.enum(['STRIPE', 'DLOCALGO']) })
     const body = schema.safeParse(request.body)
     if (!body.success) return reply.status(400).send({ error: true, message: 'Datos inválidos' })
 
@@ -48,7 +48,7 @@ export async function paymentRoutes(app: FastifyInstance) {
     if (body.data.provider === 'STRIPE') {
       checkoutUrl = await createAdRechargeSession({ adAccountId: account.id, amountUsd: body.data.amountUsd, successUrl, cancelUrl: failureUrl, customerEmail: user.email })
     } else {
-      checkoutUrl = await createMPAdRechargePreference({ adAccountId: account.id, amountUsd: body.data.amountUsd, successUrl, failureUrl, payerEmail: user.email })
+      checkoutUrl = await createDLAdRechargePayment({ adAccountId: account.id, amountUsd: body.data.amountUsd, successUrl, failureUrl, payerEmail: user.email, payerName: user.email })
     }
 
     return reply.send({ checkoutUrl, provider: body.data.provider, amountUsd: body.data.amountUsd })
@@ -93,12 +93,12 @@ export async function webhookPaymentRoutes(app: FastifyInstance) {
     }
   })
 
-  app.post('/mercadopago', async (request, reply) => {
+  app.post('/dlocalgo', async (request, reply) => {
     try {
-      await handleMPWebhook(request.body)
+      await handleDLWebhook(request.body)
       return reply.send({ received: true })
     } catch (err: any) {
-      app.log.error(`MercadoPago webhook error: ${err.message}`)
+      app.log.error(`dLocal Go webhook error: ${err.message}`)
       return reply.status(400).send({ error: true, message: err.message })
     }
   })

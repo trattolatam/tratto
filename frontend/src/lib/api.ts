@@ -53,7 +53,7 @@ export const ads = {
 
 export const subscriptions = {
   my: () => apiFetch<{ subscription: any }>('/api/subscriptions/my'),
-  checkout: (plan: 'PROFESSIONAL' | 'PREMIUM', provider: 'STRIPE' | 'MERCADOPAGO') =>
+  checkout: (plan: 'PROFESSIONAL' | 'PREMIUM', provider: 'STRIPE' | 'DLOCALGO') =>
     apiFetch<{ checkoutUrl: string }>('/api/payments/checkout', { method: 'POST', body: JSON.stringify({ plan, provider }) }),
   cancel: () => apiFetch('/api/payments/cancel', { method: 'POST' }),
 }

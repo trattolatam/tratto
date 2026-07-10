@@ -17,7 +17,7 @@ const PLANS = [
 export default function PreciosPage() {
   const { user } = useAuthStore()
   const router = useRouter()
-  const [provider, setProvider] = useState<'STRIPE' | 'MERCADOPAGO'>('STRIPE')
+  const [provider, setProvider] = useState<'STRIPE' | 'DLOCALGO'>('STRIPE')
   const [loading, setLoading] = useState<string | null>(null)
 
   const handlePlan = async (planId: 'PROFESSIONAL' | 'PREMIUM') => {
@@ -37,7 +37,7 @@ export default function PreciosPage() {
 
       <div className="flex justify-center mb-8">
         <div className="inline-flex items-center bg-gray-100 rounded-xl p-1 gap-1">
-          {([{ id: 'STRIPE', label: 'Tarjeta internacional', flag: '💳' }, { id: 'MERCADOPAGO', label: 'MercadoPago', flag: '🇦🇷' }] as const).map(p => (
+          {([{ id: 'STRIPE', label: 'Tarjeta internacional', flag: '💳' }, { id: 'DLOCALGO', label: 'dLocal Go', flag: '🇦🇷' }] as const).map(p => (
             <button key={p.id} onClick={() => setProvider(p.id)} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${provider === p.id ? 'bg-white shadow text-brand-dark' : 'text-brand-slate hover:text-brand-dark'}`}><span>{p.flag}</span> {p.label}</button>
           ))}
         </div>

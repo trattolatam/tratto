@@ -52,7 +52,7 @@ enum SubscriptionStatus {
 
 enum PaymentProvider {
   STRIPE
-  MERCADOPAGO
+  DLOCALGO
   PAYPAL
 }
 
