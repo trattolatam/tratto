@@ -14,7 +14,7 @@ export default function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true); setError('')
-    try { await login(form.email, form.password); router.push('/') }
+    try { const loggedUser = await login(form.email, form.password); router.push(loggedUser.role === 'BUSINESS' ? '/panel' : '/') }
     catch (err: any) { setError(err.message || 'Credenciales incorrectas') }
     finally { setLoading(false) }
   }
