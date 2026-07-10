@@ -25,7 +25,12 @@ export default function RegistroClient() {
       await login(form.email, form.password)
       if (form.role === 'BUSINESS') {
         const empresa = searchParams.get('empresa')
-        router.push(empresa ? `/reclamar?empresa=${encodeURIComponent(empresa)}` : '/reclamar')
+        const crear = searchParams.get('crear')
+        const params = new URLSearchParams()
+        if (empresa) params.set('empresa', empresa)
+        if (crear) params.set('crear', crear)
+        const qs = params.toString()
+        router.push(qs ? `/reclamar?${qs}` : '/reclamar')
       } else {
         router.push('/')
       }

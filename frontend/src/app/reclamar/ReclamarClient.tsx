@@ -39,7 +39,15 @@ export default function ReclamarClient() {
 
   useEffect(() => {
     const preset = searchParams.get('empresa')
-    if (preset) { setSearchTerm(preset); handleSearchTerm(preset) }
+    if (!preset) return
+    if (searchParams.get('crear') === '1') {
+      setSearchTerm(preset)
+      setCreateForm(f => ({ ...f, name: preset }))
+      setStep('create')
+    } else {
+      setSearchTerm(preset)
+      handleSearchTerm(preset)
+    }
   }, [])
 
   const handleSearchTerm = async (term: string) => {
@@ -57,7 +65,7 @@ export default function ReclamarClient() {
   }
 
   const handleStartCreate = () => {
-    if (!user) { router.push(`/registro?role=BUSINESS&empresa=${encodeURIComponent(searchTerm)}`); return }
+    if (!user) { router.push(`/registro?role=BUSINESS&empresa=${encodeURIComponent(searchTerm)}&crear=1`); return }
     setCreateForm(f => ({ ...f, name: searchTerm })); setStep('create')
   }
 
