@@ -41,6 +41,7 @@ export function Navbar() {
                     <p className="text-xs font-semibold text-brand-dark truncate">{user.name}</p>
                     <p className="text-xs text-gray-400 truncate">{user.email}</p>
                   </div>
+                  <Link href="/perfil" className="w-full flex items-center gap-2 px-3 py-2 text-xs text-brand-dark hover:bg-gray-50 text-left"><i className="ti ti-user-circle text-sm" /> Mi perfil</Link>
                   <button onClick={logout} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-brand-red hover:bg-red-50 text-left"><i className="ti ti-logout text-sm" /> Cerrar sesión</button>
                 </div>
               </div>

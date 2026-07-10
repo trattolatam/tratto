@@ -127,6 +127,29 @@ export default async function authRoutes(app: FastifyInstance) {
     return reply.send({ message: result.message })
   })
 
+  app.patch('/me', { preHandler: requireAuth }, async (request, reply) => {
+    const body = z.object({
+      name: z.string().min(2).optional(),
+      phone: z.string().optional(),
+      city: z.string().optional(),
+      country: z.string().min(2).optional(),
+    }).safeParse(request.body)
+
+    if (!body.success) return reply.status(400).send({ error: true, message: 'Datos inválidos', details: body.error.issues })
+
+    const updated = await prisma.user.update({
+      where: { id: request.user.userId },
+      data: body.data,
+      select: {
+        id: true, email: true, name: true, role: true,
+        country: true, city: true, phone: true, avatarUrl: true,
+        isVerified: true, isPro: true, createdAt: true,
+      },
+    })
+
+    return reply.send({ user: updated })
+  })
+
   app.post('/change-password', { preHandler: requireAuth }, async (request, reply) => {
     const body = z.object({
       currentPassword: z.string(),

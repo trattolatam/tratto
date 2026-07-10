@@ -11,10 +11,15 @@ export default function PanelPage() {
   const [stats, setStats] = useState<any>(null)
   const [pendingReviews, setPendingReviews] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<'overview' | 'reviews' | 'leads'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'reviews' | 'leads' | 'editar'>('overview')
   const [uploadingLogo, setUploadingLogo] = useState(false)
   const [logoError, setLogoError] = useState('')
   const logoInputRef = useRef<HTMLInputElement>(null)
+  const [companyDetails, setCompanyDetails] = useState<any>(null)
+  const [editForm, setEditForm] = useState({ description: '', phone: '', website: '', email: '', address: '' })
+  const [savingEdit, setSavingEdit] = useState(false)
+  const [editMsg, setEditMsg] = useState('')
+  const [editErr, setEditErr] = useState('')
 
   const handleLogoClick = () => logoInputRef.current?.click()
 
@@ -41,6 +46,32 @@ export default function PanelPage() {
       .then(([statsData, reviewsData]) => { setStats(statsData); setPendingReviews(reviewsData.reviews) })
       .finally(() => setLoading(false))
   }, [user])
+
+  useEffect(() => {
+    if (activeTab !== 'editar' || !user?.company || companyDetails) return
+    companiesApi.get(user.company.slug).then(data => {
+      setCompanyDetails(data.company)
+      setEditForm({
+        description: data.company.description || '', phone: data.company.phone || '',
+        website: data.company.website || '', email: data.company.email || '', address: data.company.address || '',
+      })
+    }).catch(() => {})
+  }, [activeTab, user])
+
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!user?.company) return
+    setSavingEdit(true); setEditMsg(''); setEditErr('')
+    try {
+      const body: any = { ...editForm }
+      if (!body.website) delete body.website
+      if (!body.email) delete body.email
+      const { company: updated } = await companiesApi.update(user.company.id, body)
+      setCompanyDetails(updated)
+      setEditMsg('Perfil de empresa actualizado.')
+    } catch (err: any) { setEditErr(err.message || 'Error actualizando el perfil') }
+    finally { setSavingEdit(false) }
+  }
 
   if (!user || loading) return <div className="max-w-4xl mx-auto px-4 py-12 text-center"><i className="ti ti-loader-2 animate-spin text-3xl text-brand-slate block mb-3" /><p className="text-sm text-brand-slate">Cargando tu panel...</p></div>
 
@@ -86,8 +117,8 @@ export default function PanelPage() {
       )}
 
       <div className="flex border-b border-gray-100 gap-4 mb-5">
-        {(['overview', 'reviews', 'leads'] as const).map(tab => (
-          <button key={tab} onClick={() => setActiveTab(tab)} className={`pb-3 text-sm font-medium border-b-2 transition-colors ${activeTab === tab ? 'border-brand-green text-brand-green' : 'border-transparent text-brand-slate hover:text-brand-dark'}`}>{{ overview: 'Resumen', reviews: 'Reseñas', leads: 'Consultas' }[tab]}</button>
+        {(['overview', 'reviews', 'leads', 'editar'] as const).map(tab => (
+          <button key={tab} onClick={() => setActiveTab(tab)} className={`pb-3 text-sm font-medium border-b-2 transition-colors ${activeTab === tab ? 'border-brand-green text-brand-green' : 'border-transparent text-brand-slate hover:text-brand-dark'}`}>{{ overview: 'Resumen', reviews: 'Reseñas', leads: 'Consultas', editar: 'Editar perfil' }[tab]}</button>
         ))}
       </div>
 
@@ -147,6 +178,26 @@ export default function PanelPage() {
         <div className="card p-8 text-center">
           {isPro ? <><i className="ti ti-inbox text-4xl text-gray-200 block mb-3" /><p className="text-sm text-brand-dark font-medium mb-1">Sin consultas todavía</p><p className="text-xs text-brand-slate">Las consultas de clientes aparecerán acá.</p></>
             : <><i className="ti ti-lock text-4xl text-gray-200 block mb-3" /><p className="text-sm text-brand-dark font-medium mb-1">Función del plan Profesional</p><p className="text-xs text-brand-slate mb-4">Activá el plan Pro para recibir consultas directas.</p><Link href="/precios" className="btn-primary text-sm py-2.5 px-6">Ver planes</Link></>}
+        </div>
+      )}
+      {activeTab === 'editar' && (
+        <div className="card p-6 max-w-xl">
+          {!companyDetails ? (
+            <div className="text-center py-8"><i className="ti ti-loader-2 animate-spin text-2xl text-brand-slate" /></div>
+          ) : (
+            <form onSubmit={handleEditSubmit} className="space-y-4">
+              {editErr && <div className="bg-red-50 border border-red-100 rounded-lg p-3 text-sm text-brand-red">{editErr}</div>}
+              {editMsg && <div className="bg-brand-green-dim border border-brand-green/20 rounded-lg p-3 text-sm text-brand-green">{editMsg}</div>}
+              <div><label className="label">Descripción</label><textarea rows={4} className="input" value={editForm.description} onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))} placeholder="Contales a tus clientes qué hace tu empresa" /></div>
+              <div className="grid grid-cols-2 gap-4">
+                <div><label className="label">Teléfono</label><input type="text" className="input" value={editForm.phone} onChange={e => setEditForm(f => ({ ...f, phone: e.target.value }))} /></div>
+                <div><label className="label">Email de contacto</label><input type="email" className="input" value={editForm.email} onChange={e => setEditForm(f => ({ ...f, email: e.target.value }))} /></div>
+              </div>
+              <div><label className="label">Sitio web</label><input type="url" placeholder="https://..." className="input" value={editForm.website} onChange={e => setEditForm(f => ({ ...f, website: e.target.value }))} /></div>
+              <div><label className="label">Dirección</label><input type="text" className="input" value={editForm.address} onChange={e => setEditForm(f => ({ ...f, address: e.target.value }))} /></div>
+              <button type="submit" disabled={savingEdit} className="btn-primary px-6 py-2.5 text-sm disabled:opacity-50">{savingEdit ? 'Guardando...' : 'Guardar cambios'}</button>
+            </form>
+          )}
         </div>
       )}
     </div>

@@ -27,6 +27,26 @@ export default async function uploadRoutes(app: FastifyInstance) {
     return reply.send({ url, path: filePath, mimetype: data.mimetype, size: buffer.length })
   })
 
+  app.post('/avatar', { preHandler: requireAuth, config: { rateLimit: uploadRateLimit } }, async (request, reply) => {
+    const data = await request.file()
+    if (!data) return reply.status(400).send({ error: true, message: 'No se recibió ningún archivo' })
+
+    const imgTypes = ['image/jpeg', 'image/png', 'image/webp']
+    if (!imgTypes.includes(data.mimetype)) return reply.status(400).send({ error: true, message: 'Solo se aceptan imágenes JPG, PNG o WEBP' })
+
+    const buffer = await streamToBuffer(data.file)
+    if (buffer.length > MAX_SIZE) return reply.status(400).send({ error: true, message: 'El archivo supera el límite de 5MB' })
+
+    const ext = path.extname(data.filename) || '.jpg'
+    const filePath = `avatars/${request.user.userId}/${Date.now()}${ext}`
+    const url = await uploadFile({ bucket: BUCKETS.COMPANIES, path: filePath, buffer, mimetype: data.mimetype })
+
+    const { prisma } = await import('../index')
+    await prisma.user.update({ where: { id: request.user.userId }, data: { avatarUrl: url } })
+
+    return reply.send({ url })
+  })
+
   app.post('/company-logo', { preHandler: requireBusinessOwner, config: { rateLimit: uploadRateLimit } }, async (request, reply) => {
     const data = await request.file()
     if (!data) return reply.status(400).send({ error: true, message: 'No se recibió ningún archivo' })

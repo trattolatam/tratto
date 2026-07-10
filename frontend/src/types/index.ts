@@ -4,7 +4,7 @@ export type ReviewStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'REPORTED'
 export type MedalType = 'TOP_CATEGORY' | 'FIFTY_REVIEWS' | 'CONSISTENT_12M' | 'TRENDING_UP' | 'HIGHLY_RECOMMENDED' | 'CHOICE_OF_YEAR'
 
 export interface User {
-  id: string; email: string; name: string; role: UserRole; country: string; city?: string
+  id: string; email: string; name: string; role: UserRole; country: string; city?: string; phone?: string
   avatarUrl?: string; isVerified: boolean; isPro: boolean; company?: CompanyBasic
 }
 

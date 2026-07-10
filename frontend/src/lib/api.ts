@@ -17,6 +17,10 @@ export const auth = {
   login: (email: string, password: string) =>
     apiFetch<{ user: any; token: string }>('/api/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
   me: () => apiFetch<{ user: any }>('/api/auth/me'),
+  updateProfile: (body: { name?: string; phone?: string; city?: string; country?: string }) =>
+    apiFetch<{ user: any }>('/api/auth/me', { method: 'PATCH', body: JSON.stringify(body) }),
+  changePassword: (currentPassword: string, newPassword: string) =>
+    apiFetch('/api/auth/change-password', { method: 'POST', body: JSON.stringify({ currentPassword, newPassword }) }),
 }
 
 export const companies = {
@@ -24,7 +28,7 @@ export const companies = {
   get: (slug: string) => apiFetch<{ company: any; ads: any[] }>(`/api/companies/${slug}`),
   create: (body: any) => apiFetch<{ company: any }>('/api/companies', { method: 'POST', body: JSON.stringify(body) }),
   claim: (id: string, body: any) => apiFetch(`/api/companies/${id}/claim`, { method: 'POST', body: JSON.stringify(body) }),
-  update: (id: string, body: any) => apiFetch(`/api/companies/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  update: (id: string, body: any) => apiFetch<{ company: any }>(`/api/companies/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
   stats: (id: string) => apiFetch<any>(`/api/companies/${id}/stats`),
 }
 
@@ -72,6 +76,13 @@ export const upload = {
     const form = new FormData(); form.append('file', file)
     const res = await fetch(`${API_URL}/api/upload/company-logo`, { method: 'POST', headers: token ? { Authorization: `Bearer ${token}` } : {}, body: form })
     if (!res.ok) throw new Error('Error subiendo logo')
+    return res.json()
+  },
+  avatar: async (file: File): Promise<{ url: string }> => {
+    const token = localStorage.getItem('tratto_token')
+    const form = new FormData(); form.append('file', file)
+    const res = await fetch(`${API_URL}/api/upload/avatar`, { method: 'POST', headers: token ? { Authorization: `Bearer ${token}` } : {}, body: form })
+    if (!res.ok) throw new Error('Error subiendo foto de perfil')
     return res.json()
   },
 }
