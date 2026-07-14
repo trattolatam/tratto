@@ -21,6 +21,8 @@ export const auth = {
     apiFetch<{ user: any }>('/api/auth/me', { method: 'PATCH', body: JSON.stringify(body) }),
   changePassword: (currentPassword: string, newPassword: string) =>
     apiFetch('/api/auth/change-password', { method: 'POST', body: JSON.stringify({ currentPassword, newPassword }) }),
+  resendVerification: (email: string) =>
+    apiFetch('/api/auth/resend-verification', { method: 'POST', body: JSON.stringify({ email }) }),
 }
 
 export const companies = {

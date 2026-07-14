@@ -18,6 +18,17 @@ export default function PerfilPage() {
   const [pwMsg, setPwMsg] = useState('')
   const [pwErr, setPwErr] = useState('')
 
+  const [resending, setResending] = useState(false)
+  const [resendMsg, setResendMsg] = useState('')
+
+  const handleResendVerification = async () => {
+    if (!user) return
+    setResending(true); setResendMsg('')
+    try { await auth.resendVerification(user.email); setResendMsg('Te reenviamos el link de verificación. Revisá tu casilla (y spam).') }
+    catch (err: any) { setResendMsg(err.message || 'Error al reenviar') }
+    finally { setResending(false) }
+  }
+
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
   const [avatarErr, setAvatarErr] = useState('')
   const avatarInputRef = useRef<HTMLInputElement>(null)
@@ -80,6 +91,17 @@ export default function PerfilPage() {
         <h1 className="text-2xl font-bold text-brand-dark mb-1">Mi perfil</h1>
         <p className="text-sm text-brand-slate">Gestioná tus datos personales y tu contraseña.</p>
       </div>
+
+      {!user.isVerified && (
+        <div className="card p-4 border border-brand-amber/30 bg-brand-amber-dim/30 flex items-center justify-between gap-4 flex-wrap">
+          <div>
+            <p className="text-sm font-semibold text-brand-amber">Todavía no confirmaste tu email</p>
+            <p className="text-xs text-brand-slate mt-0.5">Necesitás confirmarlo para poder dejar reseñas o crear tu empresa.</p>
+            {resendMsg && <p className="text-xs text-brand-dark mt-1.5">{resendMsg}</p>}
+          </div>
+          <button onClick={handleResendVerification} disabled={resending} className="btn-secondary text-xs py-2 px-3 whitespace-nowrap disabled:opacity-50">{resending ? 'Enviando...' : 'Reenviar email'}</button>
+        </div>
+      )}
 
       <div className="card p-6">
         <div className="flex items-center gap-4 mb-5">

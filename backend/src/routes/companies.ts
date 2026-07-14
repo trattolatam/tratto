@@ -1,7 +1,7 @@
 import { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { prisma } from '../index'
-import { requireAuth, requireBusinessOwner } from '../middleware/auth'
+import { requireAuth, requireVerifiedEmail, requireBusinessOwner } from '../middleware/auth'
 
 export default async function companyRoutes(app: FastifyInstance) {
 
@@ -87,7 +87,7 @@ export default async function companyRoutes(app: FastifyInstance) {
     return reply.send({ company, ads })
   })
 
-  app.post('/', { preHandler: requireAuth }, async (request, reply) => {
+  app.post('/', { preHandler: requireVerifiedEmail }, async (request, reply) => {
     const schema = z.object({
       name: z.string().min(2),
       categoryId: z.string().uuid().optional(),
@@ -140,7 +140,7 @@ export default async function companyRoutes(app: FastifyInstance) {
     return reply.status(201).send({ company })
   })
 
-  app.post('/:id/claim', { preHandler: requireAuth }, async (request, reply) => {
+  app.post('/:id/claim', { preHandler: requireVerifiedEmail }, async (request, reply) => {
     const { id } = request.params as { id: string }
     const schema = z.object({
       taxId: z.string().min(5),

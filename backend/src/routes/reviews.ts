@@ -1,7 +1,7 @@
 import { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { prisma } from '../index'
-import { requireAuth, requireBusinessOwner, requireAdmin } from '../middleware/auth'
+import { requireAuth, requireVerifiedEmail, requireBusinessOwner, requireAdmin } from '../middleware/auth'
 import { createReviewRateLimit } from '../middleware/rateLimits'
 import { recalcCompanyRating } from '../services/rating'
 import { checkAndAwardMedals } from '../services/medals'
@@ -37,7 +37,7 @@ export default async function reviewRoutes(app: FastifyInstance) {
   })
 
   // ─── POST /api/reviews — con rate limit (máx 3 cada 10 min) ───────────────
-  app.post('/', { preHandler: requireAuth, config: { rateLimit: createReviewRateLimit } }, async (request, reply) => {
+  app.post('/', { preHandler: requireVerifiedEmail, config: { rateLimit: createReviewRateLimit } }, async (request, reply) => {
     const schema = z.object({
       companyId: z.string().uuid(),
       rating: z.number().int().min(1).max(5),

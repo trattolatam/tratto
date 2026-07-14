@@ -15,6 +15,23 @@ export async function requireAuth(request: FastifyRequest, reply: FastifyReply) 
   }
 }
 
+export async function requireVerifiedEmail(request: FastifyRequest, reply: FastifyReply) {
+  try {
+    await request.jwtVerify()
+    const payload = request.user as JwtPayload
+    const user = await prisma.user.findUnique({ where: { id: payload.userId }, select: { isVerified: true } })
+    if (!user?.isVerified) {
+      return reply.status(403).send({
+        error: true,
+        message: 'Confirmá tu email antes de continuar. Revisá tu casilla de entrada (y spam).',
+        emailNotVerified: true,
+      })
+    }
+  } catch {
+    reply.status(401).send({ error: true, message: 'Token inválido o expirado' })
+  }
+}
+
 export async function requireAdmin(request: FastifyRequest, reply: FastifyReply) {
   try {
     await request.jwtVerify()

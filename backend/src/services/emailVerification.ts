@@ -22,26 +22,23 @@ export async function sendVerificationEmail(userId: string, email: string, name:
 
   const verifyUrl = `${process.env.FRONTEND_URL}/verificar-email?token=${token}`
 
-  if (!process.env.SENDGRID_API_KEY) {
-    console.log(`⚠️  SENDGRID_API_KEY no configurada. Link de verificación: ${verifyUrl}`)
+  if (!process.env.RESEND_API_KEY) {
+    console.log(`⚠️  RESEND_API_KEY no configurada. Link de verificación: ${verifyUrl}`)
     return
   }
 
   try {
-    const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
+    const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${process.env.SENDGRID_API_KEY}`,
+        Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        personalizations: [{ to: [{ email }] }],
-        from: { email: process.env.FROM_EMAIL || 'noreply@tratto.lat', name: 'Tratto' },
+        from: `Tratto <${process.env.FROM_EMAIL || 'noreply@tratto.lat'}>`,
+        to: [email],
         subject: 'Confirmá tu cuenta en Tratto',
-        content: [{
-          type: 'text/plain',
-          value: `Hola ${name},\n\nConfirmá tu cuenta en Tratto haciendo click en este link:\n${verifyUrl}\n\nEste link expira en 24 horas.\n\nSi no creaste esta cuenta, podés ignorar este email.`,
-        }],
+        text: `Hola ${name},\n\nConfirmá tu cuenta en Tratto haciendo click en este link:\n${verifyUrl}\n\nEste link expira en 24 horas.\n\nSi no creaste esta cuenta, podés ignorar este email.`,
       }),
     })
 
