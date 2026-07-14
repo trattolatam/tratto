@@ -13,12 +13,14 @@ export default function RegistroClient() {
   const { login } = useAuthStore()
   const initialRole = searchParams.get('role') === 'BUSINESS' ? 'BUSINESS' : 'USER'
   const [form, setForm] = useState({ name: '', email: '', password: '', country: 'UY', role: initialRole })
+  const [confirmPassword, setConfirmPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (form.password.length < 8) { setError('La contraseña debe tener al menos 8 caracteres'); return }
+    if (form.password !== confirmPassword) { setError('Las contraseñas no coinciden'); return }
     setLoading(true); setError('')
     try {
       await auth.register(form)
@@ -60,6 +62,7 @@ export default function RegistroClient() {
             <div><label className="label">Email</label><input type="email" required placeholder="tu@email.com" className="input" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} /></div>
             <div><label className="label">País</label><select className="input" value={form.country} onChange={e => setForm(f => ({ ...f, country: e.target.value }))}>{COUNTRIES.map(c => <option key={c.code} value={c.code}>{c.name}</option>)}</select></div>
             <div><label className="label">Contraseña</label><input type="password" required placeholder="Mínimo 8 caracteres" className="input" value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} /></div>
+            <div><label className="label">Repetir contraseña</label><input type="password" required placeholder="Repetí tu contraseña" className="input" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} /></div>
             <button type="submit" disabled={loading} className="btn-primary w-full py-3 text-sm disabled:opacity-50 mt-1">{loading ? <><i className="ti ti-loader-2 animate-spin" /> Creando cuenta...</> : 'Crear cuenta gratis'}</button>
           </form>
           <p className="text-xs text-gray-400 text-center mt-3">Al registrarte aceptás los <Link href="/terminos" className="text-brand-blue hover:underline">términos de uso</Link> y la <Link href="/privacidad" className="text-brand-blue hover:underline">política de privacidad</Link>.</p>
