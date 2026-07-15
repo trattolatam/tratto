@@ -137,7 +137,12 @@ export default async function companyRoutes(app: FastifyInstance) {
 
     await prisma.user.update({ where: { id: request.user.userId }, data: { role: 'BUSINESS' } })
 
-    return reply.status(201).send({ company })
+    const token = app.jwt.sign(
+      { userId: request.user.userId, role: 'BUSINESS', companyId: company.id },
+      { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+    )
+
+    return reply.status(201).send({ company, token })
   })
 
   app.post('/:id/claim', { preHandler: requireVerifiedEmail }, async (request, reply) => {
@@ -170,7 +175,12 @@ export default async function companyRoutes(app: FastifyInstance) {
 
     await prisma.user.update({ where: { id: request.user.userId }, data: { role: 'BUSINESS' } })
 
-    return reply.send({ company: updated, message: 'Perfil reclamado. Revisaremos la verificación en 24hs.' })
+    const token = app.jwt.sign(
+      { userId: request.user.userId, role: 'BUSINESS', companyId: updated.id },
+      { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+    )
+
+    return reply.send({ company: updated, token, message: 'Perfil reclamado. Revisaremos la verificación en 24hs.' })
   })
 
   app.patch('/:id', { preHandler: requireBusinessOwner }, async (request, reply) => {

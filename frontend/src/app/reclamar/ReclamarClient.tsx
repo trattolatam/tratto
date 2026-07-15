@@ -16,7 +16,7 @@ const TAX_IDS = [
 ]
 
 export default function ReclamarClient() {
-  const { user } = useAuthStore()
+  const { user, setToken } = useAuthStore()
   const router = useRouter()
   const searchParams = useSearchParams()
   const [step, setStep] = useState<'search' | 'form' | 'create' | 'success'>('search')
@@ -75,7 +75,8 @@ export default function ReclamarClient() {
     if (!selectedCompany) return
     setSubmitting(true); setError('')
     try {
-      await companies.claim(selectedCompany.id, { taxId: form.taxId, taxIdType: taxIdConfig.label, phone: form.phone || undefined, email: form.email || undefined })
+      const result = await companies.claim(selectedCompany.id, { taxId: form.taxId, taxIdType: taxIdConfig.label, phone: form.phone || undefined, email: form.email || undefined })
+      if (result.token) setToken(result.token)
       setStep('success')
     } catch (err: any) { setError(err.message) } finally { setSubmitting(false) }
   }
@@ -85,7 +86,7 @@ export default function ReclamarClient() {
     if (!user) { router.push('/registro?role=BUSINESS'); return }
     setSubmitting(true); setError('')
     try {
-      await companies.create({
+      const result = await companies.create({
         name: createForm.name,
         categoryId: suggestingCategory ? undefined : createForm.categoryId,
         categorySuggestion: suggestingCategory ? categorySuggestion : undefined,
@@ -99,6 +100,7 @@ export default function ReclamarClient() {
         taxId: createForm.taxId || undefined,
         taxIdType: createForm.taxId ? createTaxIdConfig.label : undefined,
       })
+      if (result.token) setToken(result.token)
       setStep('success')
     } catch (err: any) { setError(err.message) } finally { setSubmitting(false) }
   }

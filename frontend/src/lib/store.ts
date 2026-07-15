@@ -7,6 +7,7 @@ interface AuthState {
   user: User | null; token: string | null; isLoading: boolean
   login: (email: string, password: string) => Promise<User>
   logout: () => void; fetchMe: () => Promise<void>; setUser: (user: User) => void
+  setToken: (token: string) => void
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -29,6 +30,7 @@ export const useAuthStore = create<AuthState>()(
         try { const data = await auth.me() as any; set({ user: data.user }) } catch { get().logout() }
       },
       setUser: (user) => set({ user }),
+      setToken: (token) => { localStorage.setItem('tratto_token', token); set({ token }) },
     }),
     { name: 'tratto-auth', partialize: (state) => ({ token: state.token }) }
   )
