@@ -37,7 +37,7 @@ export default async function companyRoutes(app: FastifyInstance) {
     const [companies, total] = await Promise.all([
       prisma.company.findMany({
         where, skip, take: limit,
-        orderBy: [{ ratingAvg: 'desc' }, { reviewCount: 'desc' }],
+        orderBy: [{ plan: 'desc' }, { ratingAvg: 'desc' }, { reviewCount: 'desc' }],
         include: {
           category: { select: { name: true, slug: true, emoji: true } },
           medals: { where: { visible: true, OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] } },

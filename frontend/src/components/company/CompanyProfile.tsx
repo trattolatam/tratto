@@ -113,6 +113,11 @@ export function CompanyProfile({ company, ads }: { company: Company; ads: Ad[] }
                     <button type="submit" className="btn-primary w-full py-2.5 text-sm">Enviar consulta</button>
                     <button type="button" onClick={() => setShowLeadForm(false)} className="btn-secondary w-full py-2 text-xs">Cancelar</button>
                   </form>
+                ) : company.plan === 'FREE' ? (
+                  <>
+                    <div className="text-center py-3 px-2 bg-gray-50 rounded-lg mb-2"><i className="ti ti-lock text-xl text-brand-slate block mb-1" /><p className="text-xs text-brand-slate">Esta empresa todavía no activó el contacto directo</p></div>
+                    <Link href={`/escribir-resena?empresa=${company.id}`} className="btn-secondary w-full py-2.5 text-sm text-center block"><i className="ti ti-pencil text-sm mr-1" />Escribir reseña</Link>
+                  </>
                 ) : (
                   <>
                     <button onClick={() => setShowLeadForm(true)} className="btn-primary w-full py-3 text-sm mb-2"><i className="ti ti-message text-base" />Solicitar presupuesto</button>

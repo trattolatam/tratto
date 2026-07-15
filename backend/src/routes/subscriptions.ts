@@ -33,6 +33,9 @@ export async function leadRoutes(app: FastifyInstance) {
     const company = await prisma.company.findUnique({ where: { id: body.companyId }, include: { owner: { select: { id: true } } } })
     if (!company) return reply.status(404).send({ error: true, message: 'Empresa no encontrada' })
     if (!company.claimedById) return reply.status(400).send({ error: true, message: 'Esta empresa aún no reclamó su perfil' })
+    if (company.plan === 'FREE') {
+      return reply.status(403).send({ error: true, message: 'Esta empresa no tiene el plan necesario para recibir consultas', upgradeRequired: true })
+    }
 
     const lead = await prisma.lead.create({ data: { ...body, source: 'profile' } })
 

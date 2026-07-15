@@ -1,7 +1,7 @@
 import { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { prisma } from '../../index'
-import { requireBusinessOwner, requireAdmin } from '../../middleware/auth'
+import { requireBusinessOwner, requireAdmin, requirePlan } from '../../middleware/auth'
 import { generateAiSummary, generateReviewResponseSuggestion, runBatchAiSummaries } from './summaries'
 
 export async function aiRoutes(app: FastifyInstance) {
@@ -13,7 +13,7 @@ export async function aiRoutes(app: FastifyInstance) {
     return reply.send({ summary })
   })
 
-  app.post('/summary/:companyId', { preHandler: requireBusinessOwner }, async (request, reply) => {
+  app.post('/summary/:companyId', { preHandler: [requireBusinessOwner, requirePlan('PROFESSIONAL')] }, async (request, reply) => {
     const { companyId } = request.params as { companyId: string }
     const company = await prisma.company.findUnique({ where: { id: companyId } })
     if (!company) return reply.status(404).send({ error: true, message: 'Empresa no encontrada' })

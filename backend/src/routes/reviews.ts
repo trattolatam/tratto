@@ -1,7 +1,7 @@
 import { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { prisma } from '../index'
-import { requireAuth, requireVerifiedEmail, requireBusinessOwner, requireAdmin } from '../middleware/auth'
+import { requireAuth, requireVerifiedEmail, requireBusinessOwner, requireAdmin, requirePlan } from '../middleware/auth'
 import { createReviewRateLimit } from '../middleware/rateLimits'
 import { recalcCompanyRating } from '../services/rating'
 import { checkAndAwardMedals } from '../services/medals'
@@ -84,7 +84,7 @@ export default async function reviewRoutes(app: FastifyInstance) {
     })
   })
 
-  app.post('/:id/response', { preHandler: requireBusinessOwner }, async (request, reply) => {
+  app.post('/:id/response', { preHandler: [requireBusinessOwner, requirePlan('PROFESSIONAL')] }, async (request, reply) => {
     const { id } = request.params as { id: string }
     const body = z.object({ body: z.string().min(10).max(1000) }).safeParse(request.body)
     if (!body.success) return reply.status(400).send({ error: true, message: 'Respuesta muy corta o muy larga' })
