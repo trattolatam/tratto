@@ -32,7 +32,7 @@ export const companies = {
   claim: (id: string, body: any) => apiFetch<{ company: any; token?: string; message?: string }>(`/api/companies/${id}/claim`, { method: 'POST', body: JSON.stringify(body) }),
   update: (id: string, body: any) => apiFetch<{ company: any }>(`/api/companies/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
   stats: (id: string) => apiFetch<any>(`/api/companies/${id}/stats`),
-  revealContact: (id: string) => apiFetch<{ phone: string | null; website: string | null; address: string | null }>(`/api/companies/${id}/contact-reveal`, { method: 'POST' }),
+  revealContact: (id: string) => apiFetch<{ phone: string | null; website: string | null; address: string | null }>(`/api/companies/${id}/contact-reveal`, { method: 'POST', body: JSON.stringify({}) }),
 }
 
 export const reviews = {
