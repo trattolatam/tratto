@@ -27,7 +27,7 @@ export default function ReclamarClient() {
   const [searching, setSearching] = useState(false)
   const [categoryList, setCategoryList] = useState<any[]>([])
   const [form, setForm] = useState({ country: 'UY', taxId: '', phone: '', email: '' })
-  const [createForm, setCreateForm] = useState({ name: '', categoryId: '', country: 'UY', city: '', address: '', phone: '', email: '', taxId: '' })
+  const [createForm, setCreateForm] = useState({ name: '', categoryId: '', country: 'UY', city: '', address: '', phone: '', email: '', taxId: '', description: '', website: '' })
   const [suggestingCategory, setSuggestingCategory] = useState(false)
   const [categorySuggestion, setCategorySuggestion] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -94,6 +94,8 @@ export default function ReclamarClient() {
         address: createForm.address || undefined,
         phone: createForm.phone || undefined,
         email: createForm.email || undefined,
+        website: createForm.website || undefined,
+        description: createForm.description || undefined,
         taxId: createForm.taxId || undefined,
         taxIdType: createForm.taxId ? createTaxIdConfig.label : undefined,
       })
@@ -175,11 +177,13 @@ export default function ReclamarClient() {
                 <button type="button" onClick={() => { setSuggestingCategory(false); setCategorySuggestion('') }} className="text-xs text-brand-slate mt-2">Volver a elegir de la lista</button>
               </div>
             )}
+            <div><label className="label">Descripción (opcional)</label><textarea rows={3} placeholder="Contales a tus clientes qué hace tu empresa" className="input" value={createForm.description} onChange={e => setCreateForm(f => ({ ...f, description: e.target.value }))} /></div>
             <div className="grid grid-cols-2 gap-4">
               <div><label className="label">País</label><select className="input" value={createForm.country} onChange={e => setCreateForm(f => ({ ...f, country: e.target.value, taxId: '' }))}>{TAX_IDS.map(t => <option key={t.country} value={t.country}>{t.country}</option>)}</select></div>
               <div><label className="label">Ciudad</label><input type="text" required className="input" value={createForm.city} onChange={e => setCreateForm(f => ({ ...f, city: e.target.value }))} /></div>
             </div>
             <div><label className="label">Dirección (opcional)</label><input type="text" className="input" value={createForm.address} onChange={e => setCreateForm(f => ({ ...f, address: e.target.value }))} /></div>
+            <div><label className="label">Sitio web (opcional)</label><input type="url" placeholder="https://..." className="input" value={createForm.website} onChange={e => setCreateForm(f => ({ ...f, website: e.target.value }))} /></div>
             <div className="grid grid-cols-2 gap-4">
               <div><label className="label">Teléfono (opcional)</label><input type="text" className="input" value={createForm.phone} onChange={e => setCreateForm(f => ({ ...f, phone: e.target.value }))} /></div>
               <div><label className="label">Email (opcional)</label><input type="email" className="input" value={createForm.email} onChange={e => setCreateForm(f => ({ ...f, email: e.target.value }))} /></div>
