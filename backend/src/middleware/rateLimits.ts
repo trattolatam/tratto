@@ -34,6 +34,13 @@ export const leadRateLimit = {
   timeWindow: '30 minutes',
 }
 
+// ── Revelar contacto de empresa — máximo 20 cada 10 minutos por IP ───────────
+// Evita scraping masivo de teléfonos/webs, sin molestar a un usuario real
+export const contactRevealRateLimit = {
+  max: 20,
+  timeWindow: '10 minutes',
+}
+
 // ── Recuperación de contraseña — máximo 3 cada 30 minutos por IP ─────────────
 export const passwordResetRateLimit = {
   max: 3,

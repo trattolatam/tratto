@@ -2,7 +2,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { Company, Review, Ad, MEDAL_META, MedalType } from '@/types'
-import { reviews as reviewsApi, leads } from '@/lib/api'
+import { reviews as reviewsApi, leads, companies } from '@/lib/api'
 import { useAuthStore } from '@/lib/store'
 
 export function CompanyProfile({ company, ads }: { company: Company; ads: Ad[] }) {
@@ -12,6 +12,15 @@ export function CompanyProfile({ company, ads }: { company: Company; ads: Ad[] }
   const [showLeadForm, setShowLeadForm] = useState(false)
   const [leadSent, setLeadSent] = useState(false)
   const [leadForm, setLeadForm] = useState({ name: '', email: '', phone: '', message: '' })
+  const [contactRevealed, setContactRevealed] = useState<{ phone: string | null; website: string | null; address: string | null } | null>(null)
+  const [revealing, setRevealing] = useState(false)
+
+  const handleRevealContact = async () => {
+    setRevealing(true)
+    try { const data = await companies.revealContact(company.id); setContactRevealed(data) }
+    catch (err: any) { alert(err.message) }
+    finally { setRevealing(false) }
+  }
 
   const verifiedPct = company.reviewCount > 0 ? Math.round((company.verifiedReviewCount / company.reviewCount) * 100) : 0
 
@@ -89,9 +98,17 @@ export function CompanyProfile({ company, ads }: { company: Company; ads: Ad[] }
             {activeTab === 'reviews' && <ReviewsList companyId={company.id} />}
             {activeTab === 'info' && (
               <div className="card p-5 space-y-3">
-                {company.phone && <div className="flex items-center gap-3 text-sm"><i className="ti ti-phone text-brand-slate text-base w-5" /><a href={`tel:${company.phone}`} className="text-brand-dark hover:text-brand-green">{company.phone}</a></div>}
-                {company.website && <div className="flex items-center gap-3 text-sm"><i className="ti ti-world text-brand-slate text-base w-5" /><a href={company.website} target="_blank" rel="noopener" className="text-brand-blue hover:underline truncate">{company.website}</a></div>}
-                {company.address && <div className="flex items-center gap-3 text-sm"><i className="ti ti-map-pin text-brand-slate text-base w-5" /><span className="text-brand-dark">{company.address}</span></div>}
+                {(company.phone || company.website || company.address) && (
+                  contactRevealed ? (
+                    <>
+                      {contactRevealed.phone && <div className="flex items-center gap-3 text-sm"><i className="ti ti-phone text-brand-slate text-base w-5" /><a href={`tel:${contactRevealed.phone}`} className="text-brand-dark hover:text-brand-green">{contactRevealed.phone}</a></div>}
+                      {contactRevealed.website && <div className="flex items-center gap-3 text-sm"><i className="ti ti-world text-brand-slate text-base w-5" /><a href={contactRevealed.website} target="_blank" rel="noopener" className="text-brand-blue hover:underline truncate">{contactRevealed.website}</a></div>}
+                      {contactRevealed.address && <div className="flex items-center gap-3 text-sm"><i className="ti ti-map-pin text-brand-slate text-base w-5" /><span className="text-brand-dark">{contactRevealed.address}</span></div>}
+                    </>
+                  ) : (
+                    <button onClick={handleRevealContact} disabled={revealing} className="btn-primary w-full py-2.5 text-sm disabled:opacity-50"><i className="ti ti-address-book text-base mr-1" />{revealing ? 'Cargando...' : 'Quiero contactar con la empresa'}</button>
+                  )
+                )}
                 {company.taxId && <div className="flex items-center gap-3 text-sm"><i className="ti ti-file-certificate text-brand-slate text-base w-5" /><span className="text-brand-dark">{company.taxIdType}: {company.taxId}</span></div>}
                 {company.description && <p className="text-sm text-brand-slate pt-2 border-t border-gray-50 leading-relaxed">{company.description}</p>}
               </div>

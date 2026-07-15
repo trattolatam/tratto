@@ -2,6 +2,7 @@ import { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { prisma } from '../index'
 import { requireAuth, requireVerifiedEmail, requireBusinessOwner } from '../middleware/auth'
+import { contactRevealRateLimit } from '../middleware/rateLimits'
 
 export default async function companyRoutes(app: FastifyInstance) {
 
@@ -85,6 +86,21 @@ export default async function companyRoutes(app: FastifyInstance) {
     })
 
     return reply.send({ company, ads })
+  })
+
+  // ─── Revelar teléfono / sitio web / dirección (con tracking para el incentivo Pro) ───
+  app.post('/:id/contact-reveal', { config: { rateLimit: contactRevealRateLimit } }, async (request, reply) => {
+    const { id } = request.params as { id: string }
+
+    const company = await prisma.company.findUnique({
+      where: { id },
+      select: { id: true, phone: true, website: true, address: true },
+    })
+    if (!company) return reply.status(404).send({ error: true, message: 'Empresa no encontrada' })
+
+    await prisma.contactReveal.create({ data: { companyId: id } })
+
+    return reply.send({ phone: company.phone, website: company.website, address: company.address })
   })
 
   app.post('/', { preHandler: requireVerifiedEmail }, async (request, reply) => {
@@ -213,18 +229,19 @@ export default async function companyRoutes(app: FastifyInstance) {
     }
 
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
-    const [totalReviews, verifiedReviews, recentReviews, leads, ratingDistribution] = await Promise.all([
+    const [totalReviews, verifiedReviews, recentReviews, leads, contactReveals, ratingDistribution] = await Promise.all([
       prisma.review.count({ where: { companyId: id, status: 'APPROVED' } }),
       prisma.review.count({ where: { companyId: id, status: 'APPROVED', isVerified: true } }),
       prisma.review.count({ where: { companyId: id, createdAt: { gte: thirtyDaysAgo } } }),
       prisma.lead.count({ where: { companyId: id, createdAt: { gte: thirtyDaysAgo } } }),
+      prisma.contactReveal.count({ where: { companyId: id, createdAt: { gte: thirtyDaysAgo } } }),
       prisma.review.groupBy({ by: ['rating'], where: { companyId: id, status: 'APPROVED' }, _count: true }),
     ])
 
     return reply.send({
       totalReviews, verifiedReviews,
       verifiedPct: totalReviews > 0 ? Math.round((verifiedReviews / totalReviews) * 100) : 0,
-      recentReviews, leads, ratingDistribution, ratingAvg: company.ratingAvg,
+      recentReviews, leads, contactReveals, ratingDistribution, ratingAvg: company.ratingAvg,
     })
   })
 }

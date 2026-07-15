@@ -215,6 +215,7 @@ model Company {
   subscription  Subscription?
   boosts        ProfileBoost[]
   leads         Lead[]
+  contactReveals ContactReveal[]
   aiSummary     AiSummary?
   bookingSlots  BookingSlot[]
   bookings      Booking[]
@@ -435,6 +436,19 @@ model Lead {
   company     Company   @relation(fields: [companyId], references: [id])
 
   @@map("leads")
+}
+
+// ─── REVELADO DE CONTACTO (teléfono/web ocultos hasta hacer click) ────────────
+
+model ContactReveal {
+  id          String    @id @default(uuid())
+  companyId   String
+  createdAt   DateTime  @default(now())
+
+  company     Company   @relation(fields: [companyId], references: [id])
+
+  @@index([companyId, createdAt])
+  @@map("contact_reveals")
 }
 
 // ─── BOOST DE PERFIL ──────────────────────────────────────────────────────────

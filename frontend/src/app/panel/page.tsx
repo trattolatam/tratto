@@ -99,13 +99,22 @@ export default function PanelPage() {
       </div>
 
       {stats && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
           {[
             { label: 'Calificación', value: (company.ratingAvg ?? 0).toFixed(1), icon: 'ti-star', color: 'text-brand-amber' },
             { label: 'Reseñas totales', value: stats.totalReviews, icon: 'ti-message', color: 'text-brand-blue' },
             { label: 'Verificadas', value: `${stats.verifiedPct}%`, icon: 'ti-shield-check', color: 'text-brand-green' },
             { label: 'Leads este mes', value: stats.leads, icon: 'ti-user-check', color: 'text-brand-dark' },
+            { label: 'Quisieron tu contacto', value: stats.contactReveals, icon: 'ti-phone-ringing', color: 'text-brand-green' },
           ].map(s => <div key={s.label} className="card p-4"><div className={`text-2xl font-bold ${s.color}`}>{s.value}</div><div className="text-xs text-brand-slate mt-0.5 flex items-center gap-1"><i className={`ti ${s.icon} text-xs`} /> {s.label}</div></div>)}
+        </div>
+      )}
+
+      {!isPro && stats && stats.contactReveals > 0 && (
+        <div className="bg-brand-dark text-white rounded-xl p-4 mb-4 flex items-center gap-4">
+          <i className="ti ti-phone-ringing text-xl text-brand-green flex-shrink-0" />
+          <div className="flex-1"><p className="text-sm font-semibold">{stats.contactReveals} {stats.contactReveals === 1 ? 'persona quiso' : 'personas quisieron'} tu teléfono este mes</p><p className="text-xs text-white/60 mt-0.5">Activá Pro para ver quiénes fueron y responderles directo.</p></div>
+          <Link href="/precios" className="btn-primary text-xs py-2 px-4 flex-shrink-0 whitespace-nowrap">Activar Pro</Link>
         </div>
       )}
 
