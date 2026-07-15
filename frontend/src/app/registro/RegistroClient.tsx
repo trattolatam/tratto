@@ -25,6 +25,8 @@ export default function RegistroClient() {
     try {
       await auth.register(form)
       await login(form.email, form.password)
+
+      let next = '/'
       if (form.role === 'BUSINESS') {
         const empresa = searchParams.get('empresa')
         const crear = searchParams.get('crear')
@@ -32,10 +34,10 @@ export default function RegistroClient() {
         if (empresa) params.set('empresa', empresa)
         if (crear) params.set('crear', crear)
         const qs = params.toString()
-        router.push(qs ? `/reclamar?${qs}` : '/reclamar')
-      } else {
-        router.push('/')
+        next = qs ? `/reclamar?${qs}` : '/reclamar'
       }
+
+      router.push(`/confirmar-cuenta?email=${encodeURIComponent(form.email)}&next=${encodeURIComponent(next)}`)
     }
     catch (err: any) { setError(err.message || 'Error al registrarse') }
     finally { setLoading(false) }

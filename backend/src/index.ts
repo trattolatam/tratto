@@ -8,7 +8,6 @@ import dotenv from 'dotenv'
 dotenv.config()
 
 import authRoutes from './routes/auth'
-import { emailVerificationRoutes } from './routes/emailVerification'
 import companyRoutes from './routes/companies'
 import reviewRoutes from './routes/reviews'
 import categoryRoutes from './routes/categories'
@@ -41,7 +40,6 @@ async function start() {
 
   // Core routes
   app.register(authRoutes,         { prefix: '/api/auth' })
-  app.register(emailVerificationRoutes, { prefix: '/api/auth' })
   app.register(companyRoutes,      { prefix: '/api/companies' })
   app.register(reviewRoutes,       { prefix: '/api/reviews' })
   app.register(categoryRoutes,     { prefix: '/api/categories' })

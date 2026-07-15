@@ -14,7 +14,15 @@ export default function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true); setError('')
-    try { const loggedUser = await login(form.email, form.password); router.push(loggedUser.role === 'BUSINESS' ? '/panel' : '/') }
+    try {
+      const loggedUser = await login(form.email, form.password)
+      const next = loggedUser.role === 'BUSINESS' ? '/panel' : '/'
+      if (!loggedUser.isVerified) {
+        router.push(`/confirmar-cuenta?email=${encodeURIComponent(loggedUser.email)}&next=${encodeURIComponent(next)}`)
+      } else {
+        router.push(next)
+      }
+    }
     catch (err: any) { setError(err.message || 'Credenciales incorrectas') }
     finally { setLoading(false) }
   }
