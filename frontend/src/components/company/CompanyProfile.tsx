@@ -99,11 +99,11 @@ export function CompanyProfile({ company, ads }: { company: Company; ads: Ad[] }
             {activeTab === 'info' && (
               <div className="card p-5 space-y-3">
                 {(company.phone || company.website || company.address) && (
-                  contactRevealed ? (
+                  (isOwner || contactRevealed) ? (
                     <>
-                      {contactRevealed.phone && <div className="flex items-center gap-3 text-sm"><i className="ti ti-phone text-brand-slate text-base w-5" /><a href={`tel:${contactRevealed.phone}`} className="text-brand-dark hover:text-brand-green">{contactRevealed.phone}</a></div>}
-                      {contactRevealed.website && <div className="flex items-center gap-3 text-sm"><i className="ti ti-world text-brand-slate text-base w-5" /><a href={contactRevealed.website} target="_blank" rel="noopener" className="text-brand-blue hover:underline truncate">{contactRevealed.website}</a></div>}
-                      {contactRevealed.address && <div className="flex items-center gap-3 text-sm"><i className="ti ti-map-pin text-brand-slate text-base w-5" /><span className="text-brand-dark">{contactRevealed.address}</span></div>}
+                      {(isOwner ? company.phone : contactRevealed?.phone) && <div className="flex items-center gap-3 text-sm"><i className="ti ti-phone text-brand-slate text-base w-5" /><a href={`tel:${isOwner ? company.phone : contactRevealed?.phone}`} className="text-brand-dark hover:text-brand-green">{isOwner ? company.phone : contactRevealed?.phone}</a></div>}
+                      {(isOwner ? company.website : contactRevealed?.website) && <div className="flex items-center gap-3 text-sm"><i className="ti ti-world text-brand-slate text-base w-5" /><a href={(isOwner ? company.website : contactRevealed?.website) || undefined} target="_blank" rel="noopener" className="text-brand-blue hover:underline truncate">{isOwner ? company.website : contactRevealed?.website}</a></div>}
+                      {(isOwner ? company.address : contactRevealed?.address) && <div className="flex items-center gap-3 text-sm"><i className="ti ti-map-pin text-brand-slate text-base w-5" /><span className="text-brand-dark">{isOwner ? company.address : contactRevealed?.address}</span></div>}
                     </>
                   ) : (
                     <button onClick={handleRevealContact} disabled={revealing} className="btn-primary w-full py-2.5 text-sm disabled:opacity-50"><i className="ti ti-address-book text-base mr-1" />{revealing ? 'Cargando...' : 'Quiero contactar con la empresa'}</button>

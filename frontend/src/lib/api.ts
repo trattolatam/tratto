@@ -34,6 +34,7 @@ export const companies = {
   stats: (id: string) => apiFetch<any>(`/api/companies/${id}/stats`),
   revealContact: (id: string) => apiFetch<{ phone: string | null; website: string | null; address: string | null }>(`/api/companies/${id}/contact-reveal`, { method: 'POST', body: JSON.stringify({}) }),
   competitiveIntel: (id: string) => apiFetch<any>(`/api/companies/${id}/competitive-intel`),
+  contactReveals: (id: string) => apiFetch<{ reveals: any[] }>(`/api/companies/${id}/contact-reveals`),
   downloadCertificate: async (id: string): Promise<Blob> => {
     const token = typeof window !== 'undefined' ? localStorage.getItem('tratto_token') : null
     const res = await fetch(`${API_URL}/api/companies/${id}/certificate`, {

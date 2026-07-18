@@ -6,7 +6,7 @@ interface Props { params: { slug: string } }
 
 async function getCompany(slug: string) {
   try {
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/companies/${slug}`, { next: { revalidate: 300 } })
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/companies/${slug}`, { cache: 'no-store' })
     if (!res.ok) return null
     return res.json()
   } catch { return null }

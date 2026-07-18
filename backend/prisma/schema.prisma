@@ -117,6 +117,7 @@ model User {
   company        Company?         @relation("CompanyOwner")
   notifications  Notification[]
   bookings       Booking[]
+  contactReveals ContactReveal[]
   referredBy     User?            @relation("Referrals", fields: [referredById], references: [id])
   referrals      User[]           @relation("Referrals")
   adAccounts     AdAccount[]
@@ -444,9 +445,11 @@ model Lead {
 model ContactReveal {
   id          String    @id @default(uuid())
   companyId   String
+  userId      String?
   createdAt   DateTime  @default(now())
 
   company     Company   @relation(fields: [companyId], references: [id])
+  user        User?     @relation(fields: [userId], references: [id])
 
   @@index([companyId, createdAt])
   @@map("contact_reveals")

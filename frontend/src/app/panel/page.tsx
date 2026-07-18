@@ -23,6 +23,9 @@ export default function PanelPage() {
   const [respondError, setRespondError] = useState('')
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
   const [photoError, setPhotoError] = useState('')
+  const [showContactsModal, setShowContactsModal] = useState(false)
+  const [contactReveals, setContactReveals] = useState<any[] | null>(null)
+  const [loadingContacts, setLoadingContacts] = useState(false)
   const photoInputRef = useRef<HTMLInputElement>(null)
   const logoInputRef = useRef<HTMLInputElement>(null)
   const [companyDetails, setCompanyDetails] = useState<any>(null)
@@ -111,6 +114,15 @@ export default function PanelPage() {
     catch (err: any) { setPhotoError(err.message || 'Error borrando la foto') }
   }
 
+  const handleOpenContacts = async () => {
+    setShowContactsModal(true)
+    if (!isPremium || contactReveals) return
+    setLoadingContacts(true)
+    try { const data = await companiesApi.contactReveals(company.id); setContactReveals(data.reveals) }
+    catch (err) { console.error(err) }
+    finally { setLoadingContacts(false) }
+  }
+
   const handleRespond = async (reviewId: string) => {
     if (respondBody.trim().length < 5) { setRespondError('Escribí una respuesta un poco más completa.'); return }
     setRespondSubmitting(true); setRespondError('')
@@ -170,8 +182,8 @@ export default function PanelPage() {
             { label: 'Reseñas totales', value: stats.totalReviews, icon: 'ti-message', color: 'text-brand-blue', tab: 'reviews' as const },
             { label: 'Verificadas', value: `${stats.verifiedPct}%`, icon: 'ti-shield-check', color: 'text-brand-green', tab: 'reviews' as const },
             { label: 'Leads este mes', value: stats.leads, icon: 'ti-user-check', color: 'text-brand-dark', tab: 'leads' as const },
-            { label: 'Quisieron tu contacto', value: stats.contactReveals, icon: 'ti-phone-ringing', color: 'text-brand-green', tab: null },
-          ].map(s => <button key={s.label} onClick={() => s.tab && setActiveTab(s.tab)} className={`card p-4 text-left ${s.tab ? 'hover:shadow-card-hover cursor-pointer transition-shadow' : 'cursor-default'}`}><div className={`text-2xl font-bold ${s.color}`}>{s.value}</div><div className="text-xs text-brand-slate mt-0.5 flex items-center gap-1"><i className={`ti ${s.icon} text-xs`} /> {s.label}</div></button>)}
+            { label: 'Quisieron tu contacto', value: stats.contactReveals, icon: 'ti-phone-ringing', color: 'text-brand-green', tab: null, onClick: handleOpenContacts },
+          ].map(s => <button key={s.label} onClick={() => s.onClick ? s.onClick() : s.tab && setActiveTab(s.tab)} className="card p-4 text-left hover:shadow-card-hover cursor-pointer transition-shadow"><div className={`text-2xl font-bold ${s.color}`}>{s.value}</div><div className="text-xs text-brand-slate mt-0.5 flex items-center gap-1"><i className={`ti ${s.icon} text-xs`} /> {s.label}</div></button>)}
         </div>
       )}
 
@@ -247,19 +259,24 @@ export default function PanelPage() {
                   )}
                 </div>
               </div>
-              {r.response && (
+              {r.response && respondingId !== r.id && (
                 <div className="mt-3 pt-3 border-t border-gray-50 bg-gray-50 -mx-4 -mb-4 px-4 pb-4 rounded-b-xl">
-                  <p className="text-xs font-semibold text-brand-dark mb-1"><i className="ti ti-corner-down-right text-xs" /> Tu respuesta</p>
-                  <p className="text-xs text-brand-slate">{r.response.body}</p>
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <p className="text-xs font-semibold text-brand-dark mb-1"><i className="ti ti-corner-down-right text-xs" /> Tu respuesta</p>
+                      <p className="text-xs text-brand-slate">{r.response.body}</p>
+                    </div>
+                    {isPro && <button onClick={() => { setRespondingId(r.id); setRespondBody(r.response.body); setRespondError('') }} className="text-xs text-brand-slate hover:text-brand-green flex items-center gap-1 flex-shrink-0"><i className="ti ti-pencil text-xs" /> Editar</button>}
+                  </div>
                 </div>
               )}
               {isPro && !r.response && respondingId !== r.id && <div className="mt-3 pt-3 border-t border-gray-50"><button onClick={() => { setRespondingId(r.id); setRespondBody(''); setRespondError('') }} className="text-xs text-brand-green hover:underline flex items-center gap-1"><i className="ti ti-message-reply text-xs" /> Responder esta reseña</button></div>}
-              {isPro && !r.response && respondingId === r.id && (
+              {isPro && respondingId === r.id && (
                 <div className="mt-3 pt-3 border-t border-gray-50 space-y-2">
                   <textarea autoFocus rows={3} placeholder="Escribí tu respuesta pública..." className="input text-sm" value={respondBody} onChange={e => setRespondBody(e.target.value)} />
                   {respondError && <p className="text-xs text-brand-red">{respondError}</p>}
                   <div className="flex gap-2">
-                    <button onClick={() => handleRespond(r.id)} disabled={respondSubmitting} className="btn-primary text-xs py-2 px-4 disabled:opacity-50">{respondSubmitting ? 'Enviando...' : 'Publicar respuesta'}</button>
+                    <button onClick={() => handleRespond(r.id)} disabled={respondSubmitting} className="btn-primary text-xs py-2 px-4 disabled:opacity-50">{respondSubmitting ? 'Guardando...' : r.response ? 'Guardar cambios' : 'Publicar respuesta'}</button>
                     <button onClick={() => { setRespondingId(null); setRespondError('') }} className="btn-secondary text-xs py-2 px-4">Cancelar</button>
                   </div>
                 </div>
@@ -389,6 +406,43 @@ export default function PanelPage() {
               <button type="submit" disabled={savingEdit} className="btn-primary px-6 py-2.5 text-sm disabled:opacity-50">{savingEdit ? 'Guardando...' : 'Guardar cambios'}</button>
             </form>
           )}
+          </div>
+        </div>
+      )}
+
+      {showContactsModal && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={() => setShowContactsModal(false)}>
+          <div className="bg-white rounded-xl max-w-md w-full max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-4 border-b border-gray-100">
+              <p className="text-sm font-semibold text-brand-dark">Quisieron tu contacto</p>
+              <button onClick={() => setShowContactsModal(false)} className="text-brand-slate hover:text-brand-dark"><i className="ti ti-x text-lg" /></button>
+            </div>
+            <div className="p-4">
+              {!isPremium ? (
+                <div className="text-center py-6">
+                  <i className="ti ti-lock text-3xl text-gray-200 block mb-3" />
+                  <p className="text-sm text-brand-dark font-medium mb-1">Función del plan Premium</p>
+                  <p className="text-xs text-brand-slate mb-4">Activá Premium para ver quiénes pidieron tu contacto.</p>
+                  <Link href="/precios" className="btn-primary text-sm py-2.5 px-6">Ver planes</Link>
+                </div>
+              ) : loadingContacts ? (
+                <div className="text-center py-8"><i className="ti ti-loader-2 animate-spin text-2xl text-brand-slate" /></div>
+              ) : contactReveals && contactReveals.length > 0 ? (
+                <div className="space-y-3">
+                  {contactReveals.map((r: any) => (
+                    <div key={r.id} className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-full bg-brand-green/10 flex items-center justify-center text-brand-green text-xs font-semibold flex-shrink-0">{r.user ? r.user.name.charAt(0) : '?'}</div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-brand-dark truncate">{r.user ? r.user.name : 'Visitante anónimo'}</p>
+                        <p className="text-xs text-brand-slate">{new Date(r.createdAt).toLocaleDateString('es-AR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-brand-slate text-center py-6">Todavía nadie pidió tu contacto este mes.</p>
+              )}
+            </div>
           </div>
         </div>
       )}

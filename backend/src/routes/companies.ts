@@ -99,9 +99,29 @@ export default async function companyRoutes(app: FastifyInstance) {
     })
     if (!company) return reply.status(404).send({ error: true, message: 'Empresa no encontrada' })
 
-    await prisma.contactReveal.create({ data: { companyId: id } })
+    // Auth opcional: si el visitante está logueado, guardamos quién fue. Si no, queda anónimo.
+    let userId: string | undefined
+    try { await request.jwtVerify(); userId = (request.user as any)?.userId } catch { /* visitante anónimo, sigue igual */ }
+
+    await prisma.contactReveal.create({ data: { companyId: id, userId } })
 
     return reply.send({ phone: company.phone, website: company.website, address: company.address })
+  })
+
+  // ─── Listado de quiénes pidieron el contacto (plan Premium) ──────────────
+  app.get('/:id/contact-reveals', { preHandler: [requireBusinessOwner, requirePlan('PREMIUM')] }, async (request, reply) => {
+    const { id } = request.params as { id: string }
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+    const revealsRaw = await prisma.contactReveal.findMany({
+      where: { companyId: id, createdAt: { gte: thirtyDaysAgo } },
+      orderBy: { createdAt: 'desc' },
+      include: { user: { select: { id: true, name: true, avatarUrl: true } } },
+    })
+    const reveals = revealsRaw.map((r: typeof revealsRaw[number]) => ({
+      id: r.id, createdAt: r.createdAt,
+      user: r.user ? { id: r.user.id, name: r.user.name, avatarUrl: r.user.avatarUrl } : null,
+    }))
+    return reply.send({ reveals })
   })
 
   app.post('/', { preHandler: requireVerifiedEmail }, async (request, reply) => {
