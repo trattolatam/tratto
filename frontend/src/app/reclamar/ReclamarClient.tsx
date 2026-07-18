@@ -3,7 +3,8 @@ import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { useAuthStore } from '@/lib/store'
-import { companies, categories } from '@/lib/api'
+import { companies, categories, upload } from '@/lib/api'
+import { validateTaxId, validatePersonalId } from '@/lib/taxIdValidation'
 
 const TAX_IDS = [
   { country: 'UY', label: 'RUT', placeholder: 'Ej: 21-234567-0001' },
@@ -26,7 +27,11 @@ export default function ReclamarClient() {
   const [searched, setSearched] = useState(false)
   const [searching, setSearching] = useState(false)
   const [categoryList, setCategoryList] = useState<any[]>([])
-  const [form, setForm] = useState({ country: 'UY', taxId: '', phone: '', email: '' })
+  const [form, setForm] = useState({ country: 'UY', taxId: '', phone: '', email: '', personalIdNumber: '' })
+  const [hasCompanyTaxId, setHasCompanyTaxId] = useState(true)
+  const [docUrl, setDocUrl] = useState('')
+  const [docFile, setDocFile] = useState<File | null>(null)
+  const [uploadingDoc, setUploadingDoc] = useState(false)
   const [createForm, setCreateForm] = useState({ name: '', categoryId: '', country: 'UY', city: '', address: '', phone: '', email: '', taxId: '', description: '', website: '' })
   const [suggestingCategory, setSuggestingCategory] = useState(false)
   const [categorySuggestion, setCategorySuggestion] = useState('')
@@ -34,6 +39,18 @@ export default function ReclamarClient() {
   const [error, setError] = useState('')
   const taxIdConfig = TAX_IDS.find(t => t.country === form.country) || TAX_IDS[0]
   const createTaxIdConfig = TAX_IDS.find(t => t.country === createForm.country) || TAX_IDS[0]
+  const taxIdCheck = form.taxId.length > 3 ? validateTaxId(form.country, form.taxId) : null
+  const personalIdCheck = form.personalIdNumber.length > 3 ? validatePersonalId(form.country, form.personalIdNumber) : null
+  const needsDoc = (hasCompanyTaxId && taxIdCheck?.checksumValid === null) || !hasCompanyTaxId
+
+  const handleDocChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setDocFile(file); setUploadingDoc(true); setError('')
+    try { const result = await upload.verificationDoc(file); setDocUrl(result.url) }
+    catch (err: any) { setError(err.message || 'Error subiendo el documento') }
+    finally { setUploadingDoc(false) }
+  }
 
   useEffect(() => { categories.list().then(d => setCategoryList(d.categories)).catch(() => {}) }, [])
 
@@ -79,9 +96,29 @@ export default function ReclamarClient() {
     e.preventDefault()
     if (!user) { router.push('/registro?role=BUSINESS'); return }
     if (!selectedCompany) return
+    if (!form.phone.trim()) { setError('El teléfono es obligatorio'); return }
+    if (hasCompanyTaxId) {
+      if (!form.taxId.trim()) { setError(`Ingresá tu ${taxIdConfig.label}`); return }
+      if (taxIdCheck && !taxIdCheck.formatValid) { setError(`El formato del ${taxIdConfig.label} no es correcto`); return }
+      if (taxIdCheck && taxIdCheck.checksumValid === false) { setError(`Ese ${taxIdConfig.label} no es válido — revisá los dígitos`); return }
+    } else if (!form.personalIdNumber.trim()) {
+      setError('Ingresá tu número de documento de identidad'); return
+    } else if (personalIdCheck && personalIdCheck.checksumValid === false) {
+      setError('Ese número de documento no es válido — revisá los dígitos'); return
+    }
+    if (needsDoc && !docUrl) {
+      setError(hasCompanyTaxId ? 'Adjuntá una factura de tu empresa como respaldo' : 'Adjuntá una foto de tu documento de identidad'); return
+    }
     setSubmitting(true); setError('')
     try {
-      const result = await companies.claim(selectedCompany.id, { taxId: form.taxId || undefined, taxIdType: form.taxId ? taxIdConfig.label : undefined, phone: form.phone || undefined, email: form.email || undefined })
+      const result = await companies.claim(selectedCompany.id, {
+        country: form.country,
+        taxId: hasCompanyTaxId ? form.taxId : undefined,
+        taxIdType: hasCompanyTaxId ? taxIdConfig.label : undefined,
+        personalIdNumber: hasCompanyTaxId ? undefined : form.personalIdNumber,
+        verificationDocUrl: docUrl || undefined,
+        phone: form.phone, email: form.email || undefined,
+      })
       if (result.token) setToken(result.token)
       setStep('success')
     } catch (err: any) { setError(err.message) } finally { setSubmitting(false) }
@@ -154,13 +191,58 @@ export default function ReclamarClient() {
         <div className="card p-6">
           {error && <div className="bg-red-50 border border-red-100 rounded-lg p-3 mb-4 text-sm text-brand-red">{error}</div>}
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div><label className="label">País</label><select className="input" value={form.country} onChange={e => setForm(f => ({ ...f, country: e.target.value, taxId: '' }))}>{TAX_IDS.map(t => <option key={t.country} value={t.country}>{t.country} — {t.label}</option>)}</select></div>
-            <div>
-              <label className="label">{taxIdConfig.label} <span className="font-normal normal-case text-gray-400">(opcional, acelera la verificación)</span></label>
-              <input type="text" placeholder={taxIdConfig.placeholder} className="input" value={form.taxId} onChange={e => setForm(f => ({ ...f, taxId: e.target.value }))} />
-              <p className="text-xs text-brand-slate mt-1">Podés reclamar el perfil sin RUT y cargarlo más adelante desde "Editar perfil".</p>
+            <div className="grid grid-cols-2 gap-2 p-1 bg-gray-50 rounded-lg">
+              <button type="button" onClick={() => setHasCompanyTaxId(true)} className={`py-2 rounded-md text-sm font-medium transition-colors ${hasCompanyTaxId ? 'bg-white shadow text-brand-dark' : 'text-brand-slate'}`}>Tengo empresa registrada</button>
+              <button type="button" onClick={() => setHasCompanyTaxId(false)} className={`py-2 rounded-md text-sm font-medium transition-colors ${!hasCompanyTaxId ? 'bg-white shadow text-brand-dark' : 'text-brand-slate'}`}>Soy independiente</button>
             </div>
-            <button type="submit" disabled={submitting || !user} className="btn-primary w-full py-3 text-sm disabled:opacity-50">
+
+            {hasCompanyTaxId ? (
+              <>
+                <div><label className="label">País</label><select className="input" value={form.country} onChange={e => setForm(f => ({ ...f, country: e.target.value, taxId: '' }))}>{TAX_IDS.map(t => <option key={t.country} value={t.country}>{t.country} — {t.label}</option>)}</select></div>
+                <div>
+                  <label className="label">{taxIdConfig.label}</label>
+                  <input type="text" placeholder={taxIdConfig.placeholder} className="input" value={form.taxId} onChange={e => setForm(f => ({ ...f, taxId: e.target.value }))} />
+                  {taxIdCheck && form.taxId.length > 3 && (
+                    taxIdCheck.checksumValid === true ? <p className="text-xs text-brand-green mt-1 flex items-center gap-1"><i className="ti ti-circle-check text-xs" /> {taxIdConfig.label} válido</p>
+                    : taxIdCheck.checksumValid === false ? <p className="text-xs text-brand-red mt-1 flex items-center gap-1"><i className="ti ti-circle-x text-xs" /> Ese {taxIdConfig.label} no es válido, revisá los dígitos</p>
+                    : <p className="text-xs text-brand-slate mt-1">No podemos validar el {taxIdConfig.label} de {form.country} automáticamente — vas a necesitar adjuntar una factura.</p>
+                  )}
+                </div>
+              </>
+            ) : (
+              <>
+                <div><label className="label">País</label><select className="input" value={form.country} onChange={e => setForm(f => ({ ...f, country: e.target.value, personalIdNumber: '' }))}>{TAX_IDS.map(t => <option key={t.country} value={t.country}>{t.country}</option>)}</select></div>
+                <div>
+                  <label className="label">Número de documento de identidad</label>
+                  <input type="text" placeholder="Ej: 4.123.456-7" className="input" value={form.personalIdNumber} onChange={e => setForm(f => ({ ...f, personalIdNumber: e.target.value }))} />
+                  {personalIdCheck && form.personalIdNumber.length > 3 && (
+                    personalIdCheck.checksumValid === true ? <p className="text-xs text-brand-green mt-1 flex items-center gap-1"><i className="ti ti-circle-check text-xs" /> Documento válido</p>
+                    : personalIdCheck.checksumValid === false ? <p className="text-xs text-brand-red mt-1 flex items-center gap-1"><i className="ti ti-circle-x text-xs" /> Ese número no es válido, revisá los dígitos</p>
+                    : null
+                  )}
+                  <p className="text-xs text-brand-slate mt-1">Para independientes sin registro de empresa. Vamos a pedirte una foto del documento para verificar manualmente.</p>
+                </div>
+              </>
+            )}
+
+            {needsDoc && (
+              <div>
+                <label className="label">{hasCompanyTaxId ? 'Factura de tu empresa' : 'Foto de tu documento de identidad'}</label>
+                <label className={`block border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-all ${docUrl ? 'border-brand-green bg-brand-green-dim' : 'border-gray-200'}`}>
+                  <input type="file" accept=".jpg,.jpeg,.png,.webp,.pdf" className="hidden" onChange={handleDocChange} disabled={uploadingDoc} />
+                  {uploadingDoc ? <span className="text-sm text-brand-slate">Subiendo...</span>
+                    : docUrl ? <span className="text-sm text-brand-green font-semibold"><i className="ti ti-circle-check" /> {docFile?.name}</span>
+                    : <><i className="ti ti-upload text-xl text-gray-300 block mb-1" /><span className="text-xs text-brand-slate">JPG, PNG, WEBP o PDF · máx 5MB</span></>}
+                </label>
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-4">
+              <div><label className="label">Teléfono</label><input type="tel" required className="input" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} /></div>
+              <div><label className="label">Email <span className="font-normal normal-case text-gray-400">(opcional)</span></label><input type="email" className="input" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} /></div>
+            </div>
+
+            <button type="submit" disabled={submitting || !user || uploadingDoc} className="btn-primary w-full py-3 text-sm disabled:opacity-50">
               {submitting ? 'Enviando...' : 'Reclamar perfil gratis'}
             </button>
             <button type="button" onClick={() => setStep('search')} className="w-full text-xs text-brand-slate text-center">Volver a buscar</button>

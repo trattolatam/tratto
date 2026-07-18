@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { prisma } from '../index'
 import { requireAuth, requireVerifiedEmail, requireBusinessOwner, requirePlan } from '../middleware/auth'
 import { generateCertificatePdf } from '../services/certificate'
+import { validateTaxId, validatePersonalId } from '../services/taxIdValidation'
 import { contactRevealRateLimit } from '../middleware/rateLimits'
 
 export default async function companyRoutes(app: FastifyInstance) {
@@ -185,14 +186,17 @@ export default async function companyRoutes(app: FastifyInstance) {
   app.post('/:id/claim', { preHandler: requireVerifiedEmail }, async (request, reply) => {
     const { id } = request.params as { id: string }
     const schema = z.object({
+      country: z.string().length(2),
       taxId: z.string().min(5).optional(),
       taxIdType: z.string().optional(),
-      phone: z.string().optional(),
+      personalIdNumber: z.string().min(5).optional(),
+      verificationDocUrl: z.string().url().optional(),
+      phone: z.string().min(6),
       email: z.string().email().optional(),
-    })
+    }).refine((d) => !!d.taxId || !!d.personalIdNumber, { message: 'Ingresá tu RUT/registro de empresa, o tu número de documento si sos independiente' })
 
     const body = schema.safeParse(request.body)
-    if (!body.success) return reply.status(400).send({ error: true, message: 'Datos inválidos' })
+    if (!body.success) return reply.status(400).send({ error: true, message: body.error.issues[0]?.message || 'Datos inválidos' })
 
     const company = await prisma.company.findUnique({ where: { id } })
     if (!company) return reply.status(404).send({ error: true, message: 'Empresa no encontrada' })
@@ -201,11 +205,31 @@ export default async function companyRoutes(app: FastifyInstance) {
     const existingClaim = await prisma.company.findFirst({ where: { claimedById: request.user.userId } })
     if (existingClaim) return reply.status(409).send({ error: true, message: 'Ya tenés una empresa reclamada' })
 
+    let taxIdChecksumValid: boolean | null = null
+    if (body.data.taxId) {
+      const result = validateTaxId(body.data.country, body.data.taxId)
+      if (!result.formatValid) return reply.status(400).send({ error: true, message: 'El formato del RUT/número no parece correcto para el país seleccionado' })
+      if (result.checksumValid === false) return reply.status(400).send({ error: true, message: 'Ese RUT/número no es válido — revisá los dígitos' })
+      taxIdChecksumValid = result.checksumValid
+      // Si no se pudo validar con dígito verificador (ej. México), pedimos un documento de respaldo
+      if (taxIdChecksumValid === null && !body.data.verificationDocUrl) {
+        return reply.status(400).send({ error: true, message: 'Para este país no podemos validar el RUT automáticamente — adjuntá una factura como respaldo' })
+      }
+    } else if (body.data.personalIdNumber && !body.data.verificationDocUrl) {
+      return reply.status(400).send({ error: true, message: 'Adjuntá una foto de tu documento de identidad' })
+    } else if (body.data.personalIdNumber) {
+      const result = validatePersonalId(body.data.country, body.data.personalIdNumber)
+      if (result.checksumValid === false) return reply.status(400).send({ error: true, message: 'Ese número de documento no es válido — revisá los dígitos' })
+    }
+
     const updated = await prisma.company.update({
       where: { id },
       data: {
         claimedById: request.user.userId, claimedAt: new Date(),
-        taxId: body.data.taxId, taxIdType: body.data.taxIdType,
+        taxId: body.data.taxId, taxIdType: body.data.taxId ? body.data.taxIdType : undefined,
+        taxIdChecksumValid, personalIdNumber: body.data.personalIdNumber,
+        verificationDocUrl: body.data.verificationDocUrl,
+        verificationDocType: body.data.personalIdNumber ? 'personal_id' : (taxIdChecksumValid === null ? 'invoice' : undefined),
         phone: body.data.phone, email: body.data.email,
       },
     })
@@ -218,6 +242,28 @@ export default async function companyRoutes(app: FastifyInstance) {
     )
 
     return reply.send({ company: updated, token, message: 'Perfil reclamado. Revisaremos la verificación en 24hs.' })
+  })
+
+  // ─── Denunciar que el reclamo actual de una empresa es falso ─────────────
+  app.post('/:id/dispute-claim', { preHandler: requireVerifiedEmail, config: { rateLimit: contactRevealRateLimit } }, async (request, reply) => {
+    const { id } = request.params as { id: string }
+    const schema = z.object({ reason: z.string().min(20).max(1000), evidenceDocUrl: z.string().url().optional() })
+    const body = schema.safeParse(request.body)
+    if (!body.success) return reply.status(400).send({ error: true, message: 'Contanos con más detalle por qué creés que el reclamo es falso (mínimo 20 caracteres)' })
+
+    const company = await prisma.company.findUnique({ where: { id } })
+    if (!company) return reply.status(404).send({ error: true, message: 'Empresa no encontrada' })
+    if (!company.claimedById) return reply.status(400).send({ error: true, message: 'Esta empresa no está reclamada por nadie' })
+    if (company.claimedById === request.user.userId) return reply.status(400).send({ error: true, message: 'No podés denunciar tu propio reclamo' })
+
+    const existing = await prisma.claimDispute.findFirst({ where: { companyId: id, disputedById: request.user.userId, status: 'PENDING' } })
+    if (existing) return reply.status(409).send({ error: true, message: 'Ya tenés una denuncia pendiente para esta empresa' })
+
+    const dispute = await prisma.claimDispute.create({
+      data: { companyId: id, disputedById: request.user.userId, reason: body.data.reason, evidenceDocUrl: body.data.evidenceDocUrl },
+    })
+
+    return reply.status(201).send({ dispute, message: 'Denuncia recibida. La vamos a revisar en las próximas 48hs.' })
   })
 
   app.patch('/:id', { preHandler: requireBusinessOwner }, async (request, reply) => {

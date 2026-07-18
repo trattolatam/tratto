@@ -118,6 +118,7 @@ model User {
   notifications  Notification[]
   bookings       Booking[]
   contactReveals ContactReveal[]
+  claimDisputes  ClaimDispute[]   @relation("DisputesFiled")
   referredBy     User?            @relation("Referrals", fields: [referredById], references: [id])
   referrals      User[]           @relation("Referrals")
   adAccounts     AdAccount[]
@@ -183,6 +184,10 @@ model Company {
 
   taxId         String?
   taxIdType     String?
+  taxIdChecksumValid Boolean?
+  personalIdNumber   String?
+  verificationDocUrl String?
+  verificationDocType String?
 
   claimedById   String?     @unique
   claimedAt     DateTime?
@@ -217,6 +222,7 @@ model Company {
   boosts        ProfileBoost[]
   leads         Lead[]
   contactReveals ContactReveal[]
+  disputes      ClaimDispute[]   @relation("CompanyDisputes")
   aiSummary     AiSummary?
   bookingSlots  BookingSlot[]
   bookings      Booking[]
@@ -453,6 +459,27 @@ model ContactReveal {
 
   @@index([companyId, createdAt])
   @@map("contact_reveals")
+}
+
+// ─── DENUNCIA DE RECLAMO FALSO ──────────────────────────────────────────────
+
+model ClaimDispute {
+  id              String    @id @default(uuid())
+  companyId       String
+  disputedById    String
+  reason          String
+  evidenceDocUrl  String?
+  status          String    @default("PENDING") // PENDING | APPROVED | REJECTED
+  resolvedById    String?
+  resolvedAt      DateTime?
+  resolutionNote  String?
+  createdAt       DateTime  @default(now())
+
+  company         Company   @relation("CompanyDisputes", fields: [companyId], references: [id])
+  disputedBy      User      @relation("DisputesFiled", fields: [disputedById], references: [id])
+
+  @@index([companyId, status])
+  @@map("claim_disputes")
 }
 
 // ─── BOOST DE PERFIL ──────────────────────────────────────────────────────────

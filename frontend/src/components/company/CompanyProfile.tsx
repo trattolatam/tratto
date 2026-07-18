@@ -1,12 +1,14 @@
 'use client'
 import { useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { Company, Review, Ad, MEDAL_META, MedalType } from '@/types'
-import { reviews as reviewsApi, leads, companies } from '@/lib/api'
+import { reviews as reviewsApi, leads, companies, upload } from '@/lib/api'
 import { useAuthStore } from '@/lib/store'
 
 export function CompanyProfile({ company, ads }: { company: Company; ads: Ad[] }) {
   const { user } = useAuthStore()
+  const router = useRouter()
   const isOwner = user?.company?.id === company.id
   const isPro = ['PROFESSIONAL', 'PREMIUM', 'ENTERPRISE'].includes(company.plan)
   const [activeTab, setActiveTab] = useState<'reviews' | 'info'>('reviews')
@@ -15,6 +17,33 @@ export function CompanyProfile({ company, ads }: { company: Company; ads: Ad[] }
   const [leadForm, setLeadForm] = useState({ name: '', email: '', phone: '', message: '' })
   const [contactRevealed, setContactRevealed] = useState<{ phone: string | null; website: string | null; address: string | null } | null>(null)
   const [revealing, setRevealing] = useState(false)
+  const [showDisputeForm, setShowDisputeForm] = useState(false)
+  const [disputeReason, setDisputeReason] = useState('')
+  const [disputeDocUrl, setDisputeDocUrl] = useState('')
+  const [uploadingDisputeDoc, setUploadingDisputeDoc] = useState(false)
+  const [disputeSubmitting, setDisputeSubmitting] = useState(false)
+  const [disputeError, setDisputeError] = useState('')
+  const [disputeSent, setDisputeSent] = useState(false)
+
+  const handleDisputeDocChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploadingDisputeDoc(true); setDisputeError('')
+    try { const result = await upload.verificationDoc(file); setDisputeDocUrl(result.url) }
+    catch (err: any) { setDisputeError(err.message || 'Error subiendo el archivo') }
+    finally { setUploadingDisputeDoc(false) }
+  }
+
+  const handleDisputeSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (disputeReason.trim().length < 20) { setDisputeError('Contanos con más detalle (mínimo 20 caracteres)'); return }
+    setDisputeSubmitting(true); setDisputeError('')
+    try {
+      await companies.disputeClaim(company.id, { reason: disputeReason.trim(), evidenceDocUrl: disputeDocUrl || undefined })
+      setDisputeSent(true)
+    } catch (err: any) { setDisputeError(err.message || 'Error al enviar la denuncia') }
+    finally { setDisputeSubmitting(false) }
+  }
 
   const handleRevealContact = async () => {
     setRevealing(true)
@@ -53,6 +82,7 @@ export function CompanyProfile({ company, ads }: { company: Company; ads: Ad[] }
               </div>
               <p className="text-white/60 text-sm mt-1"><i className="ti ti-map-pin text-xs mr-1" />{company.category?.name} · {company.city}, {company.country}</p>
               {!company.claimedById && <Link href={`/reclamar?slug=${company.slug}`} className="inline-flex items-center gap-1 text-xs text-brand-amber mt-1 hover:underline"><i className="ti ti-alert-circle text-xs" />Perfil no reclamado — ¿es tu empresa?</Link>}
+              {company.claimedById && !isOwner && <button onClick={() => user ? setShowDisputeForm(true) : router.push('/login')} className="inline-flex items-center gap-1 text-xs text-white/40 mt-1 hover:text-white/70 hover:underline"><i className="ti ti-flag text-xs" />¿Es tu empresa y este reclamo es falso?</button>}
             </div>
           </div>
           <div className="grid grid-cols-3 gap-3">
@@ -170,6 +200,42 @@ export function CompanyProfile({ company, ads }: { company: Company; ads: Ad[] }
           </div>
         </div>
       </div>
+
+      {showDisputeForm && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={() => !disputeSubmitting && setShowDisputeForm(false)}>
+          <div className="bg-white rounded-xl max-w-md w-full max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-4 border-b border-gray-100">
+              <p className="text-sm font-semibold text-brand-dark">Denunciar reclamo falso</p>
+              <button onClick={() => setShowDisputeForm(false)} className="text-brand-slate hover:text-brand-dark"><i className="ti ti-x text-lg" /></button>
+            </div>
+            <div className="p-4">
+              {disputeSent ? (
+                <div className="text-center py-6">
+                  <i className="ti ti-circle-check text-3xl text-brand-green block mb-3" />
+                  <p className="text-sm text-brand-dark font-medium">Denuncia recibida</p>
+                  <p className="text-xs text-brand-slate mt-1">La vamos a revisar en las próximas 48hs.</p>
+                </div>
+              ) : (
+                <form onSubmit={handleDisputeSubmit} className="space-y-3">
+                  <p className="text-xs text-brand-slate">Si esta empresa es tuya y otra persona la reclamó sin autorización, contanos por qué y te vamos a pedir que reclames el perfil vos mismo una vez que revisemos esto.</p>
+                  {disputeError && <p className="text-xs text-brand-red">{disputeError}</p>}
+                  <textarea required rows={4} placeholder="Explicá por qué el reclamo actual es falso..." className="input text-sm" value={disputeReason} onChange={e => setDisputeReason(e.target.value)} />
+                  <div>
+                    <label className="label">Evidencia <span className="font-normal normal-case text-gray-400">(opcional)</span></label>
+                    <label className={`block border-2 border-dashed rounded-xl p-3 text-center cursor-pointer transition-all ${disputeDocUrl ? 'border-brand-green bg-brand-green-dim' : 'border-gray-200'}`}>
+                      <input type="file" accept=".jpg,.jpeg,.png,.webp,.pdf" className="hidden" onChange={handleDisputeDocChange} disabled={uploadingDisputeDoc} />
+                      {uploadingDisputeDoc ? <span className="text-xs text-brand-slate">Subiendo...</span>
+                        : disputeDocUrl ? <span className="text-xs text-brand-green font-semibold"><i className="ti ti-circle-check" /> Archivo cargado</span>
+                        : <span className="text-xs text-brand-slate">JPG, PNG, WEBP o PDF · máx 5MB</span>}
+                    </label>
+                  </div>
+                  <button type="submit" disabled={disputeSubmitting || uploadingDisputeDoc} className="btn-primary w-full py-2.5 text-sm disabled:opacity-50">{disputeSubmitting ? 'Enviando...' : 'Enviar denuncia'}</button>
+                </form>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }

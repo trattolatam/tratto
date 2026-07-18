@@ -33,6 +33,7 @@ export const companies = {
   update: (id: string, body: any) => apiFetch<{ company: any }>(`/api/companies/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
   stats: (id: string) => apiFetch<any>(`/api/companies/${id}/stats`),
   revealContact: (id: string) => apiFetch<{ phone: string | null; website: string | null; address: string | null }>(`/api/companies/${id}/contact-reveal`, { method: 'POST', body: JSON.stringify({}) }),
+  disputeClaim: (id: string, body: { reason: string; evidenceDocUrl?: string }) => apiFetch<{ message: string }>(`/api/companies/${id}/dispute-claim`, { method: 'POST', body: JSON.stringify(body) }),
   competitiveIntel: (id: string) => apiFetch<any>(`/api/companies/${id}/competitive-intel`),
   contactReveals: (id: string) => apiFetch<{ reveals: any[] }>(`/api/companies/${id}/contact-reveals`),
   downloadCertificate: async (id: string): Promise<Blob> => {
@@ -118,6 +119,13 @@ export const upload = {
     const form = new FormData(); form.append('file', file)
     const res = await fetch(`${API_URL}/api/upload/review-photo`, { method: 'POST', headers: token ? { Authorization: `Bearer ${token}` } : {}, body: form })
     if (!res.ok) throw new Error('Error subiendo la foto')
+    return res.json()
+  },
+  verificationDoc: async (file: File): Promise<{ url: string }> => {
+    const token = localStorage.getItem('tratto_token')
+    const form = new FormData(); form.append('file', file)
+    const res = await fetch(`${API_URL}/api/upload/verification-doc`, { method: 'POST', headers: token ? { Authorization: `Bearer ${token}` } : {}, body: form })
+    if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.message || 'Error subiendo el documento') }
     return res.json()
   },
 }
