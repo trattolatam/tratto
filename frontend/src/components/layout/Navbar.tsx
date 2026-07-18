@@ -7,7 +7,13 @@ import { useAuthStore } from '@/lib/store'
 export function Navbar() {
   const { user, logout } = useAuthStore()
   const [menuOpen, setMenuOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
   const router = useRouter()
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault()
+    router.push(`/buscar${searchQuery.trim() ? `?q=${encodeURIComponent(searchQuery.trim())}` : ''}`)
+  }
 
   const handleLogout = () => {
     logout()
@@ -25,10 +31,10 @@ export function Navbar() {
           <span className="font-bold text-brand-dark text-base tracking-tight">Tratto</span>
         </Link>
 
-        <div className="hidden md:flex flex-1 max-w-md relative">
+        <form onSubmit={handleSearch} className="hidden md:flex flex-1 max-w-md relative">
           <i className="ti ti-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-base" />
-          <input type="text" placeholder="Buscar electricistas, peluquerías, psicólogos..." className="input pl-9 py-2 text-sm" />
-        </div>
+          <input type="text" placeholder="Buscar electricistas, peluquerías, psicólogos..." className="input pl-9 py-2 text-sm" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
+        </form>
 
         <div className="hidden md:flex items-center gap-1">
           <Link href="/categorias" className="text-sm text-gray-600 hover:text-brand-dark px-3 py-1.5 rounded-lg hover:bg-gray-50 transition-colors">Categorías</Link>
