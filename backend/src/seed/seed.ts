@@ -154,9 +154,18 @@ async function main() {
   }
   console.log(`   ✅ ${totalReviews} reseñas creadas\n`)
 
-  console.log('💎 Activando plan Pro en empresas de demo...')
-  const demoCompanies = createdCompanies.slice(0, 3)
-  for (const company of demoCompanies) {
+  console.log('💎 Activando planes pagos en empresas de demo (sin dueño, solo para ver el ranking mezclado)...')
+  const premiumDemo = createdCompanies.slice(0, 2)
+  const proDemo = createdCompanies.slice(2, 5)
+  for (const company of premiumDemo) {
+    await prisma.company.update({ where: { id: company.id }, data: { plan: 'PREMIUM', isVerified: true, verifiedAt: new Date() } })
+    const periodEnd = new Date(); periodEnd.setMonth(periodEnd.getMonth() + 1)
+    await prisma.subscription.upsert({
+      where: { companyId: company.id }, update: {},
+      create: { companyId: company.id, plan: 'PREMIUM', provider: 'STRIPE', providerSubId: `demo_sub_${company.id.substring(0, 8)}`, status: 'ACTIVE', amountUsd: 79, currentPeriodEnd: periodEnd },
+    })
+  }
+  for (const company of proDemo) {
     await prisma.company.update({ where: { id: company.id }, data: { plan: 'PROFESSIONAL', isVerified: true, verifiedAt: new Date() } })
     const periodEnd = new Date(); periodEnd.setMonth(periodEnd.getMonth() + 1)
     await prisma.subscription.upsert({
@@ -164,7 +173,8 @@ async function main() {
       create: { companyId: company.id, plan: 'PROFESSIONAL', provider: 'STRIPE', providerSubId: `demo_sub_${company.id.substring(0, 8)}`, status: 'ACTIVE', amountUsd: 29, currentPeriodEnd: periodEnd },
     })
   }
-  console.log(`   ✅ ${demoCompanies.length} empresas con plan Pro demo\n`)
+  const demoCompanies = [...premiumDemo, ...proDemo]
+  console.log(`   ✅ ${premiumDemo.length} en Premium, ${proDemo.length} en Profesional (el resto queda en Gratis)\n`)
 
   console.log('🏅 Otorgando medallas iniciales...')
   const year = new Date().getFullYear()
@@ -176,6 +186,58 @@ async function main() {
   }
   console.log(`   ✅ Medallas otorgadas\n`)
 
+  console.log('🧪 Creando cuentas de empresa de TEST (con dueño, para loguearte directo)...')
+  const testPassword = await bcrypt.hash('test123456', 12)
+  const TEST_ACCOUNTS = [
+    { email: 'profesional@test.tratto.lat', name: 'Dueño Test Profesional', companyName: 'Empresa Test Profesional', plan: 'PROFESSIONAL' as const, amountUsd: 29, categorySlug: 'electricistas' },
+    { email: 'premium@test.tratto.lat', name: 'Dueño Test Premium', companyName: 'Empresa Test Premium', plan: 'PREMIUM' as const, amountUsd: 79, categorySlug: 'electricistas' },
+  ]
+
+  for (const acc of TEST_ACCOUNTS) {
+    const owner = await prisma.user.upsert({
+      where: { email: acc.email }, update: { role: 'BUSINESS' },
+      create: { email: acc.email, passwordHash: testPassword, name: acc.name, role: 'BUSINESS', country: 'UY', isVerified: true },
+    })
+
+    const slug = generateSlug(acc.companyName, 'Montevideo')
+    const company = await prisma.company.upsert({
+      where: { slug }, update: {},
+      create: {
+        name: acc.companyName, slug, description: 'Empresa de prueba para testear funciones del plan pago en Tratto.',
+        categoryId: categoryMap[acc.categorySlug], country: 'UY', city: 'Montevideo', phone: '+598 99 000 000',
+        website: 'https://tratto.lat', plan: acc.plan, isVerified: true, verifiedAt: new Date(),
+        claimedById: owner.id, ratingAvg: 0, reviewCount: 0,
+      },
+    })
+
+    // Reseñas de prueba para que el panel y "Competencia" tengan datos reales
+    const usedReviewers = new Set<string>()
+    const numReviews = Math.floor(Math.random() * 6) + 6
+    for (let i = 0; i < numReviews; i++) {
+      const availableReviewers = reviewers.filter(r => !usedReviewers.has(r.id))
+      if (availableReviewers.length === 0) break
+      const reviewer = availableReviewers[Math.floor(Math.random() * availableReviewers.length)]
+      usedReviewers.add(reviewer.id)
+      const template = REVIEW_TEMPLATES[Math.floor(Math.random() * REVIEW_TEMPLATES.length)]
+      const daysAgo = Math.floor(Math.random() * 90)
+      await prisma.review.create({
+        data: { companyId: company.id, userId: reviewer.id, rating: template.rating, body: template.body, isVerified: template.isVerified, verifiedAt: template.isVerified ? new Date() : null, proofType: template.proofType || undefined, status: 'APPROVED', createdAt: new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000) },
+      })
+    }
+    const result = await prisma.review.aggregate({ where: { companyId: company.id, status: 'APPROVED' }, _avg: { rating: true }, _count: { id: true } })
+    const verifiedCount = await prisma.review.count({ where: { companyId: company.id, status: 'APPROVED', isVerified: true } })
+    await prisma.company.update({ where: { id: company.id }, data: { ratingAvg: Math.round((result._avg.rating || 0) * 10) / 10, reviewCount: result._count.id, verifiedReviewCount: verifiedCount } })
+
+    const periodEnd = new Date(); periodEnd.setMonth(periodEnd.getMonth() + 1)
+    await prisma.subscription.upsert({
+      where: { companyId: company.id }, update: {},
+      create: { companyId: company.id, plan: acc.plan, provider: 'STRIPE', providerSubId: `test_sub_${company.id.substring(0, 8)}`, status: 'ACTIVE', amountUsd: acc.amountUsd, currentPeriodEnd: periodEnd },
+    })
+
+    console.log(`   ✅ ${acc.plan}: ${acc.email} / test123456 → empresa "${acc.companyName}"`)
+  }
+  console.log('')
+
   const stats = await Promise.all([prisma.category.count(), prisma.company.count(), prisma.review.count(), prisma.user.count()])
   console.log('─'.repeat(50))
   console.log('✅ Seed completado exitosamente\n')
@@ -185,8 +247,10 @@ async function main() {
   console.log(`   Reseñas:     ${stats[2]}`)
   console.log(`   Usuarios:    ${stats[3]}`)
   console.log('\n🔐 Credenciales de acceso:')
-  console.log('   Admin:    admin@tratto.lat / admin123456')
-  console.log('   Reviewer: reviewer1@example.com / reviewer123')
+  console.log('   Admin:       admin@tratto.lat / admin123456')
+  console.log('   Reviewer:    reviewer1@example.com / reviewer123')
+  console.log('   Profesional: profesional@test.tratto.lat / test123456')
+  console.log('   Premium:     premium@test.tratto.lat / test123456')
   console.log('─'.repeat(50))
 }
 
