@@ -8,6 +8,7 @@ import { useAuthStore } from '@/lib/store'
 export function CompanyProfile({ company, ads }: { company: Company; ads: Ad[] }) {
   const { user } = useAuthStore()
   const isOwner = user?.company?.id === company.id
+  const isPro = ['PROFESSIONAL', 'PREMIUM', 'ENTERPRISE'].includes(company.plan)
   const [activeTab, setActiveTab] = useState<'reviews' | 'info'>('reviews')
   const [showLeadForm, setShowLeadForm] = useState(false)
   const [leadSent, setLeadSent] = useState(false)
@@ -95,7 +96,7 @@ export function CompanyProfile({ company, ads }: { company: Company; ads: Ad[] }
               ))}
             </div>
 
-            {activeTab === 'reviews' && <ReviewsList companyId={company.id} />}
+            {activeTab === 'reviews' && <ReviewsList companyId={company.id} isOwner={isOwner} isPro={isPro} />}
             {activeTab === 'info' && (
               <div className="card p-5 space-y-3">
                 {(company.phone || company.website || company.address) && (
@@ -171,7 +172,7 @@ export function CompanyProfile({ company, ads }: { company: Company; ads: Ad[] }
   )
 }
 
-function ReviewsList({ companyId }: { companyId: string }) {
+function ReviewsList({ companyId, isOwner, isPro }: { companyId: string; isOwner: boolean; isPro: boolean }) {
   const [reviewsList, setReviewsList] = useState<Review[]>([])
   const [loading, setLoading] = useState(true)
   const [verifiedOnly, setVerifiedOnly] = useState(false)
@@ -191,12 +192,27 @@ function ReviewsList({ companyId }: { companyId: string }) {
       </div>
       {reviewsList.length === 0 ? (
         <div className="card p-8 text-center"><i className="ti ti-message-circle text-3xl text-gray-200 block mb-2" /><p className="text-sm text-brand-slate">Sin reseñas todavía. ¡Sé el primero!</p></div>
-      ) : reviewsList.map(review => <ReviewItem key={review.id} review={review} />)}
+      ) : reviewsList.map(review => (
+        <ReviewItem key={review.id} review={review} canRespond={isOwner && isPro} onResponded={(body) => setReviewsList(prev => prev.map(r => r.id === review.id ? { ...r, response: { id: r.response?.id || '', body, createdAt: r.response?.createdAt || new Date().toISOString() } } : r))} />
+      ))}
     </div>
   )
 }
 
-function ReviewItem({ review }: { review: Review }) {
+function ReviewItem({ review, canRespond, onResponded }: { review: Review; canRespond: boolean; onResponded: (body: string) => void }) {
+  const [editing, setEditing] = useState(false)
+  const [respondBody, setRespondBody] = useState(review.response?.body || '')
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState('')
+
+  const handleSubmit = async () => {
+    if (respondBody.trim().length < 10) { setError('La respuesta debe tener al menos 10 caracteres.'); return }
+    setSubmitting(true); setError('')
+    try { await reviewsApi.respond(review.id, respondBody.trim()); onResponded(respondBody.trim()); setEditing(false) }
+    catch (err: any) { setError(err.message || 'Error al guardar la respuesta') }
+    finally { setSubmitting(false) }
+  }
+
   return (
     <div className="card p-4">
       <div className="flex items-start justify-between gap-3 mb-2">
@@ -215,10 +231,26 @@ function ReviewItem({ review }: { review: Review }) {
         </div>
       )}
       {review.proofType && <div className="mt-2 flex items-center gap-1.5 text-xs text-brand-amber"><i className="ti ti-file-check text-sm" />Comprobante: {review.proofType}</div>}
-      {review.response && (
+      {review.response && !editing && (
         <div className="mt-3 pt-3 border-t border-gray-50 bg-gray-50 rounded-lg p-3">
-          <p className="text-xs font-semibold text-brand-dark mb-1 flex items-center gap-1"><i className="ti ti-building text-xs text-brand-green" />Respuesta de la empresa</p>
+          <div className="flex items-start justify-between gap-2">
+            <p className="text-xs font-semibold text-brand-dark mb-1 flex items-center gap-1"><i className="ti ti-building text-xs text-brand-green" />Respuesta de la empresa</p>
+            {canRespond && <button onClick={() => { setRespondBody(review.response!.body); setEditing(true); setError('') }} className="text-xs text-brand-slate hover:text-brand-green flex items-center gap-1 flex-shrink-0"><i className="ti ti-pencil text-xs" /> Editar</button>}
+          </div>
           <p className="text-xs text-brand-slate leading-relaxed">{review.response.body}</p>
+        </div>
+      )}
+      {canRespond && !review.response && !editing && (
+        <button onClick={() => { setRespondBody(''); setEditing(true); setError('') }} className="mt-3 pt-3 border-t border-gray-50 w-full text-left text-xs text-brand-green hover:underline flex items-center gap-1"><i className="ti ti-message-reply text-xs" /> Responder esta reseña</button>
+      )}
+      {canRespond && editing && (
+        <div className="mt-3 pt-3 border-t border-gray-50 space-y-2">
+          <textarea autoFocus rows={3} placeholder="Escribí tu respuesta pública..." className="input text-sm" value={respondBody} onChange={e => setRespondBody(e.target.value)} />
+          {error && <p className="text-xs text-brand-red">{error}</p>}
+          <div className="flex gap-2">
+            <button onClick={handleSubmit} disabled={submitting} className="btn-primary text-xs py-2 px-4 disabled:opacity-50">{submitting ? 'Guardando...' : review.response ? 'Guardar cambios' : 'Publicar respuesta'}</button>
+            <button onClick={() => { setEditing(false); setError('') }} className="btn-secondary text-xs py-2 px-4">Cancelar</button>
+          </div>
         </div>
       )}
     </div>

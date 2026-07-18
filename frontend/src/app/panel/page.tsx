@@ -237,6 +237,11 @@ export default function PanelPage() {
                     <i className={`ti ${uploadingLogo ? 'ti-loader-2 animate-spin' : 'ti-upload'} text-brand-slate`} /> {uploadingLogo ? 'Subiendo...' : 'Subir logo'}
                   </button>
                   {logoError && <p className="text-xs text-brand-red px-2.5">{logoError}</p>}
+                  <input ref={photoInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handlePhotoChange} />
+                  <button onClick={handlePhotoClick} disabled={uploadingPhoto} className="w-full flex items-center gap-2 p-2.5 rounded-lg hover:bg-gray-50 transition-colors text-sm text-brand-dark text-left disabled:opacity-50">
+                    <i className={`ti ${uploadingPhoto ? 'ti-loader-2 animate-spin' : 'ti-photo-plus'} text-brand-slate`} /> {uploadingPhoto ? 'Subiendo...' : 'Subir foto de trabajo'}
+                  </button>
+                  {photoError && <p className="text-xs text-brand-red px-2.5">{photoError}</p>}
                 </>
               )}
             </div>
