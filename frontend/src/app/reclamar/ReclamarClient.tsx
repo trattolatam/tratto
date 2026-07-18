@@ -41,7 +41,7 @@ export default function ReclamarClient() {
     const slugParam = searchParams.get('slug')
     if (slugParam) {
       if (!user) { router.push(`/registro?role=BUSINESS&slug=${encodeURIComponent(slugParam)}`); return }
-      companies.get(slugParam).then(data => handleSelect(data.company)).catch(() => {})
+      companies.get(slugParam).then(data => { setSearchTerm(data.company.name); handleSearchTerm(data.company.name) }).catch(() => {})
       return
     }
     const preset = searchParams.get('empresa')
