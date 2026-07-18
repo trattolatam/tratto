@@ -1,24 +1,14 @@
 'use client'
 import Link from 'next/link'
-import { useState, useRef, useEffect } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/lib/store'
 
 export function Navbar() {
   const { user, logout } = useAuthStore()
   const [menuOpen, setMenuOpen] = useState(false)
-  const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
-  const userMenuRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
-
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) setUserMenuOpen(false)
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
@@ -28,7 +18,6 @@ export function Navbar() {
   const handleLogout = () => {
     logout()
     setMenuOpen(false)
-    setUserMenuOpen(false)
     router.push('/')
   }
 
@@ -59,18 +48,18 @@ export function Navbar() {
               {user.role === 'BUSINESS' && (
                 <Link href="/panel" className="btn-secondary py-1.5 text-xs hidden md:flex"><i className="ti ti-layout-dashboard text-sm" />Mi panel</Link>
               )}
-              <div className="relative" ref={userMenuRef}>
-                <button onClick={() => setUserMenuOpen(v => !v)} className="w-8 h-8 rounded-full bg-brand-green/20 flex items-center justify-center text-brand-green font-semibold text-sm">{user.name.charAt(0).toUpperCase()}</button>
-                {userMenuOpen && (
-                  <div className="absolute right-0 top-10 w-44 bg-white shadow-card-hover rounded-lg border border-gray-100 py-1 z-50">
+              <div className="relative group">
+                <button className="w-8 h-8 rounded-full bg-brand-green/20 flex items-center justify-center text-brand-green font-semibold text-sm">{user.name.charAt(0).toUpperCase()}</button>
+                <div className="absolute right-0 top-8 pt-2 w-44 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none group-hover:pointer-events-auto z-50">
+                  <div className="bg-white shadow-card-hover rounded-lg border border-gray-100 py-1">
                     <div className="px-3 py-2 border-b border-gray-100">
                       <p className="text-xs font-semibold text-brand-dark truncate">{user.name}</p>
                       <p className="text-xs text-gray-400 truncate">{user.email}</p>
                     </div>
-                    <Link href="/perfil" onClick={() => setUserMenuOpen(false)} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-brand-dark hover:bg-gray-50 text-left"><i className="ti ti-user-circle text-sm" /> Mi perfil</Link>
+                    <Link href="/perfil" className="w-full flex items-center gap-2 px-3 py-2 text-xs text-brand-dark hover:bg-gray-50 text-left"><i className="ti ti-user-circle text-sm" /> Mi perfil</Link>
                     <button onClick={handleLogout} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-brand-red hover:bg-red-50 text-left"><i className="ti ti-logout text-sm" /> Cerrar sesión</button>
                   </div>
-                )}
+                </div>
               </div>
             </div>
           ) : (
