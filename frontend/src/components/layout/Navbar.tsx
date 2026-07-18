@@ -32,7 +32,7 @@ export function Navbar() {
         </Link>
 
         <form onSubmit={handleSearch} className="hidden md:flex flex-1 max-w-md relative">
-          <i className="ti ti-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-base" />
+          <button type="submit" className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-brand-green transition-colors"><i className="ti ti-search text-base" /></button>
           <input type="text" placeholder="Buscar electricistas, peluquerías, psicólogos..." className="input pl-9 py-2 text-sm" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
         </form>
 
