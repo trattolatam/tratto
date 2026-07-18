@@ -33,6 +33,18 @@ export const companies = {
   update: (id: string, body: any) => apiFetch<{ company: any }>(`/api/companies/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
   stats: (id: string) => apiFetch<any>(`/api/companies/${id}/stats`),
   revealContact: (id: string) => apiFetch<{ phone: string | null; website: string | null; address: string | null }>(`/api/companies/${id}/contact-reveal`, { method: 'POST', body: JSON.stringify({}) }),
+  competitiveIntel: (id: string) => apiFetch<any>(`/api/companies/${id}/competitive-intel`),
+  downloadCertificate: async (id: string): Promise<Blob> => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('tratto_token') : null
+    const res = await fetch(`${API_URL}/api/companies/${id}/certificate`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      throw new Error(data.message || 'Error al descargar el certificado')
+    }
+    return res.blob()
+  },
 }
 
 export const reviews = {

@@ -11,8 +11,11 @@ export default function PanelPage() {
   const [stats, setStats] = useState<any>(null)
   const [pendingReviews, setPendingReviews] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<'overview' | 'reviews' | 'leads' | 'editar'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'reviews' | 'leads' | 'competencia' | 'editar'>('overview')
   const [uploadingLogo, setUploadingLogo] = useState(false)
+  const [downloadingCert, setDownloadingCert] = useState(false)
+  const [intel, setIntel] = useState<any>(null)
+  const [loadingIntel, setLoadingIntel] = useState(false)
   const [logoError, setLogoError] = useState('')
   const logoInputRef = useRef<HTMLInputElement>(null)
   const [companyDetails, setCompanyDetails] = useState<any>(null)
@@ -78,6 +81,28 @@ export default function PanelPage() {
 
   const company = user.company!
   const isPro = ['PROFESSIONAL', 'PREMIUM', 'ENTERPRISE'].includes(company.plan)
+  const isPremium = ['PREMIUM', 'ENTERPRISE'].includes(company.plan)
+
+  const handleOpenCompetencia = async () => {
+    setActiveTab('competencia')
+    if (!isPremium || intel) return
+    setLoadingIntel(true)
+    try { setIntel(await companiesApi.competitiveIntel(company.id)) }
+    catch (err: any) { console.error(err) }
+    finally { setLoadingIntel(false) }
+  }
+
+  const handleDownloadCertificate = async () => {
+    setDownloadingCert(true)
+    try {
+      const blob = await companiesApi.downloadCertificate(company.id)
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url; a.download = `certificado-${company.slug}.pdf`; a.click()
+      URL.revokeObjectURL(url)
+    } catch (err: any) { alert(err.message) }
+    finally { setDownloadingCert(false) }
+  }
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-8">
@@ -94,6 +119,7 @@ export default function PanelPage() {
         </div>
         <div className="flex gap-2">
           <Link href={`/empresa/${company.slug}`} className="btn-secondary text-xs py-2 px-3"><i className="ti ti-external-link text-sm" /> Ver perfil</Link>
+          {isPro && <button onClick={handleDownloadCertificate} disabled={downloadingCert} className="btn-secondary text-xs py-2 px-3 disabled:opacity-50"><i className="ti ti-certificate text-sm" /> {downloadingCert ? 'Generando...' : 'Certificado PDF'}</button>}
           {!isPro && <Link href="/precios" className="btn-primary text-xs py-2 px-3"><i className="ti ti-crown text-sm" /> Actualizar plan</Link>}
         </div>
       </div>
@@ -127,8 +153,8 @@ export default function PanelPage() {
       )}
 
       <div className="flex border-b border-gray-100 gap-4 mb-5">
-        {(['overview', 'reviews', 'leads', 'editar'] as const).map(tab => (
-          <button key={tab} onClick={() => setActiveTab(tab)} className={`pb-3 text-sm font-medium border-b-2 transition-colors ${activeTab === tab ? 'border-brand-green text-brand-green' : 'border-transparent text-brand-slate hover:text-brand-dark'}`}>{{ overview: 'Resumen', reviews: 'Reseñas', leads: 'Consultas', editar: 'Editar perfil' }[tab]}</button>
+        {(['overview', 'reviews', 'leads', 'competencia', 'editar'] as const).map(tab => (
+          <button key={tab} onClick={() => tab === 'competencia' ? handleOpenCompetencia() : setActiveTab(tab)} className={`pb-3 text-sm font-medium border-b-2 transition-colors ${activeTab === tab ? 'border-brand-green text-brand-green' : 'border-transparent text-brand-slate hover:text-brand-dark'}`}>{{ overview: 'Resumen', reviews: 'Reseñas', leads: 'Consultas', competencia: 'Competencia', editar: 'Editar perfil' }[tab]}</button>
         ))}
       </div>
 
@@ -188,6 +214,54 @@ export default function PanelPage() {
         <div className="card p-8 text-center">
           {isPro ? <><i className="ti ti-inbox text-4xl text-gray-200 block mb-3" /><p className="text-sm text-brand-dark font-medium mb-1">Sin consultas todavía</p><p className="text-xs text-brand-slate">Las consultas de clientes aparecerán acá.</p></>
             : <><i className="ti ti-lock text-4xl text-gray-200 block mb-3" /><p className="text-sm text-brand-dark font-medium mb-1">Función del plan Profesional</p><p className="text-xs text-brand-slate mb-4">Activá el plan Pro para recibir consultas directas.</p><Link href="/precios" className="btn-primary text-sm py-2.5 px-6">Ver planes</Link></>}
+        </div>
+      )}
+      {activeTab === 'competencia' && (
+        <div>
+          {!isPremium ? (
+            <div className="card p-8 text-center">
+              <i className="ti ti-lock text-4xl text-gray-200 block mb-3" />
+              <p className="text-sm text-brand-dark font-medium mb-1">Función del plan Premium</p>
+              <p className="text-xs text-brand-slate mb-4">Comparate contra tu competencia y descubrí tu posición en el ranking.</p>
+              <Link href="/precios" className="btn-primary text-sm py-2.5 px-6">Ver planes</Link>
+            </div>
+          ) : loadingIntel ? (
+            <div className="card p-8 text-center"><i className="ti ti-loader-2 animate-spin text-2xl text-brand-slate" /></div>
+          ) : intel ? (
+            <div className="space-y-4">
+              <div className="card p-5">
+                <p className="text-xs text-brand-slate mb-4">Comparado con {intel.peerCount} empresas de tu rubro {intel.scope === 'city' ? 'en tu ciudad' : 'en tu país'}</p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-xs text-brand-slate mb-2">Tu calificación</p>
+                    <div className="flex items-baseline gap-2"><span className="text-2xl font-bold text-brand-dark">{intel.myStats.ratingAvg.toFixed(1)}</span><span className="text-xs text-brand-slate">vs promedio {intel.categoryAvg.ratingAvg.toFixed(1)}</span></div>
+                  </div>
+                  <div>
+                    <p className="text-xs text-brand-slate mb-2">Tus reseñas</p>
+                    <div className="flex items-baseline gap-2"><span className="text-2xl font-bold text-brand-dark">{intel.myStats.reviewCount}</span><span className="text-xs text-brand-slate">vs promedio {intel.categoryAvg.reviewCount}</span></div>
+                  </div>
+                </div>
+              </div>
+              <div className="card p-5">
+                <p className="text-sm font-semibold text-brand-dark mb-1">Posición #{intel.rank.position} de {intel.rank.total}</p>
+                {intel.companiesAbove.length > 0 ? (
+                  <>
+                    <p className="text-xs text-brand-slate mb-3">Empresas arriba tuyo en el ranking:</p>
+                    <div className="space-y-2">
+                      {intel.companiesAbove.map((c: any, i: number) => (
+                        <div key={i} className="flex items-center justify-between text-sm py-1.5 border-t border-gray-50 first:border-0">
+                          <span className="text-brand-dark">{c.name}</span>
+                          <span className="text-brand-slate">{c.ratingAvg.toFixed(1)} ★ · {c.reviewCount} reseñas</span>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                ) : <p className="text-xs text-brand-slate">¡Estás primero en el ranking de tu rubro!</p>}
+              </div>
+            </div>
+          ) : (
+            <div className="card p-8 text-center"><p className="text-sm text-brand-slate">No pudimos cargar la información. Probá de nuevo.</p></div>
+          )}
         </div>
       )}
       {activeTab === 'editar' && (

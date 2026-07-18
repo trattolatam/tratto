@@ -88,7 +88,7 @@ export default async function adminRoutes(app: FastifyInstance) {
     const body = z.object({ verified: z.boolean() }).parse(request.body)
     const company = await prisma.company.update({
       where: { id },
-      data: { isVerified: body.verified, verifiedAt: body.verified ? new Date() : null },
+      data: { isVerified: body.verified, verifiedAt: body.verified ? new Date() : null, plan: body.verified ? 'PROFESSIONAL' : undefined },
     })
     return reply.send({ company, message: body.verified ? 'Empresa verificada' : 'Verificación removida' })
   })

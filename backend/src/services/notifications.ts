@@ -14,12 +14,18 @@ export async function sendNotification(payload: NotificationPayload): Promise<vo
     data: { userId: payload.userId, type: payload.type, title: payload.title, body: payload.body, data: payload.data || {} },
   })
 
-  const user = await prisma.user.findUnique({ where: { id: payload.userId }, select: { email: true, phone: true } })
+  const user = await prisma.user.findUnique({
+    where: { id: payload.userId },
+    select: { email: true, phone: true, company: { select: { plan: true } } },
+  })
   if (!user) return
+
+  const isPro = ['PROFESSIONAL', 'PREMIUM', 'ENTERPRISE'].includes(user.company?.plan || '')
+  const whatsappAllowed = shouldSendWhatsApp(payload.type) && isPro
 
   const sends: Promise<void>[] = []
   if (user.email && shouldSendEmail(payload.type)) sends.push(sendEmail(user.email, payload.title, payload.body, payload.data))
-  if (user.phone && shouldSendWhatsApp(payload.type)) sends.push(sendWhatsApp(user.phone, payload.title, payload.body))
+  if (user.phone && whatsappAllowed) sends.push(sendWhatsApp(user.phone, payload.title, payload.body))
 
   await Promise.allSettled(sends)
 
@@ -27,7 +33,7 @@ export async function sendNotification(payload: NotificationPayload): Promise<vo
     where: { id: notification.id },
     data: {
       sentEmail: user.email ? shouldSendEmail(payload.type) : false,
-      sentWhatsapp: user.phone ? shouldSendWhatsApp(payload.type) : false,
+      sentWhatsapp: user.phone ? whatsappAllowed : false,
     },
   })
 }
@@ -41,18 +47,19 @@ function shouldSendWhatsApp(type: NotificationType): boolean {
 }
 
 async function sendEmail(to: string, subject: string, body: string, data?: Record<string, any>): Promise<void> {
-  if (!process.env.SENDGRID_API_KEY) return
+  if (!process.env.RESEND_API_KEY) return
   try {
-    const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
+    const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
-      headers: { Authorization: `Bearer ${process.env.SENDGRID_API_KEY}`, 'Content-Type': 'application/json' },
+      headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        personalizations: [{ to: [{ email: to }], dynamic_template_data: { subject, body, ...data } }],
-        from: { email: process.env.FROM_EMAIL || 'noreply@tratto.lat', name: 'Tratto' },
-        subject, content: [{ type: 'text/plain', value: body }],
+        from: `Tratto <${process.env.FROM_EMAIL || 'noreply@tratto.lat'}>`,
+        to: [to],
+        subject,
+        text: body,
       }),
     })
-    if (!response.ok) console.error('SendGrid error:', await response.text())
+    if (!response.ok) console.error('Resend error:', await response.text())
   } catch (err) { console.error('Email send error:', err) }
 }
 

@@ -1,7 +1,8 @@
 import { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { prisma } from '../index'
-import { requireAuth, requireVerifiedEmail, requireBusinessOwner } from '../middleware/auth'
+import { requireAuth, requireVerifiedEmail, requireBusinessOwner, requirePlan } from '../middleware/auth'
+import { generateCertificatePdf } from '../services/certificate'
 import { contactRevealRateLimit } from '../middleware/rateLimits'
 
 export default async function companyRoutes(app: FastifyInstance) {
@@ -243,6 +244,73 @@ export default async function companyRoutes(app: FastifyInstance) {
       verifiedPct: totalReviews > 0 ? Math.round((verifiedReviews / totalReviews) * 100) : 0,
       recentReviews, leads, contactReveals, ratingDistribution, ratingAvg: company.ratingAvg,
     })
+  })
+
+  // ─── Inteligencia competitiva (plan Premium+) ─────────────────────────────
+  app.get('/:id/competitive-intel', { preHandler: [requireBusinessOwner, requirePlan('PREMIUM')] }, async (request, reply) => {
+    const { id } = request.params as { id: string }
+    const company = await prisma.company.findUnique({ where: { id } })
+    if (!company || company.claimedById !== request.user.userId) {
+      return reply.status(403).send({ error: true, message: 'Sin permiso' })
+    }
+
+    // Grupo de comparación: misma categoría + ciudad. Si hay pocos pares, se amplía a toda la categoría en el país.
+    let peers = await prisma.company.findMany({
+      where: { categoryId: company.categoryId, city: company.city, country: company.country },
+      select: { id: true, name: true, plan: true, ratingAvg: true, reviewCount: true },
+    })
+    let scope: 'city' | 'country' = 'city'
+    if (peers.length < 3) {
+      peers = await prisma.company.findMany({
+        where: { categoryId: company.categoryId, country: company.country },
+        select: { id: true, name: true, plan: true, ratingAvg: true, reviewCount: true },
+      })
+      scope = 'country'
+    }
+
+    const peerCount = peers.length
+    const avgRating = peerCount > 0 ? peers.reduce((sum, p) => sum + p.ratingAvg, 0) / peerCount : 0
+    const avgReviews = peerCount > 0 ? peers.reduce((sum, p) => sum + p.reviewCount, 0) / peerCount : 0
+
+    // Mismo orden que el ranking público: plan primero, después rating, después cantidad de reseñas
+    const planRank = { FREE: 0, PROFESSIONAL: 1, PREMIUM: 2, ENTERPRISE: 3 } as const
+    const sorted = [...peers].sort((a, b) => {
+      if (planRank[b.plan] !== planRank[a.plan]) return planRank[b.plan] - planRank[a.plan]
+      if (b.ratingAvg !== a.ratingAvg) return b.ratingAvg - a.ratingAvg
+      return b.reviewCount - a.reviewCount
+    })
+    const myPosition = sorted.findIndex((p) => p.id === id) + 1
+    const above = sorted.slice(0, Math.max(0, myPosition - 1)).slice(-3).reverse()
+
+    return reply.send({
+      scope,
+      peerCount,
+      myStats: { ratingAvg: company.ratingAvg, reviewCount: company.reviewCount },
+      categoryAvg: { ratingAvg: Math.round(avgRating * 10) / 10, reviewCount: Math.round(avgReviews) },
+      rank: { position: myPosition, total: sorted.length },
+      companiesAbove: above.map((c) => ({ name: c.name, plan: c.plan, ratingAvg: c.ratingAvg, reviewCount: c.reviewCount })),
+    })
+  })
+
+  // ─── Certificado PDF descargable (plan Profesional+) ─────────────────────
+  app.get('/:id/certificate', { preHandler: [requireBusinessOwner, requirePlan('PROFESSIONAL')] }, async (request, reply) => {
+    const { id } = request.params as { id: string }
+    const company = await prisma.company.findUnique({ where: { id }, include: { category: { select: { name: true } } } })
+
+    if (!company || company.claimedById !== request.user.userId) {
+      return reply.status(403).send({ error: true, message: 'Sin permiso' })
+    }
+
+    const pdf = await generateCertificatePdf({
+      name: company.name, slug: company.slug, city: company.city, country: company.country,
+      categoryName: company.category.name, ratingAvg: company.ratingAvg, reviewCount: company.reviewCount,
+      verifiedReviewCount: company.verifiedReviewCount, isVerified: company.isVerified,
+    })
+
+    reply
+      .header('Content-Type', 'application/pdf')
+      .header('Content-Disposition', `attachment; filename="certificado-${company.slug}.pdf"`)
+      .send(pdf)
   })
 }
 
