@@ -27,7 +27,7 @@ export function CompanyProfile({ company, ads }: { company: Company; ads: Ad[] }
 
   const handleLead = async (e: React.FormEvent) => {
     e.preventDefault()
-    try { await leads.create({ ...leadForm, companyId: company.id }); setLeadSent(true) }
+    try { await leads.create({ ...leadForm, email: leadForm.email || undefined, phone: leadForm.phone || undefined, companyId: company.id }); setLeadSent(true) }
     catch (err: any) { alert(err.message) }
   }
 

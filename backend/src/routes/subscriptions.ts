@@ -27,8 +27,9 @@ export async function leadRoutes(app: FastifyInstance) {
   app.post('/', { config: { rateLimit: leadRateLimit } }, async (request, reply) => {
     const body = z.object({
       companyId: z.string().uuid(), name: z.string().min(2),
-      email: z.string().email().optional(), phone: z.string().optional(), message: z.string().min(10),
+      email: z.union([z.string().email(), z.literal('')]).optional(), phone: z.string().optional(), message: z.string().min(10),
     }).parse(request.body)
+    if (body.email === '') body.email = undefined
 
     const company = await prisma.company.findUnique({ where: { id: body.companyId }, include: { owner: { select: { id: true } } } })
     if (!company) return reply.status(404).send({ error: true, message: 'Empresa no encontrada' })
