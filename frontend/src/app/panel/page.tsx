@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuthStore } from '@/lib/store'
-import { companies as companiesApi, reviews as reviewsApi, upload } from '@/lib/api'
+import { companies as companiesApi, reviews as reviewsApi, leads as leadsApi, upload } from '@/lib/api'
 
 export default function PanelPage() {
   const { user, fetchMe } = useAuthStore()
@@ -26,6 +26,8 @@ export default function PanelPage() {
   const [showContactsModal, setShowContactsModal] = useState(false)
   const [contactReveals, setContactReveals] = useState<any[] | null>(null)
   const [loadingContacts, setLoadingContacts] = useState(false)
+  const [myLeads, setMyLeads] = useState<any[] | null>(null)
+  const [loadingLeads, setLoadingLeads] = useState(false)
   const photoInputRef = useRef<HTMLInputElement>(null)
   const logoInputRef = useRef<HTMLInputElement>(null)
   const [companyDetails, setCompanyDetails] = useState<any>(null)
@@ -114,6 +116,15 @@ export default function PanelPage() {
     catch (err: any) { setPhotoError(err.message || 'Error borrando la foto') }
   }
 
+  const handleOpenLeads = async () => {
+    setActiveTab('leads')
+    if (!isPro || myLeads) return
+    setLoadingLeads(true)
+    try { const data = await leadsApi.my(); setMyLeads(data.leads) }
+    catch (err) { console.error(err) }
+    finally { setLoadingLeads(false) }
+  }
+
   const handleOpenContacts = async () => {
     setShowContactsModal(true)
     if (!isPremium || contactReveals) return
@@ -181,7 +192,7 @@ export default function PanelPage() {
             { label: 'Calificación', value: (company.ratingAvg ?? 0).toFixed(1), icon: 'ti-star', color: 'text-brand-amber', tab: 'reviews' as const },
             { label: 'Reseñas totales', value: stats.totalReviews, icon: 'ti-message', color: 'text-brand-blue', tab: 'reviews' as const },
             { label: 'Verificadas', value: `${stats.verifiedPct}%`, icon: 'ti-shield-check', color: 'text-brand-green', tab: 'reviews' as const },
-            { label: 'Leads este mes', value: stats.leads, icon: 'ti-user-check', color: 'text-brand-dark', tab: 'leads' as const },
+            { label: 'Leads este mes', value: stats.leads, icon: 'ti-user-check', color: 'text-brand-dark', tab: null, onClick: () => handleOpenLeads() },
             { label: 'Quisieron tu contacto', value: stats.contactReveals, icon: 'ti-phone-ringing', color: 'text-brand-green', tab: null, onClick: handleOpenContacts },
           ].map(s => <button key={s.label} onClick={() => s.onClick ? s.onClick() : s.tab && setActiveTab(s.tab)} className="card p-4 text-left hover:shadow-card-hover cursor-pointer transition-shadow"><div className={`text-2xl font-bold ${s.color}`}>{s.value}</div><div className="text-xs text-brand-slate mt-0.5 flex items-center gap-1"><i className={`ti ${s.icon} text-xs`} /> {s.label}</div></button>)}
         </div>
@@ -205,7 +216,7 @@ export default function PanelPage() {
 
       <div className="flex border-b border-gray-100 gap-4 mb-5">
         {(['overview', 'reviews', 'leads', 'competencia', 'editar'] as const).map(tab => (
-          <button key={tab} onClick={() => tab === 'competencia' ? handleOpenCompetencia() : setActiveTab(tab)} className={`pb-3 text-sm font-medium border-b-2 transition-colors ${activeTab === tab ? 'border-brand-green text-brand-green' : 'border-transparent text-brand-slate hover:text-brand-dark'}`}>{{ overview: 'Resumen', reviews: 'Reseñas', leads: 'Consultas', competencia: 'Competencia', editar: 'Editar perfil' }[tab]}</button>
+          <button key={tab} onClick={() => tab === 'competencia' ? handleOpenCompetencia() : tab === 'leads' ? handleOpenLeads() : setActiveTab(tab)} className={`pb-3 text-sm font-medium border-b-2 transition-colors ${activeTab === tab ? 'border-brand-green text-brand-green' : 'border-transparent text-brand-slate hover:text-brand-dark'}`}>{{ overview: 'Resumen', reviews: 'Reseñas', leads: 'Consultas', competencia: 'Competencia', editar: 'Editar perfil' }[tab]}</button>
         ))}
       </div>
 
@@ -293,10 +304,31 @@ export default function PanelPage() {
       )}
 
       {activeTab === 'leads' && (
-        <div className="card p-8 text-center">
-          {isPro ? <><i className="ti ti-inbox text-4xl text-gray-200 block mb-3" /><p className="text-sm text-brand-dark font-medium mb-1">Sin consultas todavía</p><p className="text-xs text-brand-slate">Las consultas de clientes aparecerán acá.</p></>
-            : <><i className="ti ti-lock text-4xl text-gray-200 block mb-3" /><p className="text-sm text-brand-dark font-medium mb-1">Función del plan Profesional</p><p className="text-xs text-brand-slate mb-4">Activá el plan Pro para recibir consultas directas.</p><Link href="/precios" className="btn-primary text-sm py-2.5 px-6">Ver planes</Link></>}
-        </div>
+        <>
+          {!isPro ? (
+            <div className="card p-8 text-center"><i className="ti ti-lock text-4xl text-gray-200 block mb-3" /><p className="text-sm text-brand-dark font-medium mb-1">Función del plan Profesional</p><p className="text-xs text-brand-slate mb-4">Activá el plan Pro para recibir consultas directas.</p><Link href="/precios" className="btn-primary text-sm py-2.5 px-6">Ver planes</Link></div>
+          ) : loadingLeads ? (
+            <div className="card p-8 text-center"><i className="ti ti-loader-2 animate-spin text-2xl text-brand-slate" /></div>
+          ) : myLeads && myLeads.length > 0 ? (
+            <div className="space-y-3">
+              {myLeads.map((lead: any) => (
+                <div key={lead.id} className="card p-4">
+                  <div className="flex items-start justify-between gap-3 mb-1">
+                    <p className="text-sm font-semibold text-brand-dark">{lead.name}</p>
+                    <p className="text-xs text-brand-slate flex-shrink-0">{new Date(lead.createdAt).toLocaleDateString('es-AR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</p>
+                  </div>
+                  <p className="text-sm text-brand-slate mb-2">{lead.message}</p>
+                  <div className="flex gap-3 text-xs">
+                    {lead.email && <a href={`mailto:${lead.email}`} className="text-brand-blue hover:underline flex items-center gap-1"><i className="ti ti-mail text-xs" /> {lead.email}</a>}
+                    {lead.phone && <a href={`tel:${lead.phone}`} className="text-brand-green hover:underline flex items-center gap-1"><i className="ti ti-phone text-xs" /> {lead.phone}</a>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="card p-8 text-center"><i className="ti ti-inbox text-4xl text-gray-200 block mb-3" /><p className="text-sm text-brand-dark font-medium mb-1">Sin consultas todavía</p><p className="text-xs text-brand-slate">Las consultas de clientes aparecerán acá.</p></div>
+          )}
+        </>
       )}
       {activeTab === 'competencia' && (
         <div>
