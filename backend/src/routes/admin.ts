@@ -86,6 +86,11 @@ export default async function adminRoutes(app: FastifyInstance) {
   app.patch('/companies/:id/verify', async (request, reply) => {
     const { id } = request.params as { id: string }
     const body = z.object({ verified: z.boolean() }).parse(request.body)
+    const existing = await prisma.company.findUnique({ where: { id }, select: { claimedById: true } })
+    if (!existing) return reply.status(404).send({ error: true, message: 'Empresa no encontrada' })
+    if (body.verified && !existing.claimedById) {
+      return reply.status(400).send({ error: true, message: 'No se puede verificar una empresa que nadie reclamó todavía' })
+    }
     const company = await prisma.company.update({
       where: { id },
       data: { isVerified: body.verified, verifiedAt: body.verified ? new Date() : null, plan: body.verified ? 'PROFESSIONAL' : undefined },
