@@ -185,8 +185,8 @@ export default async function companyRoutes(app: FastifyInstance) {
   app.post('/:id/claim', { preHandler: requireVerifiedEmail }, async (request, reply) => {
     const { id } = request.params as { id: string }
     const schema = z.object({
-      taxId: z.string().min(5),
-      taxIdType: z.string(),
+      taxId: z.string().min(5).optional(),
+      taxIdType: z.string().optional(),
       phone: z.string().optional(),
       email: z.string().email().optional(),
     })
@@ -233,6 +233,8 @@ export default async function companyRoutes(app: FastifyInstance) {
       website: z.string().url().optional(),
       email: z.string().email().optional(),
       address: z.string().optional(),
+      taxId: z.string().min(5).optional(),
+      taxIdType: z.string().optional(),
     })
 
     const body = schema.safeParse(request.body)

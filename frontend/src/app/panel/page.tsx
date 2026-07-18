@@ -5,6 +5,8 @@ import Link from 'next/link'
 import { useAuthStore } from '@/lib/store'
 import { companies as companiesApi, reviews as reviewsApi, leads as leadsApi, upload } from '@/lib/api'
 
+const TAX_ID_LABELS: Record<string, string> = { UY: 'RUT', AR: 'CUIT', CL: 'RUT', MX: 'RFC', CO: 'NIT', PE: 'RUC', BR: 'CNPJ' }
+
 export default function PanelPage() {
   const { user, fetchMe } = useAuthStore()
   const router = useRouter()
@@ -31,7 +33,7 @@ export default function PanelPage() {
   const photoInputRef = useRef<HTMLInputElement>(null)
   const logoInputRef = useRef<HTMLInputElement>(null)
   const [companyDetails, setCompanyDetails] = useState<any>(null)
-  const [editForm, setEditForm] = useState({ description: '', phone: '', website: '', email: '', address: '' })
+  const [editForm, setEditForm] = useState({ description: '', phone: '', website: '', email: '', address: '', taxId: '' })
   const [savingEdit, setSavingEdit] = useState(false)
   const [editMsg, setEditMsg] = useState('')
   const [editErr, setEditErr] = useState('')
@@ -70,6 +72,7 @@ export default function PanelPage() {
       setEditForm({
         description: data.company.description || '', phone: data.company.phone || '',
         website: data.company.website || '', email: data.company.email || '', address: data.company.address || '',
+        taxId: data.company.taxId || '',
       })
     }).catch(() => {})
   }, [activeTab, user])
@@ -82,6 +85,7 @@ export default function PanelPage() {
       const body: any = { ...editForm }
       if (!body.website) delete body.website
       if (!body.email) delete body.email
+      if (body.taxId) { body.taxIdType = TAX_ID_LABELS[companyDetails?.country] || 'RUT' } else { delete body.taxId }
       const { company: updated } = await companiesApi.update(user.company.id, body)
       setCompanyDetails(updated)
       setEditMsg('Perfil actualizado con éxito.')
@@ -440,6 +444,10 @@ export default function PanelPage() {
               </div>
               <div><label className="label">Sitio web</label><input type="url" placeholder="https://..." className="input" value={editForm.website} onChange={e => setEditForm(f => ({ ...f, website: e.target.value }))} /></div>
               <div><label className="label">Dirección</label><input type="text" className="input" value={editForm.address} onChange={e => setEditForm(f => ({ ...f, address: e.target.value }))} /></div>
+              <div>
+                <label className="label">{TAX_ID_LABELS[companyDetails?.country] || 'RUT'} <span className="font-normal normal-case text-gray-400">(opcional, acelera la verificación)</span></label>
+                <input type="text" className="input" value={editForm.taxId} onChange={e => setEditForm(f => ({ ...f, taxId: e.target.value }))} />
+              </div>
               <button type="submit" disabled={savingEdit} className="btn-primary px-6 py-2.5 text-sm disabled:opacity-50">{savingEdit ? 'Guardando...' : 'Guardar cambios'}</button>
             </form>
           )}

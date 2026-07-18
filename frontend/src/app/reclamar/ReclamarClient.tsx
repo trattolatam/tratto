@@ -81,7 +81,7 @@ export default function ReclamarClient() {
     if (!selectedCompany) return
     setSubmitting(true); setError('')
     try {
-      const result = await companies.claim(selectedCompany.id, { taxId: form.taxId, taxIdType: taxIdConfig.label, phone: form.phone || undefined, email: form.email || undefined })
+      const result = await companies.claim(selectedCompany.id, { taxId: form.taxId || undefined, taxIdType: form.taxId ? taxIdConfig.label : undefined, phone: form.phone || undefined, email: form.email || undefined })
       if (result.token) setToken(result.token)
       setStep('success')
     } catch (err: any) { setError(err.message) } finally { setSubmitting(false) }
@@ -155,8 +155,12 @@ export default function ReclamarClient() {
           {error && <div className="bg-red-50 border border-red-100 rounded-lg p-3 mb-4 text-sm text-brand-red">{error}</div>}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div><label className="label">País</label><select className="input" value={form.country} onChange={e => setForm(f => ({ ...f, country: e.target.value, taxId: '' }))}>{TAX_IDS.map(t => <option key={t.country} value={t.country}>{t.country} — {t.label}</option>)}</select></div>
-            <div><label className="label">{taxIdConfig.label}</label><input type="text" required placeholder={taxIdConfig.placeholder} className="input" value={form.taxId} onChange={e => setForm(f => ({ ...f, taxId: e.target.value }))} /></div>
-            <button type="submit" disabled={submitting || !form.taxId || !user} className="btn-primary w-full py-3 text-sm disabled:opacity-50">
+            <div>
+              <label className="label">{taxIdConfig.label} <span className="font-normal normal-case text-gray-400">(opcional, acelera la verificación)</span></label>
+              <input type="text" placeholder={taxIdConfig.placeholder} className="input" value={form.taxId} onChange={e => setForm(f => ({ ...f, taxId: e.target.value }))} />
+              <p className="text-xs text-brand-slate mt-1">Podés reclamar el perfil sin RUT y cargarlo más adelante desde "Editar perfil".</p>
+            </div>
+            <button type="submit" disabled={submitting || !user} className="btn-primary w-full py-3 text-sm disabled:opacity-50">
               {submitting ? 'Enviando...' : 'Reclamar perfil gratis'}
             </button>
             <button type="button" onClick={() => setStep('search')} className="w-full text-xs text-brand-slate text-center">Volver a buscar</button>
