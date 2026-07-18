@@ -1,8 +1,9 @@
 import { FastifyInstance } from 'fastify'
-import { requireAuth, requireBusinessOwner } from '../middleware/auth'
+import { requireAuth, requireBusinessOwner, requirePlan } from '../middleware/auth'
 import { uploadFile, streamToBuffer, BUCKETS } from '../services/storage'
 import { uploadRateLimit } from '../middleware/rateLimits'
 import path from 'path'
+import { z } from 'zod'
 
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf']
 const MAX_SIZE = 5 * 1024 * 1024
@@ -67,11 +68,16 @@ export default async function uploadRoutes(app: FastifyInstance) {
     return reply.send({ url })
   })
 
-  app.post('/company-photo', { preHandler: requireBusinessOwner, config: { rateLimit: uploadRateLimit } }, async (request, reply) => {
+  app.post('/company-photo', { preHandler: [requireBusinessOwner, requirePlan('PROFESSIONAL')], config: { rateLimit: uploadRateLimit } }, async (request, reply) => {
     const data = await request.file()
     if (!data) return reply.status(400).send({ error: true, message: 'No se recibió ningún archivo' })
 
+    const imgTypes = ['image/jpeg', 'image/png', 'image/webp']
+    if (!imgTypes.includes(data.mimetype)) return reply.status(400).send({ error: true, message: 'Solo se aceptan imágenes JPG, PNG o WEBP' })
+
     const buffer = await streamToBuffer(data.file)
+    if (buffer.length > MAX_SIZE) return reply.status(400).send({ error: true, message: 'El archivo supera el límite de 5MB' })
+
     const ext = path.extname(data.filename) || '.jpg'
     const filePath = `photos/${request.user.companyId}/${Date.now()}${ext}`
     const url = await uploadFile({ bucket: BUCKETS.COMPANIES, path: filePath, buffer, mimetype: data.mimetype })
@@ -82,6 +88,34 @@ export default async function uploadRoutes(app: FastifyInstance) {
       if (company && company.photos.length >= 10) return reply.status(400).send({ error: true, message: 'Límite de 10 fotos por empresa' })
       await prisma.company.update({ where: { id: request.user.companyId }, data: { photos: { push: url } } })
     }
+
+    return reply.send({ url })
+  })
+
+  app.delete('/company-photo', { preHandler: [requireBusinessOwner, requirePlan('PROFESSIONAL')] }, async (request, reply) => {
+    const body = z.object({ url: z.string() }).parse(request.body)
+    const { prisma } = await import('../index')
+    if (!request.user.companyId) return reply.status(400).send({ error: true, message: 'Sin empresa asociada' })
+    const company = await prisma.company.findUnique({ where: { id: request.user.companyId }, select: { photos: true } })
+    if (!company) return reply.status(404).send({ error: true, message: 'Empresa no encontrada' })
+    await prisma.company.update({ where: { id: request.user.companyId }, data: { photos: company.photos.filter((p) => p !== body.url) } })
+    return reply.send({ ok: true })
+  })
+
+  // ─── Foto adjunta a una reseña (cualquier usuario autenticado, máx 3 por reseña) ───
+  app.post('/review-photo', { preHandler: requireAuth, config: { rateLimit: uploadRateLimit } }, async (request, reply) => {
+    const data = await request.file()
+    if (!data) return reply.status(400).send({ error: true, message: 'No se recibió ningún archivo' })
+
+    const imgTypes = ['image/jpeg', 'image/png', 'image/webp']
+    if (!imgTypes.includes(data.mimetype)) return reply.status(400).send({ error: true, message: 'Solo se aceptan imágenes JPG, PNG o WEBP' })
+
+    const buffer = await streamToBuffer(data.file)
+    if (buffer.length > MAX_SIZE) return reply.status(400).send({ error: true, message: 'El archivo supera el límite de 5MB' })
+
+    const ext = path.extname(data.filename) || '.jpg'
+    const filePath = `review-photos/${request.user.userId}/${Date.now()}${ext}`
+    const url = await uploadFile({ bucket: BUCKETS.COMPANIES, path: filePath, buffer, mimetype: data.mimetype })
 
     return reply.send({ url })
   })

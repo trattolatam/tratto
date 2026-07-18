@@ -236,6 +236,7 @@ model Review {
   body          String
   proofUrl      String?
   proofType     String?
+  photos        String[]      @default([])
   isVerified    Boolean       @default(false)
   verifiedAt    DateTime?
   status        ReviewStatus  @default(PENDING)

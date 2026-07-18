@@ -113,6 +113,14 @@ export function CompanyProfile({ company, ads }: { company: Company; ads: Ad[] }
                 {company.description && <p className="text-sm text-brand-slate pt-2 border-t border-gray-50 leading-relaxed">{company.description}</p>}
               </div>
             )}
+            {activeTab === 'info' && company.photos && company.photos.length > 0 && (
+              <div className="card p-5 mt-4">
+                <p className="text-sm font-semibold text-brand-dark mb-3">Trabajos realizados</p>
+                <div className="grid grid-cols-3 gap-2">
+                  {company.photos.map((url, i) => <a key={i} href={url} target="_blank" rel="noopener" className="aspect-square"><img src={url} alt="" className="w-full h-full rounded-lg object-cover" /></a>)}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="space-y-4">
@@ -201,6 +209,11 @@ function ReviewItem({ review }: { review: Review }) {
       <div className="flex items-center gap-1 mb-2">{[1,2,3,4,5].map(n => <span key={n} className={n <= review.rating ? 'star-filled' : 'star-empty'}>★</span>)}</div>
       {review.title && <p className="text-sm font-semibold text-brand-dark mb-1">{review.title}</p>}
       <p className="text-sm text-brand-slate leading-relaxed">{review.body}</p>
+      {review.photos && review.photos.length > 0 && (
+        <div className="flex gap-2 mt-2">
+          {review.photos.map((p: string, i: number) => <a key={i} href={p} target="_blank" rel="noopener"><img src={p} alt="" className="w-16 h-16 rounded-lg object-cover" /></a>)}
+        </div>
+      )}
       {review.proofType && <div className="mt-2 flex items-center gap-1.5 text-xs text-brand-amber"><i className="ti ti-file-check text-sm" />Comprobante: {review.proofType}</div>}
       {review.response && (
         <div className="mt-3 pt-3 border-t border-gray-50 bg-gray-50 rounded-lg p-3">

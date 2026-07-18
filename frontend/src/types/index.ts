@@ -23,6 +23,7 @@ export interface Review {
   id: string; companyId: string; userId: string; rating: number; title?: string; body: string
   proofUrl?: string; proofType?: string; isVerified: boolean; verifiedAt?: string; status: ReviewStatus
   helpfulCount: number; createdAt: string; user: { name: string; avatarUrl?: string; country: string }; response?: ReviewResponse
+  photos?: string[]
 }
 
 export interface ReviewResponse { id: string; body: string; createdAt: string }

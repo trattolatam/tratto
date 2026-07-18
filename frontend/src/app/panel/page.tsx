@@ -17,6 +17,13 @@ export default function PanelPage() {
   const [intel, setIntel] = useState<any>(null)
   const [loadingIntel, setLoadingIntel] = useState(false)
   const [logoError, setLogoError] = useState('')
+  const [respondingId, setRespondingId] = useState<string | null>(null)
+  const [respondBody, setRespondBody] = useState('')
+  const [respondSubmitting, setRespondSubmitting] = useState(false)
+  const [respondError, setRespondError] = useState('')
+  const [uploadingPhoto, setUploadingPhoto] = useState(false)
+  const [photoError, setPhotoError] = useState('')
+  const photoInputRef = useRef<HTMLInputElement>(null)
   const logoInputRef = useRef<HTMLInputElement>(null)
   const [companyDetails, setCompanyDetails] = useState<any>(null)
   const [editForm, setEditForm] = useState({ description: '', phone: '', website: '', email: '', address: '' })
@@ -35,6 +42,7 @@ export default function PanelPage() {
     try {
       await upload.companyLogo(file)
       await fetchMe()
+      if (user?.company) companiesApi.get(user.company.slug).then(data => setCompanyDetails(data.company))
     } catch (err: any) { setLogoError(err.message || 'Error subiendo el logo') }
     finally { setUploadingLogo(false); if (logoInputRef.current) logoInputRef.current.value = '' }
   }
@@ -83,6 +91,37 @@ export default function PanelPage() {
   const isPro = ['PROFESSIONAL', 'PREMIUM', 'ENTERPRISE'].includes(company.plan)
   const isPremium = ['PREMIUM', 'ENTERPRISE'].includes(company.plan)
 
+  const refreshCompanyDetails = () => { if (user?.company) companiesApi.get(user.company.slug).then(data => setCompanyDetails(data.company)) }
+
+  const handlePhotoClick = () => photoInputRef.current?.click()
+
+  const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) { setPhotoError('Solo se aceptan imágenes JPG, PNG o WEBP'); return }
+    if (file.size > 5 * 1024 * 1024) { setPhotoError('El archivo supera el límite de 5MB'); return }
+    setUploadingPhoto(true); setPhotoError('')
+    try { await upload.companyPhoto(file); refreshCompanyDetails() }
+    catch (err: any) { setPhotoError(err.message || 'Error subiendo la foto') }
+    finally { setUploadingPhoto(false); if (photoInputRef.current) photoInputRef.current.value = '' }
+  }
+
+  const handleDeletePhoto = async (url: string) => {
+    try { await upload.deleteCompanyPhoto(url); refreshCompanyDetails() }
+    catch (err: any) { setPhotoError(err.message || 'Error borrando la foto') }
+  }
+
+  const handleRespond = async (reviewId: string) => {
+    if (respondBody.trim().length < 5) { setRespondError('Escribí una respuesta un poco más completa.'); return }
+    setRespondSubmitting(true); setRespondError('')
+    try {
+      await reviewsApi.respond(reviewId, respondBody.trim())
+      setPendingReviews(prev => prev.map(r => r.id === reviewId ? { ...r, response: { body: respondBody.trim() } } : r))
+      setRespondingId(null); setRespondBody('')
+    } catch (err: any) { setRespondError(err.message || 'Error al enviar la respuesta') }
+    finally { setRespondSubmitting(false) }
+  }
+
   const handleOpenCompetencia = async () => {
     setActiveTab('competencia')
     if (!isPremium || intel) return
@@ -127,12 +166,12 @@ export default function PanelPage() {
       {stats && (
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
           {[
-            { label: 'Calificación', value: (company.ratingAvg ?? 0).toFixed(1), icon: 'ti-star', color: 'text-brand-amber' },
-            { label: 'Reseñas totales', value: stats.totalReviews, icon: 'ti-message', color: 'text-brand-blue' },
-            { label: 'Verificadas', value: `${stats.verifiedPct}%`, icon: 'ti-shield-check', color: 'text-brand-green' },
-            { label: 'Leads este mes', value: stats.leads, icon: 'ti-user-check', color: 'text-brand-dark' },
-            { label: 'Quisieron tu contacto', value: stats.contactReveals, icon: 'ti-phone-ringing', color: 'text-brand-green' },
-          ].map(s => <div key={s.label} className="card p-4"><div className={`text-2xl font-bold ${s.color}`}>{s.value}</div><div className="text-xs text-brand-slate mt-0.5 flex items-center gap-1"><i className={`ti ${s.icon} text-xs`} /> {s.label}</div></div>)}
+            { label: 'Calificación', value: (company.ratingAvg ?? 0).toFixed(1), icon: 'ti-star', color: 'text-brand-amber', tab: 'reviews' as const },
+            { label: 'Reseñas totales', value: stats.totalReviews, icon: 'ti-message', color: 'text-brand-blue', tab: 'reviews' as const },
+            { label: 'Verificadas', value: `${stats.verifiedPct}%`, icon: 'ti-shield-check', color: 'text-brand-green', tab: 'reviews' as const },
+            { label: 'Leads este mes', value: stats.leads, icon: 'ti-user-check', color: 'text-brand-dark', tab: 'leads' as const },
+            { label: 'Quisieron tu contacto', value: stats.contactReveals, icon: 'ti-phone-ringing', color: 'text-brand-green', tab: null },
+          ].map(s => <button key={s.label} onClick={() => s.tab && setActiveTab(s.tab)} className={`card p-4 text-left ${s.tab ? 'hover:shadow-card-hover cursor-pointer transition-shadow' : 'cursor-default'}`}><div className={`text-2xl font-bold ${s.color}`}>{s.value}</div><div className="text-xs text-brand-slate mt-0.5 flex items-center gap-1"><i className={`ti ${s.icon} text-xs`} /> {s.label}</div></button>)}
         </div>
       )}
 
@@ -201,9 +240,30 @@ export default function PanelPage() {
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1"><span className="text-sm font-semibold text-brand-dark">{r.user.name}</span>{r.isVerified && <span className="badge-verified text-xs"><span className="badge-verified-dot" />Verificada</span>}<span className="text-brand-amber">{'★'.repeat(r.rating)}</span></div>
                   <p className="text-sm text-brand-slate">{r.body}</p>
+                  {r.photos && r.photos.length > 0 && (
+                    <div className="flex gap-2 mt-2">
+                      {r.photos.map((p: string, i: number) => <img key={i} src={p} alt="" className="w-16 h-16 rounded-lg object-cover" />)}
+                    </div>
+                  )}
                 </div>
               </div>
-              {isPro && !r.response && <div className="mt-3 pt-3 border-t border-gray-50"><button className="text-xs text-brand-green hover:underline flex items-center gap-1"><i className="ti ti-message-reply text-xs" /> Responder esta reseña</button></div>}
+              {r.response && (
+                <div className="mt-3 pt-3 border-t border-gray-50 bg-gray-50 -mx-4 -mb-4 px-4 pb-4 rounded-b-xl">
+                  <p className="text-xs font-semibold text-brand-dark mb-1"><i className="ti ti-corner-down-right text-xs" /> Tu respuesta</p>
+                  <p className="text-xs text-brand-slate">{r.response.body}</p>
+                </div>
+              )}
+              {isPro && !r.response && respondingId !== r.id && <div className="mt-3 pt-3 border-t border-gray-50"><button onClick={() => { setRespondingId(r.id); setRespondBody(''); setRespondError('') }} className="text-xs text-brand-green hover:underline flex items-center gap-1"><i className="ti ti-message-reply text-xs" /> Responder esta reseña</button></div>}
+              {isPro && !r.response && respondingId === r.id && (
+                <div className="mt-3 pt-3 border-t border-gray-50 space-y-2">
+                  <textarea autoFocus rows={3} placeholder="Escribí tu respuesta pública..." className="input text-sm" value={respondBody} onChange={e => setRespondBody(e.target.value)} />
+                  {respondError && <p className="text-xs text-brand-red">{respondError}</p>}
+                  <div className="flex gap-2">
+                    <button onClick={() => handleRespond(r.id)} disabled={respondSubmitting} className="btn-primary text-xs py-2 px-4 disabled:opacity-50">{respondSubmitting ? 'Enviando...' : 'Publicar respuesta'}</button>
+                    <button onClick={() => { setRespondingId(null); setRespondError('') }} className="btn-secondary text-xs py-2 px-4">Cancelar</button>
+                  </div>
+                </div>
+              )}
               {!isPro && !r.response && <div className="mt-3 pt-3 border-t border-gray-50"><Link href="/precios" className="text-xs text-brand-amber hover:underline flex items-center gap-1"><i className="ti ti-lock text-xs" /> Activá el plan Pro para responder</Link></div>}
             </div>
           ))}
@@ -265,7 +325,54 @@ export default function PanelPage() {
         </div>
       )}
       {activeTab === 'editar' && (
-        <div className="card p-6 max-w-xl">
+        <div className="max-w-xl space-y-4">
+          <div className="card p-6">
+            <label className="label mb-2 block">Logo de la empresa</label>
+            {isPro ? (
+              <div className="flex items-center gap-4">
+                {companyDetails?.logoUrl
+                  ? <img src={companyDetails.logoUrl} alt="Logo" className="w-16 h-16 rounded-xl object-cover flex-shrink-0" />
+                  : <div className="w-16 h-16 rounded-xl bg-gray-100 flex items-center justify-center flex-shrink-0"><i className="ti ti-photo text-2xl text-gray-300" /></div>}
+                <div>
+                  <input ref={logoInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleLogoChange} />
+                  <button onClick={handleLogoClick} disabled={uploadingLogo} className="btn-secondary text-xs py-2 px-4 disabled:opacity-50">
+                    <i className={`ti ${uploadingLogo ? 'ti-loader-2 animate-spin' : 'ti-upload'} text-sm`} /> {uploadingLogo ? 'Subiendo...' : companyDetails?.logoUrl ? 'Cambiar logo' : 'Agregar logo'}
+                  </button>
+                  {logoError && <p className="text-xs text-brand-red mt-1.5">{logoError}</p>}
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 text-xs text-brand-slate"><i className="ti ti-lock text-sm" /> Disponible en el plan Profesional — <Link href="/precios" className="text-brand-green hover:underline">ver planes</Link></div>
+            )}
+          </div>
+
+          <div className="card p-6">
+            <label className="label mb-2 block">Trabajos realizados</label>
+            {isPro ? (
+              <>
+                <p className="text-xs text-brand-slate mb-3">Mostrales a tus clientes fotos de trabajos que ya hiciste. Hasta 10 fotos.</p>
+                <div className="grid grid-cols-4 gap-2">
+                  {(companyDetails?.photos || []).map((url: string) => (
+                    <div key={url} className="relative group aspect-square">
+                      <img src={url} alt="" className="w-full h-full rounded-lg object-cover" />
+                      <button onClick={() => handleDeletePhoto(url)} className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-brand-dark text-white text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"><i className="ti ti-x" /></button>
+                    </div>
+                  ))}
+                  {(companyDetails?.photos || []).length < 10 && (
+                    <button onClick={handlePhotoClick} disabled={uploadingPhoto} className="aspect-square rounded-lg border-2 border-dashed border-gray-200 flex items-center justify-center hover:border-brand-green transition-colors disabled:opacity-50">
+                      <i className={`ti ${uploadingPhoto ? 'ti-loader-2 animate-spin' : 'ti-plus'} text-xl text-gray-300`} />
+                    </button>
+                  )}
+                </div>
+                <input ref={photoInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handlePhotoChange} />
+                {photoError && <p className="text-xs text-brand-red mt-2">{photoError}</p>}
+              </>
+            ) : (
+              <div className="flex items-center gap-2 text-xs text-brand-slate"><i className="ti ti-lock text-sm" /> Disponible en el plan Profesional — <Link href="/precios" className="text-brand-green hover:underline">ver planes</Link></div>
+            )}
+          </div>
+
+          <div className="card p-6">
           {!companyDetails ? (
             <div className="text-center py-8"><i className="ti ti-loader-2 animate-spin text-2xl text-brand-slate" /></div>
           ) : (
@@ -282,6 +389,7 @@ export default function PanelPage() {
               <button type="submit" disabled={savingEdit} className="btn-primary px-6 py-2.5 text-sm disabled:opacity-50">{savingEdit ? 'Guardando...' : 'Guardar cambios'}</button>
             </form>
           )}
+          </div>
         </div>
       )}
     </div>

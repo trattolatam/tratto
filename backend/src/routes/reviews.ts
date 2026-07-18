@@ -45,6 +45,7 @@ export default async function reviewRoutes(app: FastifyInstance) {
       body: z.string().min(20).max(2000),
       proofUrl: z.string().url().optional(),
       proofType: z.string().optional(),
+      photos: z.array(z.string().url()).max(3).optional(),
     })
 
     const body = schema.safeParse(request.body)

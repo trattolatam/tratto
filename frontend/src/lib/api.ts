@@ -100,6 +100,25 @@ export const upload = {
     if (!res.ok) throw new Error('Error subiendo foto de perfil')
     return res.json()
   },
+  companyPhoto: async (file: File): Promise<{ url: string }> => {
+    const token = localStorage.getItem('tratto_token')
+    const form = new FormData(); form.append('file', file)
+    const res = await fetch(`${API_URL}/api/upload/company-photo`, { method: 'POST', headers: token ? { Authorization: `Bearer ${token}` } : {}, body: form })
+    if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.message || 'Error subiendo la foto') }
+    return res.json()
+  },
+  deleteCompanyPhoto: async (url: string): Promise<void> => {
+    const token = localStorage.getItem('tratto_token')
+    const res = await fetch(`${API_URL}/api/upload/company-photo`, { method: 'DELETE', headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify({ url }) })
+    if (!res.ok) throw new Error('Error borrando la foto')
+  },
+  reviewPhoto: async (file: File): Promise<{ url: string }> => {
+    const token = localStorage.getItem('tratto_token')
+    const form = new FormData(); form.append('file', file)
+    const res = await fetch(`${API_URL}/api/upload/review-photo`, { method: 'POST', headers: token ? { Authorization: `Bearer ${token}` } : {}, body: form })
+    if (!res.ok) throw new Error('Error subiendo la foto')
+    return res.json()
+  },
 }
 
 export const admin = {

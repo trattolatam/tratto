@@ -16,6 +16,9 @@ export default function EscribirResenaClient() {
   const [proofFile, setProofFile] = useState<File | null>(null)
   const [proofUrl, setProofUrl] = useState('')
   const [uploading, setUploading] = useState(false)
+  const [reviewPhotos, setReviewPhotos] = useState<string[]>([])
+  const [uploadingPhoto, setUploadingPhoto] = useState(false)
+  const [photoError, setPhotoError] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [success, setSuccess] = useState(false)
 
@@ -39,13 +42,27 @@ export default function EscribirResenaClient() {
     finally { setUploading(false) }
   }
 
+  const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (reviewPhotos.length >= 3) { setPhotoError('Máximo 3 fotos por reseña'); return }
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) { setPhotoError('Solo se aceptan imágenes JPG, PNG o WEBP'); return }
+    if (file.size > 5 * 1024 * 1024) { setPhotoError('El archivo supera el límite de 5MB'); return }
+    setUploadingPhoto(true); setPhotoError('')
+    try { const result = await upload.reviewPhoto(file); setReviewPhotos(prev => [...prev, result.url]) }
+    catch (err: any) { setPhotoError(err.message || 'Error subiendo la foto') }
+    finally { setUploadingPhoto(false); e.target.value = '' }
+  }
+
+  const removeReviewPhoto = (url: string) => setReviewPhotos(prev => prev.filter(p => p !== url))
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (rating === 0) { alert('Por favor seleccioná una calificación'); return }
     if (form.body.length < 20) { alert('La reseña debe tener al menos 20 caracteres'); return }
     setSubmitting(true)
     try {
-      await reviewsApi.create({ companyId, rating, title: form.title || undefined, body: form.body, proofUrl: proofUrl || undefined, proofType: form.proofType || undefined })
+      await reviewsApi.create({ companyId, rating, title: form.title || undefined, body: form.body, proofUrl: proofUrl || undefined, proofType: form.proofType || undefined, photos: reviewPhotos.length > 0 ? reviewPhotos : undefined })
       setSuccess(true)
     } catch (err: any) { alert(err.message) } finally { setSubmitting(false) }
   }
@@ -96,6 +113,24 @@ export default function EscribirResenaClient() {
               : proofUrl ? <div className="text-sm text-brand-green font-semibold"><i className="ti ti-circle-check" /> {proofFile?.name}</div>
               : <><i className="ti ti-upload text-2xl text-gray-300 block mb-2" /><p className="text-sm text-brand-slate">Subí tu comprobante aquí</p><p className="text-xs text-gray-400 mt-1">JPG, PNG, WEBP o PDF · máx 5MB</p></>}
           </label>
+        </div>
+        <div>
+          <label className="label">Fotos <span className="font-normal normal-case text-gray-400">(opcional, hasta 3)</span></label>
+          <div className="flex gap-2 flex-wrap">
+            {reviewPhotos.map(url => (
+              <div key={url} className="relative w-16 h-16">
+                <img src={url} alt="" className="w-16 h-16 rounded-lg object-cover" />
+                <button type="button" onClick={() => removeReviewPhoto(url)} className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-brand-dark text-white text-xs flex items-center justify-center"><i className="ti ti-x" /></button>
+              </div>
+            ))}
+            {reviewPhotos.length < 3 && (
+              <label className="w-16 h-16 rounded-lg border-2 border-dashed border-gray-200 flex items-center justify-center cursor-pointer hover:border-brand-green transition-colors">
+                <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handlePhotoChange} disabled={uploadingPhoto} />
+                <i className={`ti ${uploadingPhoto ? 'ti-loader-2 animate-spin' : 'ti-plus'} text-lg text-gray-300`} />
+              </label>
+            )}
+          </div>
+          {photoError && <p className="text-xs text-brand-red mt-1.5">{photoError}</p>}
         </div>
         <button type="submit" disabled={submitting || rating === 0} className="btn-primary w-full py-3 text-sm disabled:opacity-50">
           {submitting ? 'Publicando...' : proofUrl ? 'Publicar reseña verificada' : 'Publicar reseña'}
