@@ -28,23 +28,24 @@ export async function leadRoutes(app: FastifyInstance) {
     const body = z.object({
       companyId: z.string().uuid(), name: z.string().min(2),
       email: z.union([z.string().email(), z.literal('')]).optional(), phone: z.string().optional(), message: z.string().min(10),
-    }).parse(request.body)
-    if (body.email === '') body.email = undefined
+    }).refine((data) => !!(data.email || data.phone), { message: 'Dejá al menos un email o teléfono para que la empresa pueda contactarte' }).safeParse(request.body)
+    if (!body.success) return reply.status(400).send({ error: true, message: body.error.issues[0]?.message || 'Datos inválidos' })
+    if (body.data.email === '') body.data.email = undefined
 
-    const company = await prisma.company.findUnique({ where: { id: body.companyId }, include: { owner: { select: { id: true } } } })
+    const company = await prisma.company.findUnique({ where: { id: body.data.companyId }, include: { owner: { select: { id: true } } } })
     if (!company) return reply.status(404).send({ error: true, message: 'Empresa no encontrada' })
     if (!company.claimedById) return reply.status(400).send({ error: true, message: 'Esta empresa aún no reclamó su perfil' })
     if (company.plan === 'FREE') {
       return reply.status(403).send({ error: true, message: 'Esta empresa no tiene el plan necesario para recibir consultas', upgradeRequired: true })
     }
 
-    const lead = await prisma.lead.create({ data: { ...body, source: 'profile' } })
+    const lead = await prisma.lead.create({ data: { ...body.data, source: 'profile' } })
 
     const { sendNotification } = await import('../services/notifications')
     if (company.owner) {
       await sendNotification({
         userId: company.owner.id, type: 'LEAD_RECEIVED', title: `Nueva consulta en ${company.name}`,
-        body: `${body.name} quiere contactarte: "${body.message.substring(0, 80)}..."`, data: { leadId: lead.id, companyId: body.companyId },
+        body: `${body.data.name} quiere contactarte: "${body.data.message.substring(0, 80)}..."`, data: { leadId: lead.id, companyId: body.data.companyId },
       })
     }
 

@@ -27,6 +27,7 @@ export function CompanyProfile({ company, ads }: { company: Company; ads: Ad[] }
 
   const handleLead = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!leadForm.email && !leadForm.phone) { alert('Dejá al menos un email o teléfono para que la empresa pueda contactarte'); return }
     try { await leads.create({ ...leadForm, email: leadForm.email || undefined, phone: leadForm.phone || undefined, companyId: company.id }); setLeadSent(true) }
     catch (err: any) { alert(err.message) }
   }
@@ -133,8 +134,9 @@ export function CompanyProfile({ company, ads }: { company: Company; ads: Ad[] }
                   <form onSubmit={handleLead} className="space-y-3">
                     <p className="text-sm font-semibold text-brand-dark mb-2">Solicitar presupuesto</p>
                     <input required type="text" placeholder="Tu nombre" className="input text-sm" value={leadForm.name} onChange={e => setLeadForm(f => ({...f, name: e.target.value}))} />
-                    <input type="email" placeholder="Tu email (opcional)" className="input text-sm" value={leadForm.email} onChange={e => setLeadForm(f => ({...f, email: e.target.value}))} />
-                    <input type="tel" placeholder="Tu teléfono (opcional)" className="input text-sm" value={leadForm.phone} onChange={e => setLeadForm(f => ({...f, phone: e.target.value}))} />
+                    <p className="text-xs text-brand-slate -mb-1">Dejá al menos un dato de contacto:</p>
+                    <input type="email" placeholder="Tu email" className="input text-sm" value={leadForm.email} onChange={e => setLeadForm(f => ({...f, email: e.target.value}))} />
+                    <input type="tel" placeholder="Tu teléfono" className="input text-sm" value={leadForm.phone} onChange={e => setLeadForm(f => ({...f, phone: e.target.value}))} />
                     <textarea required placeholder="¿Qué necesitás?" className="input text-sm min-h-[80px] resize-none" value={leadForm.message} onChange={e => setLeadForm(f => ({...f, message: e.target.value}))} />
                     <button type="submit" className="btn-primary w-full py-2.5 text-sm">Enviar consulta</button>
                     <button type="button" onClick={() => setShowLeadForm(false)} className="btn-secondary w-full py-2 text-xs">Cancelar</button>
