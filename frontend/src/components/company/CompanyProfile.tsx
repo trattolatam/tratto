@@ -51,7 +51,7 @@ export function CompanyProfile({ company, ads }: { company: Company; ads: Ad[] }
                 {company.isVerified && <span className="badge-verified text-xs mt-0.5"><span className="badge-verified-dot" />Empresa verificada</span>}
               </div>
               <p className="text-white/60 text-sm mt-1"><i className="ti ti-map-pin text-xs mr-1" />{company.category?.name} · {company.city}, {company.country}</p>
-              {!company.claimedById && <Link href={`/reclamar?empresa=${company.id}`} className="inline-flex items-center gap-1 text-xs text-brand-amber mt-1 hover:underline"><i className="ti ti-alert-circle text-xs" />Perfil no reclamado — ¿es tu empresa?</Link>}
+              {!company.claimedById && <Link href={`/reclamar?slug=${company.slug}`} className="inline-flex items-center gap-1 text-xs text-brand-amber mt-1 hover:underline"><i className="ti ti-alert-circle text-xs" />Perfil no reclamado — ¿es tu empresa?</Link>}
             </div>
           </div>
           <div className="grid grid-cols-3 gap-3">

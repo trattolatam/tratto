@@ -30,9 +30,11 @@ export default function RegistroClient() {
       if (form.role === 'BUSINESS') {
         const empresa = searchParams.get('empresa')
         const crear = searchParams.get('crear')
+        const slug = searchParams.get('slug')
         const params = new URLSearchParams()
         if (empresa) params.set('empresa', empresa)
         if (crear) params.set('crear', crear)
+        if (slug) params.set('slug', slug)
         const qs = params.toString()
         next = qs ? `/reclamar?${qs}` : '/reclamar'
       }

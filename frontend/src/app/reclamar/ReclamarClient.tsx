@@ -38,6 +38,12 @@ export default function ReclamarClient() {
   useEffect(() => { categories.list().then(d => setCategoryList(d.categories)).catch(() => {}) }, [])
 
   useEffect(() => {
+    const slugParam = searchParams.get('slug')
+    if (slugParam) {
+      if (!user) { router.push(`/registro?role=BUSINESS&slug=${encodeURIComponent(slugParam)}`); return }
+      companies.get(slugParam).then(data => handleSelect(data.company)).catch(() => {})
+      return
+    }
     const preset = searchParams.get('empresa')
     if (!preset) return
     if (searchParams.get('crear') === '1') {
