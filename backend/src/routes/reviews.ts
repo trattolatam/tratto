@@ -24,10 +24,22 @@ export default async function reviewRoutes(app: FastifyInstance) {
     if (query.verified === 'true') where.isVerified = true
     if (query.rating) where.rating = parseInt(query.rating)
 
+    // Si quien consulta es el dueño de la empresa (o un admin), también le mostramos
+    // sus reseñas pendientes/rechazadas — con auth opcional, no rompe el uso público normal.
+    try {
+      await request.jwtVerify()
+      const payload = request.user as any
+      if (payload.role === 'ADMIN') {
+        delete where.status
+      } else if (payload.companyId === query.companyId) {
+        delete where.status
+      }
+    } catch { /* visitante anónimo, sigue con solo APPROVED */ }
+
     const [reviews, total] = await Promise.all([
       prisma.review.findMany({
         where, skip: (page - 1) * limit, take: limit,
-        orderBy: [{ isVerified: 'desc' }, { helpfulCount: 'desc' }, { createdAt: 'desc' }],
+        orderBy: [{ status: 'asc' }, { isVerified: 'desc' }, { helpfulCount: 'desc' }, { createdAt: 'desc' }],
         include: { user: { select: { name: true, avatarUrl: true, country: true } }, response: true },
       }),
       prisma.review.count({ where }),

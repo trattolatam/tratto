@@ -287,7 +287,7 @@ export default function PanelPage() {
             <div key={r.id} className="card p-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1"><span className="text-sm font-semibold text-brand-dark">{r.user.name}</span>{r.isVerified && <span className="badge-verified text-xs"><span className="badge-verified-dot" />Verificada</span>}<span className="text-brand-amber">{'★'.repeat(r.rating)}</span></div>
+                  <div className="flex items-center gap-2 mb-1"><span className="text-sm font-semibold text-brand-dark">{r.user.name}</span>{r.isVerified && <span className="badge-verified text-xs"><span className="badge-verified-dot" />Verificada</span>}{r.status === 'PENDING' && <span className="text-xs px-2 py-0.5 rounded-full bg-brand-amber-dim text-brand-amber font-medium">Pendiente de aprobación</span>}{r.status === 'REJECTED' && <span className="text-xs px-2 py-0.5 rounded-full bg-red-50 text-brand-red font-medium">Rechazada</span>}<span className="text-brand-amber">{'★'.repeat(r.rating)}</span></div>
                   <p className="text-sm text-brand-slate">{r.body}</p>
                   {r.photos && r.photos.length > 0 && (
                     <div className="flex gap-2 mt-2">
