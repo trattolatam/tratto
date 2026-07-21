@@ -16,7 +16,7 @@ export async function sendNotification(payload: NotificationPayload): Promise<vo
 
   const user = await prisma.user.findUnique({
     where: { id: payload.userId },
-    select: { email: true, phone: true, company: { select: { plan: true } } },
+    select: { email: true, phone: true, country: true, company: { select: { plan: true } } },
   })
   if (!user) return
 
@@ -25,7 +25,7 @@ export async function sendNotification(payload: NotificationPayload): Promise<vo
 
   const sends: Promise<void>[] = []
   if (user.email && shouldSendEmail(payload.type)) sends.push(sendEmail(user.email, payload.title, payload.body, payload.data))
-  if (user.phone && whatsappAllowed) sends.push(sendWhatsApp(user.phone, payload.title, payload.body))
+  if (user.phone && whatsappAllowed) sends.push(sendWhatsApp(normalizePhone(user.phone, user.country), payload.title, payload.body))
 
   await Promise.allSettled(sends)
 
@@ -44,6 +44,20 @@ function shouldSendEmail(type: NotificationType): boolean {
 
 function shouldSendWhatsApp(type: NotificationType): boolean {
   return ['NEW_REVIEW', 'MEDAL_EARNED', 'MEDAL_ALMOST', 'LEAD_RECEIVED'].includes(type)
+}
+
+// Códigos de país para normalizar teléfonos locales (ej: "097550450") a formato
+// internacional E.164 (ej: "+59897550450"), que es lo que exige la API de WhatsApp.
+const COUNTRY_CODES: Record<string, string> = { UY: '598', AR: '54', CL: '56', MX: '52', CO: '57', PE: '51', BR: '55' }
+
+function normalizePhone(phone: string, country: string | null): string {
+  const trimmed = phone.trim()
+  if (trimmed.startsWith('+')) return trimmed.replace(/[^\d+]/g, '')
+  const digits = trimmed.replace(/\D/g, '')
+  const code = country ? COUNTRY_CODES[country.toUpperCase()] : undefined
+  if (!code) return digits // país desconocido: lo mandamos tal cual, mejor que adivinar mal
+  const withoutLeadingZero = digits.replace(/^0+/, '')
+  return `+${code}${withoutLeadingZero}`
 }
 
 async function sendEmail(to: string, subject: string, body: string, data?: Record<string, any>): Promise<void> {
