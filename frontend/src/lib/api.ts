@@ -65,6 +65,7 @@ export const leads = {
 }
 
 export const medals = { get: (companyId: string) => apiFetch<{ medals: any[] }>(`/api/medals/${companyId}`) }
+export const ai = { generateSummary: (companyId: string) => apiFetch<{ message: string }>(`/api/ai/summary/${companyId}`, { method: 'POST', body: JSON.stringify({}) }) }
 
 export const ads = {
   feed: (params: { categoryId?: string; country?: string } = {}) => apiFetch<{ ads: any[] }>(`/api/ads/feed?${new URLSearchParams(params as any).toString()}`),

@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuthStore } from '@/lib/store'
-import { companies as companiesApi, reviews as reviewsApi, leads as leadsApi, upload } from '@/lib/api'
+import { companies as companiesApi, reviews as reviewsApi, leads as leadsApi, upload, ai as aiApi } from '@/lib/api'
 
 const TAX_ID_LABELS: Record<string, string> = { UY: 'RUT', AR: 'CUIT', CL: 'RUT', MX: 'RFC', CO: 'NIT', PE: 'RUC', BR: 'CNPJ' }
 
@@ -25,6 +25,9 @@ export default function PanelPage() {
   const [respondError, setRespondError] = useState('')
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
   const [photoError, setPhotoError] = useState('')
+  const [generatingSummary, setGeneratingSummary] = useState(false)
+  const [summaryMsg, setSummaryMsg] = useState('')
+  const [summaryError, setSummaryError] = useState('')
   const [showContactsModal, setShowContactsModal] = useState(false)
   const [contactReveals, setContactReveals] = useState<any[] | null>(null)
   const [loadingContacts, setLoadingContacts] = useState(false)
@@ -99,6 +102,13 @@ export default function PanelPage() {
   const company = user.company!
   const isPro = ['PROFESSIONAL', 'PREMIUM', 'ENTERPRISE'].includes(company.plan)
   const isPremium = ['PREMIUM', 'ENTERPRISE'].includes(company.plan)
+
+  const handleGenerateSummary = async () => {
+    setGeneratingSummary(true); setSummaryError(''); setSummaryMsg('')
+    try { const result = await aiApi.generateSummary(company.id); setSummaryMsg(result.message) }
+    catch (err: any) { setSummaryError(err.message || 'Error al generar el resumen') }
+    finally { setGeneratingSummary(false) }
+  }
 
   const refreshCompanyDetails = () => { if (user?.company) companiesApi.get(user.company.slug).then(data => setCompanyDetails(data.company)) }
 
@@ -425,6 +435,26 @@ export default function PanelPage() {
                 <input ref={photoInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handlePhotoChange} />
                 {photoError && <p className="text-xs text-brand-red mt-2">{photoError}</p>}
               </>
+            ) : (
+              <div className="flex items-center gap-2 text-xs text-brand-slate"><i className="ti ti-lock text-sm" /> Disponible en el plan Profesional — <Link href="/precios" className="text-brand-green hover:underline">ver planes</Link></div>
+            )}
+          </div>
+
+          <div className="card p-6">
+            <label className="label mb-2 block">Resumen IA de tus reseñas</label>
+            {isPro ? (
+              company.reviewCount < 5 ? (
+                <p className="text-xs text-brand-slate">Necesitás al menos 5 reseñas para generar el resumen (tenés {company.reviewCount}).</p>
+              ) : (
+                <>
+                  <p className="text-xs text-brand-slate mb-3">Genera un resumen automático de tus reseñas, visible en tu perfil público.</p>
+                  <button onClick={handleGenerateSummary} disabled={generatingSummary} className="btn-secondary text-xs py-2 px-4 disabled:opacity-50">
+                    <i className={`ti ${generatingSummary ? 'ti-loader-2 animate-spin' : 'ti-sparkles'} text-sm`} /> {generatingSummary ? 'Generando...' : 'Generar resumen IA'}
+                  </button>
+                  {summaryMsg && <p className="text-xs text-brand-green mt-2">{summaryMsg}</p>}
+                  {summaryError && <p className="text-xs text-brand-red mt-2">{summaryError}</p>}
+                </>
+              )
             ) : (
               <div className="flex items-center gap-2 text-xs text-brand-slate"><i className="ti ti-lock text-sm" /> Disponible en el plan Profesional — <Link href="/precios" className="text-brand-green hover:underline">ver planes</Link></div>
             )}
