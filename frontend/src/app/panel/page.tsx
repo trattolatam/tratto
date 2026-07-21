@@ -267,6 +267,13 @@ export default function PanelPage() {
                     <i className={`ti ${uploadingPhoto ? 'ti-loader-2 animate-spin' : 'ti-photo-plus'} text-brand-slate`} /> {uploadingPhoto ? 'Subiendo...' : 'Subir foto de trabajo'}
                   </button>
                   {photoError && <p className="text-xs text-brand-red px-2.5">{photoError}</p>}
+                  {company.reviewCount >= 5 && (
+                    <button onClick={handleGenerateSummary} disabled={generatingSummary} className="w-full flex items-center gap-2 p-2.5 rounded-lg hover:bg-gray-50 transition-colors text-sm text-brand-dark text-left disabled:opacity-50">
+                      <i className={`ti ${generatingSummary ? 'ti-loader-2 animate-spin' : 'ti-sparkles'} text-brand-slate`} /> {generatingSummary ? 'Generando...' : 'Generar resumen IA'}
+                    </button>
+                  )}
+                  {summaryMsg && <p className="text-xs text-brand-green px-2.5">{summaryMsg}</p>}
+                  {summaryError && <p className="text-xs text-brand-red px-2.5">{summaryError}</p>}
                 </>
               )}
             </div>
