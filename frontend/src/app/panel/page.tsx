@@ -242,7 +242,7 @@ export default function PanelPage() {
               {pendingReviews.length === 0 ? <p className="text-xs text-brand-slate py-4 text-center">Sin reseñas todavía</p> : pendingReviews.slice(0, 3).map(r => (
                 <div key={r.id} className="flex items-start gap-2 py-2 border-b border-gray-50 last:border-0">
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5"><span className="text-xs font-semibold text-brand-dark">{r.user.name}</span>{r.isVerified && <span className="badge-verified text-xs py-0"><span className="badge-verified-dot" />Verificada</span>}</div>
+                    <div className="flex items-center gap-1.5"><span className="text-xs font-semibold text-brand-dark">{r.user.name}</span>{r.isVerified && <span className="badge-verified text-xs py-0"><span className="badge-verified-dot" />Verificada</span>}{r.status === 'PENDING' && <span className="text-xs px-1.5 py-0 rounded-full bg-brand-amber-dim text-brand-amber font-medium">Pendiente</span>}</div>
                     <p className="text-xs text-brand-slate truncate mt-0.5">{r.body}</p>
                   </div>
                   <div className="text-brand-amber text-sm flex-shrink-0">{'★'.repeat(r.rating)}</div>
