@@ -42,7 +42,7 @@ export async function sendNotification(payload: NotificationPayload): Promise<vo
 }
 
 function shouldSendEmail(type: NotificationType): boolean {
-  return ['NEW_REVIEW', 'MEDAL_EARNED', 'MONTHLY_REPORT', 'SUBSCRIPTION_RENEWAL', 'AD_APPROVED', 'AD_REJECTED'].includes(type)
+  return ['NEW_REVIEW', 'MEDAL_EARNED', 'MONTHLY_REPORT', 'SUBSCRIPTION_RENEWAL', 'AD_APPROVED', 'AD_REJECTED', 'LEAD_RECEIVED'].includes(type)
 }
 
 function shouldSendWhatsApp(type: NotificationType): boolean {
