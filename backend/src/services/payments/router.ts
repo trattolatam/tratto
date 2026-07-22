@@ -23,7 +23,7 @@ export async function paymentRoutes(app: FastifyInstance) {
     if (body.data.provider === 'STRIPE') {
       checkoutUrl = await createCheckoutSession({ companyId: user.company.id, plan: body.data.plan, successUrl, cancelUrl, customerEmail: user.email })
     } else {
-      checkoutUrl = await createDLPayment({ companyId: user.company.id, plan: body.data.plan, successUrl, failureUrl: cancelUrl, payerEmail: user.email, payerName: user.email })
+      checkoutUrl = await createDLPayment({ companyId: user.company.id, plan: body.data.plan, successUrl, failureUrl: cancelUrl, payerEmail: user.email, payerName: user.name })
     }
 
     return reply.send({ checkoutUrl, provider: body.data.provider })
@@ -48,7 +48,7 @@ export async function paymentRoutes(app: FastifyInstance) {
     if (body.data.provider === 'STRIPE') {
       checkoutUrl = await createAdRechargeSession({ adAccountId: account.id, amountUsd: body.data.amountUsd, successUrl, cancelUrl: failureUrl, customerEmail: user.email })
     } else {
-      checkoutUrl = await createDLAdRechargePayment({ adAccountId: account.id, amountUsd: body.data.amountUsd, successUrl, failureUrl, payerEmail: user.email, payerName: user.email })
+      checkoutUrl = await createDLAdRechargePayment({ adAccountId: account.id, amountUsd: body.data.amountUsd, successUrl, failureUrl, payerEmail: user.email, payerName: user.name })
     }
 
     return reply.send({ checkoutUrl, provider: body.data.provider, amountUsd: body.data.amountUsd })
