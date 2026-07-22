@@ -16,16 +16,19 @@ export async function sendNotification(payload: NotificationPayload): Promise<vo
 
   const user = await prisma.user.findUnique({
     where: { id: payload.userId },
-    select: { email: true, phone: true, country: true, company: { select: { plan: true } } },
+    select: { email: true, phone: true, country: true, company: { select: { plan: true, phone: true } } },
   })
   if (!user) return
 
   const isPro = ['PROFESSIONAL', 'PREMIUM', 'ENTERPRISE'].includes(user.company?.plan || '')
   const whatsappAllowed = shouldSendWhatsApp(payload.type) && isPro
+  // Si el dueño no cargó su teléfono personal en "Mi perfil", usamos el de la empresa como respaldo
+  // (algunos vienen con más de un número separado por "/" — nos quedamos con el primero)
+  const notifyPhone = user.phone || user.company?.phone?.split('/')[0].trim()
 
   const sends: Promise<void>[] = []
   if (user.email && shouldSendEmail(payload.type)) sends.push(sendEmail(user.email, payload.title, payload.body, payload.data))
-  if (user.phone && whatsappAllowed) sends.push(sendWhatsApp(normalizePhone(user.phone, user.country), payload.title, payload.body))
+  if (notifyPhone && whatsappAllowed) sends.push(sendWhatsApp(normalizePhone(notifyPhone, user.country), payload.title, payload.body))
 
   await Promise.allSettled(sends)
 
@@ -33,7 +36,7 @@ export async function sendNotification(payload: NotificationPayload): Promise<vo
     where: { id: notification.id },
     data: {
       sentEmail: user.email ? shouldSendEmail(payload.type) : false,
-      sentWhatsapp: user.phone ? whatsappAllowed : false,
+      sentWhatsapp: notifyPhone ? whatsappAllowed : false,
     },
   })
 }
