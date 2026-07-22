@@ -67,8 +67,17 @@ export default async function reviewRoutes(app: FastifyInstance) {
     if (!company) return reply.status(404).send({ error: true, message: 'Empresa no encontrada' })
     if (company.claimedById === request.user.userId) return reply.status(403).send({ error: true, message: 'No podés reseñar tu propia empresa' })
 
-    const existing = await prisma.review.findFirst({ where: { companyId: body.data.companyId, userId: request.user.userId } })
-    if (existing) return reply.status(409).send({ error: true, message: 'Ya dejaste una reseña para esta empresa' })
+    const REVIEW_COOLDOWN_DAYS = 30
+    const cooldownStart = new Date(Date.now() - REVIEW_COOLDOWN_DAYS * 24 * 60 * 60 * 1000)
+    const existing = await prisma.review.findFirst({
+      where: { companyId: body.data.companyId, userId: request.user.userId, createdAt: { gte: cooldownStart } },
+      orderBy: { createdAt: 'desc' },
+    })
+    if (existing) {
+      const nextAvailable = new Date(existing.createdAt.getTime() + REVIEW_COOLDOWN_DAYS * 24 * 60 * 60 * 1000)
+      const daysLeft = Math.ceil((nextAvailable.getTime() - Date.now()) / (24 * 60 * 60 * 1000))
+      return reply.status(409).send({ error: true, message: `Ya dejaste una reseña para esta empresa hace poco. Podés dejar otra en ${daysLeft} día${daysLeft === 1 ? '' : 's'}.` })
+    }
 
     const isVerified = !!body.data.proofUrl
 
