@@ -43,9 +43,13 @@ export async function leadRoutes(app: FastifyInstance) {
 
     const { sendNotification } = await import('../services/notifications')
     if (company.owner) {
+      const contactLines = [
+        body.data.email ? `📧 ${body.data.email}` : null,
+        body.data.phone ? `📞 ${body.data.phone}` : null,
+      ].filter(Boolean).join(' · ')
       await sendNotification({
         userId: company.owner.id, type: 'LEAD_RECEIVED', title: `Nueva consulta en ${company.name}`,
-        body: `${body.data.name} quiere contactarte: "${body.data.message.substring(0, 80)}..."`, data: { leadId: lead.id, companyId: body.data.companyId },
+        body: `${body.data.name} quiere contactarte (${contactLines}): "${body.data.message.substring(0, 80)}..."`, data: { leadId: lead.id, companyId: body.data.companyId },
       })
     }
 
