@@ -16,7 +16,7 @@ export async function sendNotification(payload: NotificationPayload): Promise<vo
 
   const user = await prisma.user.findUnique({
     where: { id: payload.userId },
-    select: { email: true, phone: true, country: true, company: { select: { plan: true, phone: true } } },
+    select: { email: true, phone: true, country: true, company: { select: { plan: true, phone: true, email: true } } },
   })
   if (!user) return
 
@@ -25,9 +25,12 @@ export async function sendNotification(payload: NotificationPayload): Promise<vo
   // Si el dueño no cargó su teléfono personal en "Mi perfil", usamos el de la empresa como respaldo
   // (algunos vienen con más de un número separado por "/" — nos quedamos con el primero)
   const notifyPhone = user.phone || user.company?.phone?.split('/')[0].trim()
+  // Para email priorizamos el "Email de contacto" que carga el dueño en Editar perfil
+  // (es el que explícitamente configura para este fin), y si no está, el de su cuenta.
+  const notifyEmail = user.company?.email || user.email
 
   const sends: Promise<void>[] = []
-  if (user.email && shouldSendEmail(payload.type)) sends.push(sendEmail(user.email, payload.title, payload.body, payload.data))
+  if (notifyEmail && shouldSendEmail(payload.type)) sends.push(sendEmail(notifyEmail, payload.title, payload.body, payload.data))
   if (notifyPhone && whatsappAllowed) sends.push(sendWhatsApp(normalizePhone(notifyPhone, user.country), payload.title, payload.body))
 
   await Promise.allSettled(sends)
@@ -35,7 +38,7 @@ export async function sendNotification(payload: NotificationPayload): Promise<vo
   await prisma.notification.update({
     where: { id: notification.id },
     data: {
-      sentEmail: user.email ? shouldSendEmail(payload.type) : false,
+      sentEmail: notifyEmail ? shouldSendEmail(payload.type) : false,
       sentWhatsapp: notifyPhone ? whatsappAllowed : false,
     },
   })
