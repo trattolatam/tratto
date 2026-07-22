@@ -106,19 +106,57 @@ async function sendWhatsApp(to: string, title: string, body: string): Promise<vo
   } catch (err) { console.error('WhatsApp send error:', err) }
 }
 
-export async function sendMonthlyLostOpportunityReport(): Promise<void> {
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
+/**
+ * Reporte mensual para empresas en plan Gratuito que ya reclamaron su perfil.
+ * Usa el conteo REAL de "quisieron tu contacto" del último mes (mismo dato que
+ * ven en su panel) — nada inventado. Si una empresa tuvo 0, no le mandamos nada
+ * ese mes (no tiene sentido un mensaje negativo de "nadie te buscó").
+ *
+ * Procesa en tandas chicas con una pausa entre cada una, y si falla el envío
+ * de una empresa puntual, sigue con las demás en vez de frenar todo el proceso
+ * — pensado para que este mismo script funcione igual de bien con 20 empresas
+ * que con 2.000.
+ */
+export async function sendMonthlyLostOpportunityReport(): Promise<{ sent: number; skipped: number; failed: number }> {
   const claimedFreeCompanies = await prisma.company.findMany({
     where: { plan: 'FREE', claimedById: { not: null } },
     include: { owner: { select: { id: true, email: true } } },
   })
 
-  for (const company of claimedFreeCompanies) {
-    if (!company.owner) continue
-    const estimatedSearches = Math.floor(Math.random() * 800) + 200
-    await sendNotification({
-      userId: company.owner.id, type: 'MONTHLY_REPORT', title: 'Tu reporte mensual de Tratto',
-      body: `Este mes aproximadamente ${estimatedSearches} personas buscaron servicios en tu rubro. Tu perfil no tiene botón de contacto — activá el plan Profesional para no perder más clientes.`,
-      data: { estimatedSearches, companyId: company.id, companyName: company.name },
-    })
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+  const BATCH_SIZE = 20
+  const DELAY_BETWEEN_BATCHES_MS = 2000
+
+  let sent = 0, skipped = 0, failed = 0
+
+  for (let i = 0; i < claimedFreeCompanies.length; i += BATCH_SIZE) {
+    const batch = claimedFreeCompanies.slice(i, i + BATCH_SIZE)
+
+    await Promise.allSettled(
+      batch.map(async (company: typeof claimedFreeCompanies[number]) => {
+        if (!company.owner) { skipped++; return }
+
+        const contactReveals = await prisma.contactReveal.count({ where: { companyId: company.id, createdAt: { gte: thirtyDaysAgo } } })
+        if (contactReveals === 0) { skipped++; return }
+
+        try {
+          await sendNotification({
+            userId: company.owner.id, type: 'MONTHLY_REPORT', title: 'Tu reporte mensual de Tratto',
+            body: `${contactReveals} ${contactReveals === 1 ? 'persona quiso' : 'personas quisieron'} tu contacto este mes, pero tu perfil no tiene el botón de contacto activado — activá el plan Profesional para no perder más clientes.`,
+            data: { contactReveals, companyId: company.id, companyName: company.name },
+          })
+          sent++
+        } catch (err) {
+          console.error(`Error mandando reporte mensual a la empresa ${company.id}:`, err)
+          failed++
+        }
+      })
+    )
+
+    if (i + BATCH_SIZE < claimedFreeCompanies.length) await sleep(DELAY_BETWEEN_BATCHES_MS)
   }
+
+  return { sent, skipped, failed }
 }
