@@ -42,7 +42,7 @@ export default async function uploadRoutes(app: FastifyInstance) {
     const filePath = `avatars/${request.user.userId}/${Date.now()}${ext}`
     const url = await uploadFile({ bucket: BUCKETS.COMPANIES, path: filePath, buffer, mimetype: data.mimetype })
 
-    const { prisma } = await import('../index')
+    const { prisma } = await import('../lib/prisma')
     await prisma.user.update({ where: { id: request.user.userId }, data: { avatarUrl: url } })
 
     return reply.send({ url })
@@ -62,7 +62,7 @@ export default async function uploadRoutes(app: FastifyInstance) {
     const filePath = `logos/${request.user.companyId}/${Date.now()}${ext}`
     const url = await uploadFile({ bucket: BUCKETS.COMPANIES, path: filePath, buffer, mimetype: data.mimetype })
 
-    const { prisma } = await import('../index')
+    const { prisma } = await import('../lib/prisma')
     if (request.user.companyId) await prisma.company.update({ where: { id: request.user.companyId }, data: { logoUrl: url } })
 
     return reply.send({ url })
@@ -82,7 +82,7 @@ export default async function uploadRoutes(app: FastifyInstance) {
     const filePath = `photos/${request.user.companyId}/${Date.now()}${ext}`
     const url = await uploadFile({ bucket: BUCKETS.COMPANIES, path: filePath, buffer, mimetype: data.mimetype })
 
-    const { prisma } = await import('../index')
+    const { prisma } = await import('../lib/prisma')
     if (request.user.companyId) {
       const company = await prisma.company.findUnique({ where: { id: request.user.companyId }, select: { photos: true } })
       if (company && company.photos.length >= 10) return reply.status(400).send({ error: true, message: 'Límite de 10 fotos por empresa' })
@@ -94,11 +94,11 @@ export default async function uploadRoutes(app: FastifyInstance) {
 
   app.delete('/company-photo', { preHandler: [requireBusinessOwner, requirePlan('PROFESSIONAL')] }, async (request, reply) => {
     const body = z.object({ url: z.string() }).parse(request.body)
-    const { prisma } = await import('../index')
+    const { prisma } = await import('../lib/prisma')
     if (!request.user.companyId) return reply.status(400).send({ error: true, message: 'Sin empresa asociada' })
     const company = await prisma.company.findUnique({ where: { id: request.user.companyId }, select: { photos: true } })
     if (!company) return reply.status(404).send({ error: true, message: 'Empresa no encontrada' })
-    await prisma.company.update({ where: { id: request.user.companyId }, data: { photos: company.photos.filter((p) => p !== body.url) } })
+    await prisma.company.update({ where: { id: request.user.companyId }, data: { photos: company.photos.filter((p: string) => p !== body.url) } })
     return reply.send({ ok: true })
   })
 

@@ -1,6 +1,6 @@
 import { FastifyInstance } from 'fastify'
 import { z } from 'zod'
-import { prisma } from '../index'
+import { prisma } from '../lib/prisma'
 import { requireAuth, requireVerifiedEmail, requireBusinessOwner, requirePlan } from '../middleware/auth'
 import { generateCertificatePdf } from '../services/certificate'
 import { validateTaxId, validatePersonalId } from '../services/taxIdValidation'

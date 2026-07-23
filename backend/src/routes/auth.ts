@@ -1,7 +1,7 @@
 import { FastifyInstance } from 'fastify'
 import bcrypt from 'bcryptjs'
 import { z } from 'zod'
-import { prisma } from '../index'
+import { prisma } from '../lib/prisma'
 import { requireAuth } from '../middleware/auth'
 import { authRateLimit, passwordResetRateLimit } from '../middleware/rateLimits'
 import { sendVerificationEmail, verifyEmailToken, resendVerificationEmail } from '../services/emailVerification'

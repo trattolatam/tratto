@@ -1,5 +1,5 @@
 import { FastifyInstance } from 'fastify'
-import { prisma } from '../index'
+import { prisma } from '../lib/prisma'
 
 export default async function categoryRoutes(app: FastifyInstance) {
   app.get('/', async (_req, reply) => {

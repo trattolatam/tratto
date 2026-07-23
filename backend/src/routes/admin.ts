@@ -1,6 +1,6 @@
 import { FastifyInstance } from 'fastify'
 import { z } from 'zod'
-import { prisma } from '../index'
+import { prisma } from '../lib/prisma'
 import { requireAdmin } from '../middleware/auth'
 
 export default async function adminRoutes(app: FastifyInstance) {

@@ -1,4 +1,4 @@
-import { prisma } from '../index'
+import { prisma } from '../lib/prisma'
 import { MedalType } from '@prisma/client'
 
 const CURRENT_YEAR = new Date().getFullYear()

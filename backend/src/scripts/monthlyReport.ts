@@ -6,7 +6,7 @@
  * Uso en producción (Render Cron Job, Command): node dist/scripts/monthlyReport.js
  * Uso local para probar: npx ts-node src/scripts/monthlyReport.ts
  */
-import { prisma } from '../index'
+import { prisma } from '../lib/prisma'
 import { sendMonthlyLostOpportunityReport } from '../services/notifications'
 
 async function main() {

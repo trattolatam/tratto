@@ -1,4 +1,4 @@
-import { prisma } from '../../index'
+import { prisma } from '../../lib/prisma'
 
 // VERIFICAR: confirmar en tu panel de dLocal Go (Integraciones > Integración por API)
 // la URL base exacta de sandbox y producción antes de ir a producción.

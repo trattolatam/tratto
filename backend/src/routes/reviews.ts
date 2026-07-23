@@ -1,6 +1,6 @@
 import { FastifyInstance } from 'fastify'
 import { z } from 'zod'
-import { prisma } from '../index'
+import { prisma } from '../lib/prisma'
 import { requireAuth, requireVerifiedEmail, requireBusinessOwner, requireAdmin, requirePlan } from '../middleware/auth'
 import { createReviewRateLimit } from '../middleware/rateLimits'
 import { recalcCompanyRating } from '../services/rating'

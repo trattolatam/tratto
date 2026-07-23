@@ -1,5 +1,5 @@
 import crypto from 'crypto'
-import { prisma } from '../index'
+import { prisma } from '../lib/prisma'
 
 /**
  * Genera un token de verificación y lo envía por email.

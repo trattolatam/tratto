@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk'
-import { prisma } from '../../index'
+import { prisma } from '../../lib/prisma'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
 

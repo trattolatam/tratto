@@ -1,6 +1,6 @@
 import { FastifyInstance } from 'fastify'
 import { z } from 'zod'
-import { prisma } from '../index'
+import { prisma } from '../lib/prisma'
 import { requireAuth, requireBusinessOwner, requireAdmin } from '../middleware/auth'
 import { leadRateLimit } from '../middleware/rateLimits'
 

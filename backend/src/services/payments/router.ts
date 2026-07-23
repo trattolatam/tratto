@@ -1,6 +1,6 @@
 import { FastifyInstance } from 'fastify'
 import { z } from 'zod'
-import { prisma } from '../../index'
+import { prisma } from '../../lib/prisma'
 import { requireAuth, requireBusinessOwner } from '../../middleware/auth'
 import { createCheckoutSession, createAdRechargeSession, cancelSubscription, handleStripeWebhook } from './stripe'
 import { createDLPayment, createDLAdRechargePayment, handleDLWebhook } from './dlocalgo'

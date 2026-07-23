@@ -3,10 +3,10 @@ import cors from '@fastify/cors'
 import jwt from '@fastify/jwt'
 import multipart from '@fastify/multipart'
 import rateLimit from '@fastify/rate-limit'
-import { PrismaClient } from '@prisma/client'
 import dotenv from 'dotenv'
 dotenv.config()
 
+import { prisma } from './lib/prisma'
 import authRoutes from './routes/auth'
 import companyRoutes from './routes/companies'
 import reviewRoutes from './routes/reviews'
@@ -18,7 +18,6 @@ import { subscriptionRoutes, leadRoutes, medalRoutes, notificationRoutes } from 
 import { paymentRoutes, webhookPaymentRoutes } from './services/payments/router'
 import { aiRoutes } from './services/ai/routes'
 
-export const prisma = new PrismaClient({ log: ['error'] })
 const app = Fastify({ logger: true })
 
 async function start() {

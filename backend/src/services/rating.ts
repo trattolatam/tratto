@@ -1,4 +1,4 @@
-import { prisma } from '../index'
+import { prisma } from '../lib/prisma'
 
 export async function recalcCompanyRating(companyId: string): Promise<void> {
   const result = await prisma.review.aggregate({
