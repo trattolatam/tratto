@@ -4,6 +4,7 @@
   "description": "Tratto API — Plataforma de reseñas verificadas para LATAM",
   "main": "dist/index.js",
   "scripts": {
+    "postinstall": "prisma generate",
     "dev": "ts-node src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
