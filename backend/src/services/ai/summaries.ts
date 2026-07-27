@@ -62,6 +62,21 @@ Reglas: exactamente 5 insights basados en lo que realmente mencionan las reseña
   console.log(`✅ AI summary generado para: ${company.name}`)
 }
 
+export async function generateCompetitorInsight(reviews: { body: string; rating: number }[], categoryName: string): Promise<string> {
+  const reviewsText = reviews.map((r) => `[${r.rating}★] ${r.body}`).join('\n')
+  const prompt = `Sos un analista de mercado para Tratto, una plataforma de reseñas verificadas de LATAM.
+
+Estas son reseñas reales de OTRAS empresas del rubro "${categoryName}" (competidores de la empresa que está mirando este análisis, no reseñas de ella misma):
+
+${reviewsText}
+
+Escribí 1-2 oraciones cortas en español resumiendo qué elogia y qué critica la gente de estos competidores en general (ej: "Tus competidores reciben elogios por la rapidez de entrega, pero varias quejas por falta de comunicación durante el envío."). Sin nombrar empresas puntuales. Respondé SOLO con esas 1-2 oraciones, sin comillas ni markdown.`
+
+  const message = await anthropic.messages.create({ model: 'claude-sonnet-4-6', max_tokens: 150, messages: [{ role: 'user', content: prompt }] })
+  const content = message.content[0]
+  return content.type === 'text' ? content.text.trim() : ''
+}
+
 export async function runBatchAiSummaries(): Promise<void> {
   const companies = await prisma.company.findMany({
     where: { reviewCount: { gte: 10 }, OR: [{ aiSummary: null }, { aiSummary: { generatedAt: { lt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } } }] },

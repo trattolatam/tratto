@@ -317,7 +317,7 @@ export default async function companyRoutes(app: FastifyInstance) {
   // ─── Inteligencia competitiva (plan Premium+) ─────────────────────────────
   app.get('/:id/competitive-intel', { preHandler: [requireBusinessOwner, requirePlan('PREMIUM')] }, async (request, reply) => {
     const { id } = request.params as { id: string }
-    const company = await prisma.company.findUnique({ where: { id } })
+    const company = await prisma.company.findUnique({ where: { id }, include: { category: { select: { name: true } } } })
     if (!company || company.claimedById !== request.user.userId) {
       return reply.status(403).send({ error: true, message: 'Sin permiso' })
     }
@@ -325,20 +325,57 @@ export default async function companyRoutes(app: FastifyInstance) {
     // Grupo de comparación: misma categoría + ciudad. Si hay pocos pares, se amplía a toda la categoría en el país.
     let peers = await prisma.company.findMany({
       where: { categoryId: company.categoryId, city: company.city, country: company.country },
-      select: { id: true, name: true, plan: true, ratingAvg: true, reviewCount: true },
+      select: { id: true, name: true, plan: true, ratingAvg: true, reviewCount: true, verifiedReviewCount: true },
     })
     let scope: 'city' | 'country' = 'city'
     if (peers.length < 3) {
       peers = await prisma.company.findMany({
         where: { categoryId: company.categoryId, country: company.country },
-        select: { id: true, name: true, plan: true, ratingAvg: true, reviewCount: true },
+        select: { id: true, name: true, plan: true, ratingAvg: true, reviewCount: true, verifiedReviewCount: true },
       })
       scope = 'country'
     }
 
     const peerCount = peers.length
+    const peerIds = peers.map((p) => p.id)
     const avgRating = peerCount > 0 ? peers.reduce((sum, p) => sum + p.ratingAvg, 0) / peerCount : 0
     const avgReviews = peerCount > 0 ? peers.reduce((sum, p) => sum + p.reviewCount, 0) / peerCount : 0
+
+    // % de reseñas verificadas — mío vs. promedio del rubro
+    const verifiedPct = (p: { reviewCount: number; verifiedReviewCount: number }) => p.reviewCount > 0 ? (p.verifiedReviewCount / p.reviewCount) * 100 : 0
+    const myVerifiedPct = verifiedPct(company)
+    const avgVerifiedPct = peerCount > 0 ? peers.reduce((sum, p) => sum + verifiedPct(p), 0) / peerCount : 0
+
+    // Mezcla de planes de la competencia
+    const planMix = { FREE: 0, PROFESSIONAL: 0, PREMIUM: 0, ENTERPRISE: 0 }
+    for (const p of peers) planMix[p.plan]++
+
+    // Medallas — mío vs. promedio
+    const peerMedals = await prisma.medal.findMany({ where: { companyId: { in: peerIds }, visible: true }, select: { companyId: true } })
+    const medalCountByCompany: Record<string, number> = {}
+    for (const m of peerMedals) medalCountByCompany[m.companyId] = (medalCountByCompany[m.companyId] || 0) + 1
+    const myMedalCount = medalCountByCompany[id] || 0
+    const avgMedalCount = peerCount > 0 ? peerIds.reduce((sum, pid) => sum + (medalCountByCompany[pid] || 0), 0) / peerCount : 0
+
+    // Tendencia reciente (reseñas de los últimos 30 días) y tasa de respuesta — de una sola consulta
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+    const peerReviews = await prisma.review.findMany({
+      where: { companyId: { in: peerIds }, status: 'APPROVED' },
+      select: { companyId: true, createdAt: true, response: { select: { id: true } } },
+    })
+    const recentByCompany: Record<string, number> = {}
+    const respondedByCompany: Record<string, number> = {}
+    const totalByCompany: Record<string, number> = {}
+    for (const r of peerReviews) {
+      totalByCompany[r.companyId] = (totalByCompany[r.companyId] || 0) + 1
+      if (r.createdAt >= thirtyDaysAgo) recentByCompany[r.companyId] = (recentByCompany[r.companyId] || 0) + 1
+      if (r.response) respondedByCompany[r.companyId] = (respondedByCompany[r.companyId] || 0) + 1
+    }
+    const responseRate = (pid: string) => totalByCompany[pid] > 0 ? ((respondedByCompany[pid] || 0) / totalByCompany[pid]) * 100 : 0
+    const myRecentCount = recentByCompany[id] || 0
+    const avgRecentCount = peerCount > 0 ? peerIds.reduce((sum, pid) => sum + (recentByCompany[pid] || 0), 0) / peerCount : 0
+    const myResponseRate = responseRate(id)
+    const avgResponseRate = peerCount > 0 ? peerIds.reduce((sum, pid) => sum + responseRate(pid), 0) / peerCount : 0
 
     // Mismo orden que el ranking público: plan primero, después rating, después cantidad de reseñas
     const planRank = { FREE: 0, PROFESSIONAL: 1, PREMIUM: 2, ENTERPRISE: 3 } as const
@@ -350,6 +387,26 @@ export default async function companyRoutes(app: FastifyInstance) {
     const myPosition = sorted.findIndex((p) => p.id === id) + 1
     const above = sorted.slice(0, Math.max(0, myPosition - 1)).slice(-3).reverse()
 
+    // Resumen con IA de qué se dice de la competencia (no de mi propia empresa) —
+    // se genera al vuelo, no se guarda; son pocas palabras y se pide solo si hay
+    // suficiente material real de otras empresas del rubro.
+    let competitorInsight: string | null = null
+    const otherPeerIds = peerIds.filter((pid) => pid !== id)
+    if (otherPeerIds.length > 0) {
+      const sampleReviews = await prisma.review.findMany({
+        where: { companyId: { in: otherPeerIds }, status: 'APPROVED', body: { not: '' } },
+        select: { body: true, rating: true },
+        orderBy: { createdAt: 'desc' },
+        take: 30,
+      })
+      if (sampleReviews.length >= 5) {
+        try {
+          const { generateCompetitorInsight } = await import('../services/ai/summaries')
+          competitorInsight = await generateCompetitorInsight(sampleReviews, company.category?.name || '')
+        } catch (err) { console.error('Error generando insight de competencia:', err) }
+      }
+    }
+
     return reply.send({
       scope,
       peerCount,
@@ -357,6 +414,12 @@ export default async function companyRoutes(app: FastifyInstance) {
       categoryAvg: { ratingAvg: Math.round(avgRating * 10) / 10, reviewCount: Math.round(avgReviews) },
       rank: { position: myPosition, total: sorted.length },
       companiesAbove: above.map((c) => ({ name: c.name, plan: c.plan, ratingAvg: c.ratingAvg, reviewCount: c.reviewCount })),
+      verified: { mine: Math.round(myVerifiedPct), categoryAvg: Math.round(avgVerifiedPct) },
+      medals: { mine: myMedalCount, categoryAvg: Math.round(avgMedalCount * 10) / 10 },
+      planMix,
+      recentTrend: { mine: myRecentCount, categoryAvg: Math.round(avgRecentCount * 10) / 10, days: 30 },
+      responseRate: { mine: Math.round(myResponseRate), categoryAvg: Math.round(avgResponseRate) },
+      competitorInsight,
     })
   })
 

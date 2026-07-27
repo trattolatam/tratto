@@ -549,6 +549,48 @@ export default function PanelPage() {
                   </div>
                 </div>
               </div>
+
+              <div className="card p-5">
+                <p className="text-sm font-semibold text-brand-dark mb-4">Más allá del rating</p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-xs text-brand-slate mb-2">% reseñas verificadas</p>
+                    <div className="flex items-baseline gap-2"><span className="text-2xl font-bold text-brand-dark">{intel.verified.mine}%</span><span className="text-xs text-brand-slate">vs promedio {intel.verified.categoryAvg}%</span></div>
+                  </div>
+                  <div>
+                    <p className="text-xs text-brand-slate mb-2">Medallas</p>
+                    <div className="flex items-baseline gap-2"><span className="text-2xl font-bold text-brand-dark">{intel.medals.mine}</span><span className="text-xs text-brand-slate">vs promedio {intel.medals.categoryAvg}</span></div>
+                  </div>
+                  <div>
+                    <p className="text-xs text-brand-slate mb-2">Reseñas últimos {intel.recentTrend.days} días</p>
+                    <div className="flex items-baseline gap-2"><span className="text-2xl font-bold text-brand-dark">{intel.recentTrend.mine}</span><span className="text-xs text-brand-slate">vs promedio {intel.recentTrend.categoryAvg}</span></div>
+                  </div>
+                  <div>
+                    <p className="text-xs text-brand-slate mb-2">% reseñas respondidas</p>
+                    <div className="flex items-baseline gap-2"><span className="text-2xl font-bold text-brand-dark">{intel.responseRate.mine}%</span><span className="text-xs text-brand-slate">vs promedio {intel.responseRate.categoryAvg}%</span></div>
+                  </div>
+                </div>
+              </div>
+
+              {(intel.planMix.FREE + intel.planMix.PROFESSIONAL + intel.planMix.PREMIUM + intel.planMix.ENTERPRISE) > 0 && (
+                <div className="card p-5">
+                  <p className="text-sm font-semibold text-brand-dark mb-3">Planes de la competencia</p>
+                  <div className="flex gap-4 text-xs text-brand-slate">
+                    <span>Gratuito: <strong className="text-brand-dark">{intel.planMix.FREE}</strong></span>
+                    <span>Profesional: <strong className="text-brand-dark">{intel.planMix.PROFESSIONAL}</strong></span>
+                    <span>Premium: <strong className="text-brand-dark">{intel.planMix.PREMIUM}</strong></span>
+                    <span>Enterprise: <strong className="text-brand-dark">{intel.planMix.ENTERPRISE}</strong></span>
+                  </div>
+                </div>
+              )}
+
+              {intel.competitorInsight && (
+                <div className="card p-5 bg-brand-dark/5 border-brand-green/20">
+                  <p className="text-xs font-semibold text-brand-green mb-2 flex items-center gap-1.5"><i className="ti ti-sparkles text-sm" /> Qué dice la gente de tu competencia</p>
+                  <p className="text-sm text-brand-dark leading-relaxed">{intel.competitorInsight}</p>
+                </div>
+              )}
+
               <div className="card p-5">
                 <p className="text-sm font-semibold text-brand-dark mb-1">Posición #{intel.rank.position} de {intel.rank.total}</p>
                 {intel.companiesAbove.length > 0 ? (
