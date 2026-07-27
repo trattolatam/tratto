@@ -377,6 +377,24 @@ export default async function companyRoutes(app: FastifyInstance) {
     const myResponseRate = responseRate(id)
     const avgResponseRate = peerCount > 0 ? peerIds.reduce((sum, pid) => sum + responseRate(pid), 0) / peerCount : 0
 
+    // Tiempo de respuesta a consultas — solo cuenta desde que existe el botón
+    // "Marcar como contactado" (respondedAt), así que empresas que nunca marcaron
+    // ninguna consulta como respondida simplemente no entran en este promedio.
+    const peerLeads = await prisma.lead.findMany({
+      where: { companyId: { in: peerIds }, respondedAt: { not: null } },
+      select: { companyId: true, createdAt: true, respondedAt: true },
+    })
+    const responseHoursByCompany: Record<string, number[]> = {}
+    for (const l of peerLeads) {
+      const hours = (l.respondedAt!.getTime() - l.createdAt.getTime()) / (1000 * 60 * 60)
+      if (!responseHoursByCompany[l.companyId]) responseHoursByCompany[l.companyId] = []
+      responseHoursByCompany[l.companyId].push(hours)
+    }
+    const avgHours = (arr: number[]) => arr.length > 0 ? arr.reduce((s, h) => s + h, 0) / arr.length : null
+    const myLeadResponseHours = avgHours(responseHoursByCompany[id] || [])
+    const companiesWithLeadData = peerIds.map((pid) => avgHours(responseHoursByCompany[pid] || [])).filter((v): v is number => v !== null)
+    const avgLeadResponseHours = companiesWithLeadData.length > 0 ? companiesWithLeadData.reduce((s, h) => s + h, 0) / companiesWithLeadData.length : null
+
     // Mismo orden que el ranking público: plan primero, después rating, después cantidad de reseñas
     const planRank = { FREE: 0, PROFESSIONAL: 1, PREMIUM: 2, ENTERPRISE: 3 } as const
     const sorted = [...peers].sort((a, b) => {
@@ -386,6 +404,22 @@ export default async function companyRoutes(app: FastifyInstance) {
     })
     const myPosition = sorted.findIndex((p) => p.id === id) + 1
     const above = sorted.slice(0, Math.max(0, myPosition - 1)).slice(-3).reverse()
+
+    // Evolución en el tiempo — comparamos contra la última "foto" mensual guardada
+    // (mínimo hace 20 días, para no comparar contra algo de la misma semana).
+    // Si todavía no corrió ningún mes el cron de fotos, esto queda null y el
+    // panel simplemente no muestra la sección de evolución.
+    const twentyDaysAgo = new Date(Date.now() - 20 * 24 * 60 * 60 * 1000)
+    const lastSnapshot = await prisma.companyRatingSnapshot.findFirst({
+      where: { companyId: id, capturedAt: { lte: twentyDaysAgo } },
+      orderBy: { capturedAt: 'desc' },
+    })
+    const evolution = lastSnapshot ? {
+      ratingChange: Math.round((company.ratingAvg - lastSnapshot.ratingAvg) * 10) / 10,
+      positionChange: lastSnapshot.rankPosition !== null ? lastSnapshot.rankPosition - myPosition : null, // positivo = mejoró (subió posiciones)
+      previousPosition: lastSnapshot.rankPosition,
+      since: lastSnapshot.capturedAt,
+    } : null
 
     // Qué hace falta para superar a la empresa inmediatamente arriba tuyo —
     // no alcanza con mostrar el número, hay que decir qué hacer con él.
@@ -413,8 +447,9 @@ export default async function companyRoutes(app: FastifyInstance) {
     let competitorInsight: { strengths: string; weaknesses: string } | null = null
     const otherPeerIds = peerIds.filter((pid) => pid !== id)
     if (otherPeerIds.length > 0) {
+      const sixMonthsAgo = new Date(Date.now() - 180 * 24 * 60 * 60 * 1000)
       const sampleReviews = await prisma.review.findMany({
-        where: { companyId: { in: otherPeerIds }, status: 'APPROVED', body: { not: '' } },
+        where: { companyId: { in: otherPeerIds }, status: 'APPROVED', body: { not: '' }, createdAt: { gte: sixMonthsAgo } },
         select: { body: true, rating: true },
         orderBy: { createdAt: 'desc' },
         take: 30,
@@ -440,6 +475,8 @@ export default async function companyRoutes(app: FastifyInstance) {
       planMix,
       recentTrend: { mine: myRecentCount, categoryAvg: Math.round(avgRecentCount * 10) / 10, days: 30 },
       responseRate: { mine: Math.round(myResponseRate), categoryAvg: Math.round(avgResponseRate) },
+      leadResponseHours: { mine: myLeadResponseHours !== null ? Math.round(myLeadResponseHours * 10) / 10 : null, categoryAvg: avgLeadResponseHours !== null ? Math.round(avgLeadResponseHours * 10) / 10 : null },
+      evolution,
       competitorInsight,
     })
   })

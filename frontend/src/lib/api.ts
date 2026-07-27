@@ -112,6 +112,7 @@ export const categories = { list: () => apiFetch<{ categories: any[] }>('/api/ca
 export const leads = {
   create: (body: any) => apiFetch('/api/leads', { method: 'POST', body: JSON.stringify(body) }),
   my: () => apiFetch<{ leads: any[] }>('/api/leads/my'),
+  respond: (id: string) => apiFetch<{ lead: any }>(`/api/leads/${id}/respond`, { method: 'PATCH' }),
 }
 
 export const medals = { get: (companyId: string) => apiFetch<{ medals: any[] }>(`/api/medals/${companyId}`) }

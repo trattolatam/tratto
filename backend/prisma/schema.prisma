@@ -437,6 +437,7 @@ model Lead {
   source      String    @default("profile")
   chargedAt   DateTime?
   amountUsd   Float?    @default(5)
+  respondedAt DateTime?
 
   createdAt   DateTime  @default(now())
 
@@ -609,4 +610,19 @@ model Webhook {
   company   Company  @relation(fields: [companyId], references: [id])
 
   @@map("webhooks")
+}
+
+// ─── FOTO MENSUAL — para mostrar evolución en el tiempo, no solo la foto de hoy ─
+
+model CompanyRatingSnapshot {
+  id          String   @id @default(uuid())
+  companyId   String
+  ratingAvg   Float
+  reviewCount Int
+  rankPosition Int?
+  rankTotal   Int?
+  capturedAt  DateTime @default(now())
+
+  @@index([companyId, capturedAt])
+  @@map("company_rating_snapshots")
 }

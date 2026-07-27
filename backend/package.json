@@ -14,7 +14,8 @@
     "db:generate": "prisma generate",
     "seed": "ts-node src/seed/seed.ts",
     "report:monthly": "node dist/scripts/monthlyReport.js",
-    "check:subscriptions": "node dist/scripts/checkExpiredSubscriptions.js"
+    "check:subscriptions": "node dist/scripts/checkExpiredSubscriptions.js",
+    "snapshot:ratings": "node dist/scripts/captureRatingSnapshots.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.1",

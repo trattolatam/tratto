@@ -67,6 +67,21 @@ export async function leadRoutes(app: FastifyInstance) {
     const leads = await prisma.lead.findMany({ where: { companyId: company.id }, orderBy: { createdAt: 'desc' }, take: 50 })
     return reply.send({ leads })
   })
+
+  // ─── Marcar una consulta como ya contactada ────────────────────────────────
+  // Esto es lo que alimenta el tiempo de respuesta a consultas en el panel de
+  // Competencia — sin este botón no hay forma de saber cuándo se respondió.
+  app.patch('/:id/respond', { preHandler: requireBusinessOwner }, async (request, reply) => {
+    const { id } = request.params as { id: string }
+    const company = await prisma.company.findFirst({ where: { claimedById: request.user.userId } })
+    if (!company) return reply.status(404).send({ error: true, message: 'Sin empresa' })
+
+    const lead = await prisma.lead.findFirst({ where: { id, companyId: company.id } })
+    if (!lead) return reply.status(404).send({ error: true, message: 'Consulta no encontrada' })
+
+    const updated = await prisma.lead.update({ where: { id }, data: { respondedAt: new Date() } })
+    return reply.send({ lead: updated })
+  })
 }
 
 export async function medalRoutes(app: FastifyInstance) {

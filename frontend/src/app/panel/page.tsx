@@ -162,6 +162,13 @@ export default function PanelPage() {
     finally { setLoadingLeads(false) }
   }
 
+  const handleMarkLeadResponded = async (leadId: string) => {
+    try {
+      await leadsApi.respond(leadId)
+      setMyLeads((prev) => prev ? prev.map((l: any) => l.id === leadId ? { ...l, respondedAt: new Date().toISOString() } : l) : prev)
+    } catch (err) { console.error(err) }
+  }
+
   const handleOpenContacts = async () => {
     setShowContactsModal(true)
     if (!isPremium || contactReveals) return
@@ -511,9 +518,16 @@ export default function PanelPage() {
                     <p className="text-xs text-brand-slate flex-shrink-0">{new Date(lead.createdAt).toLocaleDateString('es-AR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</p>
                   </div>
                   <p className="text-sm text-brand-slate mb-2">{lead.message}</p>
-                  <div className="flex gap-3 text-xs">
-                    {lead.email && <a href={`mailto:${lead.email}`} className="text-brand-blue hover:underline flex items-center gap-1"><i className="ti ti-mail text-xs" /> {lead.email}</a>}
-                    {lead.phone && <a href={`tel:${lead.phone}`} className="text-brand-green hover:underline flex items-center gap-1"><i className="ti ti-phone text-xs" /> {lead.phone}</a>}
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex gap-3 text-xs">
+                      {lead.email && <a href={`mailto:${lead.email}`} className="text-brand-blue hover:underline flex items-center gap-1"><i className="ti ti-mail text-xs" /> {lead.email}</a>}
+                      {lead.phone && <a href={`tel:${lead.phone}`} className="text-brand-green hover:underline flex items-center gap-1"><i className="ti ti-phone text-xs" /> {lead.phone}</a>}
+                    </div>
+                    {lead.respondedAt ? (
+                      <span className="text-xs text-brand-green flex items-center gap-1 flex-shrink-0"><i className="ti ti-check text-xs" /> Contactado</span>
+                    ) : (
+                      <button onClick={() => handleMarkLeadResponded(lead.id)} className="text-xs text-brand-slate hover:text-brand-green hover:underline flex-shrink-0">Marcar como contactado</button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -537,7 +551,7 @@ export default function PanelPage() {
           ) : intel ? (
             <div className="space-y-4">
               <div className="card p-5">
-                <p className="text-xs text-brand-slate mb-4">Comparado con {intel.peerCount} empresas de tu rubro {intel.scope === 'city' ? 'en tu ciudad' : 'en tu país'}</p>
+                <p className="text-xs text-brand-slate mb-4">Comparado con {intel.peerCount} empresas de tu rubro {intel.scope === 'city' ? 'en tu ciudad' : 'en tu país'}{intel.peerCount < 5 && <span className="text-brand-amber"> — muestra chica, un solo dato puede mover mucho el promedio</span>}</p>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <p className="text-xs text-brand-slate mb-2">Tu calificación</p>
@@ -549,6 +563,26 @@ export default function PanelPage() {
                   </div>
                 </div>
               </div>
+
+              {intel.evolution && (
+                <div className="card p-5">
+                  <p className="text-sm font-semibold text-brand-dark mb-3">Evolución desde {new Date(intel.evolution.since).toLocaleDateString('es-AR', { month: 'short', year: 'numeric' })}</p>
+                  <div className="flex gap-6">
+                    <div className="flex items-center gap-2">
+                      <i className={`ti ${intel.evolution.ratingChange > 0 ? 'ti-trending-up text-brand-green' : intel.evolution.ratingChange < 0 ? 'ti-trending-down text-brand-red' : 'ti-minus text-brand-slate'} text-lg`} />
+                      <span className="text-sm text-brand-dark">Calificación {intel.evolution.ratingChange > 0 ? '+' : ''}{intel.evolution.ratingChange}</span>
+                    </div>
+                    {intel.evolution.positionChange !== null && (
+                      <div className="flex items-center gap-2">
+                        <i className={`ti ${intel.evolution.positionChange > 0 ? 'ti-trending-up text-brand-green' : intel.evolution.positionChange < 0 ? 'ti-trending-down text-brand-red' : 'ti-minus text-brand-slate'} text-lg`} />
+                        <span className="text-sm text-brand-dark">
+                          {intel.evolution.positionChange > 0 ? `Subiste ${intel.evolution.positionChange} posición${intel.evolution.positionChange === 1 ? '' : 'es'}` : intel.evolution.positionChange < 0 ? `Bajaste ${Math.abs(intel.evolution.positionChange)} posición${Math.abs(intel.evolution.positionChange) === 1 ? '' : 'es'}` : 'Misma posición'} (de #{intel.evolution.previousPosition})
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
               <div className="card p-5">
                 <p className="text-sm font-semibold text-brand-dark mb-4">Más allá del rating</p>
@@ -569,6 +603,15 @@ export default function PanelPage() {
                     <p className="text-xs text-brand-slate mb-2">% reseñas respondidas</p>
                     <div className="flex items-baseline gap-2"><span className="text-2xl font-bold text-brand-dark">{intel.responseRate.mine}%</span><span className="text-xs text-brand-slate">vs promedio {intel.responseRate.categoryAvg}%</span></div>
                   </div>
+                  {(intel.leadResponseHours.mine !== null || intel.leadResponseHours.categoryAvg !== null) && (
+                    <div>
+                      <p className="text-xs text-brand-slate mb-2">Horas para responder consultas</p>
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-2xl font-bold text-brand-dark">{intel.leadResponseHours.mine !== null ? intel.leadResponseHours.mine : '—'}</span>
+                        <span className="text-xs text-brand-slate">vs promedio {intel.leadResponseHours.categoryAvg !== null ? intel.leadResponseHours.categoryAvg : 'sin datos'}</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
