@@ -48,15 +48,44 @@ export default async function authRoutes(app: FastifyInstance) {
       app.log.error(`Error enviando email de verificación: ${err.message}`)
     )
 
+    // Si alguien lo había invitado a un equipo antes de que tuviera cuenta,
+    // lo asociamos automáticamente ahora que se registró con ese mismo email.
+    const pendingInvites = await prisma.teamInvite.findMany({ where: { email, status: 'PENDING' } })
+    let joinedCompany: { id: string; name: string; slug: string; plan: string; isVerified: boolean; ratingAvg: number; reviewCount: number; logoUrl: string | null } | null = null
+    let finalRole = user.role
+    let companyRole: 'ADMIN' | 'EDITOR' | 'VIEWER' | undefined
+
+    if (pendingInvites.length > 0) {
+      for (const invite of pendingInvites) {
+        await prisma.$transaction([
+          prisma.companyMember.create({ data: { companyId: invite.companyId, userId: user.id, role: invite.role } }),
+          prisma.teamInvite.update({ where: { id: invite.id }, data: { status: 'ACCEPTED', acceptedAt: new Date() } }),
+        ])
+      }
+      // Necesita role BUSINESS para poder entrar al panel de la empresa, sin importar qué haya elegido al registrarse.
+      if (user.role !== 'BUSINESS') {
+        await prisma.user.update({ where: { id: user.id }, data: { role: 'BUSINESS' } })
+        finalRole = 'BUSINESS'
+      }
+      const firstCompany = await prisma.company.findUnique({
+        where: { id: pendingInvites[0].companyId },
+        select: { id: true, name: true, slug: true, plan: true, isVerified: true, ratingAvg: true, reviewCount: true, logoUrl: true },
+      })
+      joinedCompany = firstCompany
+      companyRole = pendingInvites[0].role
+    }
+
     const token = app.jwt.sign(
-      { userId: user.id, role: user.role },
+      { userId: user.id, role: finalRole, companyId: joinedCompany?.id, companyRole },
       { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
     )
 
     return reply.status(201).send({
-      user,
+      user: { ...user, role: finalRole, company: joinedCompany },
       token,
-      message: 'Cuenta creada. Te enviamos un email para confirmar tu cuenta.',
+      message: joinedCompany
+        ? `Cuenta creada y sumada al equipo de ${joinedCompany.name}. Te enviamos un email para confirmar tu cuenta.`
+        : 'Cuenta creada. Te enviamos un email para confirmar tu cuenta.',
     })
   })
 
@@ -80,18 +109,20 @@ export default async function authRoutes(app: FastifyInstance) {
     }
 
     // Si no es dueño de ninguna empresa, puede ser un miembro de equipo invitado
-    // (plan Enterprise) — en ese caso, su acceso es a la empresa que lo invitó.
+    // (plan Enterprise) — en ese caso, su acceso es a la empresa que lo invitó,
+    // con el rol que le hayan asignado (no acceso total como el dueño).
     let effectiveCompany = user.company
+    let companyRole: 'OWNER' | 'ADMIN' | 'EDITOR' | 'VIEWER' | undefined = user.company ? 'OWNER' : undefined
     if (!effectiveCompany) {
       const membership = await prisma.companyMember.findFirst({
         where: { userId: user.id },
         include: { company: { select: { id: true, name: true, slug: true, plan: true, isVerified: true, ratingAvg: true, reviewCount: true, logoUrl: true } } },
       })
-      if (membership) effectiveCompany = membership.company
+      if (membership) { effectiveCompany = membership.company; companyRole = membership.role }
     }
 
     const token = app.jwt.sign(
-      { userId: user.id, role: user.role, companyId: effectiveCompany?.id },
+      { userId: user.id, role: user.role, companyId: effectiveCompany?.id, companyRole },
       { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
     )
 
@@ -99,7 +130,7 @@ export default async function authRoutes(app: FastifyInstance) {
       user: {
         id: user.id, email: user.email, name: user.name, role: user.role,
         country: user.country, city: user.city, phone: user.phone, avatarUrl: user.avatarUrl,
-        isVerified: user.isVerified, isPro: user.isPro, company: effectiveCompany,
+        isVerified: user.isVerified, isPro: user.isPro, company: effectiveCompany, companyRole,
       },
       token,
     })
@@ -122,15 +153,16 @@ export default async function authRoutes(app: FastifyInstance) {
 
     // Mismo fallback que en /login: si no es dueño, puede ser miembro de un equipo Enterprise
     let company = me.company
+    let companyRole: 'OWNER' | 'ADMIN' | 'EDITOR' | 'VIEWER' | undefined = me.company ? 'OWNER' : undefined
     if (!company) {
       const membership = await prisma.companyMember.findFirst({
         where: { userId: me.id },
         include: { company: { select: { id: true, name: true, slug: true, plan: true, isVerified: true, ratingAvg: true, reviewCount: true, logoUrl: true } } },
       })
-      if (membership) company = membership.company
+      if (membership) { company = membership.company; companyRole = membership.role }
     }
 
-    return reply.send({ user: { ...me, company } })
+    return reply.send({ user: { ...me, company, companyRole } })
   })
 
   app.get('/verify-email', async (request, reply) => {

@@ -40,7 +40,7 @@ export default function PanelPage() {
   const [newRawKey, setNewRawKey] = useState('')
   const [apiKeyError, setApiKeyError] = useState('')
   const [widgetCopied, setWidgetCopied] = useState(false)
-  const [teamData, setTeamData] = useState<{ owner: any; members: any[] } | null>(null)
+  const [teamData, setTeamData] = useState<{ owner: any; members: any[]; pendingInvites: any[] } | null>(null)
   const [loadingTeam, setLoadingTeam] = useState(false)
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviteRole, setInviteRole] = useState<'ADMIN' | 'EDITOR' | 'VIEWER'>('EDITOR')
@@ -265,6 +265,15 @@ export default function PanelPage() {
     if (!confirm('¿Sacar a esta persona del equipo?')) return
     try {
       await teamApi.remove(memberId)
+      const teamRes = await teamApi.list()
+      setTeamData(teamRes)
+    } catch (err: any) { setTeamError(err.message) }
+  }
+
+  const handleCancelInvite = async (inviteId: string) => {
+    if (!confirm('¿Cancelar esta invitación pendiente?')) return
+    try {
+      await teamApi.cancelInvite(inviteId)
       const teamRes = await teamApi.list()
       setTeamData(teamRes)
     } catch (err: any) { setTeamError(err.message) }
@@ -866,6 +875,12 @@ export default function PanelPage() {
                       <div className="flex items-center gap-2"><span className="text-xs text-brand-slate">{m.role}</span><button onClick={() => handleRemoveMember(m.id)} className="text-xs text-red-500 hover:underline">Sacar</button></div>
                     </div>
                   ))}
+                  {(teamData?.pendingInvites || []).map((inv) => (
+                    <div key={inv.id} className="flex items-center justify-between text-sm border border-dashed border-brand-amber/40 bg-brand-amber-dim/20 rounded-lg px-3 py-2">
+                      <div><p className="text-brand-dark">{inv.email}</p><p className="text-xs text-brand-amber">Invitación enviada — esperando que se registre</p></div>
+                      <div className="flex items-center gap-2"><span className="text-xs text-brand-slate">{inv.role}</span><button onClick={() => handleCancelInvite(inv.id)} className="text-xs text-red-500 hover:underline">Cancelar</button></div>
+                    </div>
+                  ))}
                 </div>
                 <form onSubmit={handleInviteMember} className="flex gap-2">
                   <input type="email" required placeholder="email@delapersona.com" className="input text-sm flex-1" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} />
@@ -876,7 +891,7 @@ export default function PanelPage() {
                   </select>
                   <button type="submit" disabled={invitingMember} className="btn-secondary text-xs py-2 px-4 disabled:opacity-50 flex-shrink-0">{invitingMember ? 'Invitando...' : 'Invitar'}</button>
                 </form>
-                <p className="text-xs text-brand-slate mt-2">La persona ya tiene que tener una cuenta en Tratto con ese email.</p>
+                <p className="text-xs text-brand-slate mt-2">Si la persona ya tiene cuenta en Tratto, se suma al equipo al instante. Si no, le llega un email para registrarse y va a quedar asociada automáticamente con el rol elegido.</p>
               </div>
 
               <div className="card p-5">

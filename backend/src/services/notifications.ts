@@ -69,7 +69,7 @@ function normalizePhone(phone: string, country: string | null): string {
   return `+${code}${withoutLeadingZero}`
 }
 
-async function sendEmail(to: string, subject: string, body: string, html?: string): Promise<void> {
+export async function sendEmail(to: string, subject: string, body: string, html?: string): Promise<void> {
   if (!process.env.RESEND_API_KEY) return
   try {
     const response = await fetch('https://api.resend.com/emails', {
@@ -115,6 +115,75 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
  * pero con diseño y un botón que lleva directo a /precios para convertir.
  * No incluye precios a propósito: la idea es que decidan mirando la página, no acá.
  */
+export function buildTeamInviteToRegisterEmailHtml(companyName: string, role: string, registerUrl: string): string {
+  const frontendUrl = process.env.FRONTEND_URL || 'https://tratto.lat'
+  const roleLabel = { ADMIN: 'Administrador', EDITOR: 'Editor', VIEWER: 'Solo lectura' }[role] || role
+  return `
+<!DOCTYPE html>
+<html lang="es">
+<body style="margin:0;padding:0;background-color:#f4f5f7;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f5f7;padding:32px 16px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" style="max-width:480px;background-color:#ffffff;border-radius:16px;overflow:hidden;">
+          <tr><td style="background-color:#0f172a;padding:24px 32px;"><span style="color:#ffffff;font-size:20px;font-weight:700;">Tratto</span></td></tr>
+          <tr>
+            <td style="padding:32px;">
+              <p style="margin:0 0 16px 0;font-size:16px;line-height:1.5;color:#1f2937;">
+                Te invitaron a sumarte al equipo de <strong>${companyName}</strong> en Tratto, como <strong>${roleLabel}</strong>.
+              </p>
+              <p style="margin:0 0 24px 0;font-size:14px;line-height:1.5;color:#4b5563;">
+                Creá tu cuenta gratis con este mismo email y vas a quedar asociado automáticamente al panel de ${companyName}, sin ningún paso extra.
+              </p>
+              <table role="presentation" width="100%"><tr><td align="center">
+                <a href="${registerUrl}" style="display:inline-block;background-color:#10b981;color:#ffffff;text-decoration:none;font-size:15px;font-weight:600;padding:14px 32px;border-radius:999px;">Crear mi cuenta</a>
+              </td></tr></table>
+              <p style="margin:20px 0 0 0;text-align:center;font-size:12px;color:#9ca3af;">Si no esperabas esta invitación, podés ignorar este email.</p>
+            </td>
+          </tr>
+          <tr><td style="padding:20px 32px;background-color:#f9fafb;text-align:center;"><a href="${frontendUrl}" style="color:#9ca3af;font-size:12px;text-decoration:none;">tratto.lat</a></td></tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`
+}
+
+export function buildTeamInviteRegisterEmailHtml(inviterName: string, companyName: string, role: string, registerUrl: string): string {
+  const frontendUrl = process.env.FRONTEND_URL || 'https://tratto.lat'
+  const roleLabel = { ADMIN: 'Administrador', EDITOR: 'Editor', VIEWER: 'Solo lectura' }[role] || role
+  return `
+<!DOCTYPE html>
+<html lang="es">
+<body style="margin:0;padding:0;background-color:#f4f5f7;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f5f7;padding:32px 16px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" style="max-width:480px;background-color:#ffffff;border-radius:16px;overflow:hidden;">
+          <tr><td style="background-color:#0f172a;padding:24px 32px;"><span style="color:#ffffff;font-size:20px;font-weight:700;">Tratto</span></td></tr>
+          <tr>
+            <td style="padding:32px;">
+              <p style="margin:0 0 16px 0;font-size:16px;line-height:1.5;color:#1f2937;">
+                <strong>${inviterName}</strong> te invitó a sumarte al equipo de <strong>${companyName}</strong> en Tratto.
+              </p>
+              <p style="margin:0 0 24px 0;font-size:14px;line-height:1.5;color:#4b5563;">
+                Creá tu cuenta con este mismo email y vas a quedar asociado automáticamente a la empresa como <strong>${roleLabel}</strong> — no hace falta ningún paso extra.
+              </p>
+              <table role="presentation" width="100%"><tr><td align="center">
+                <a href="${registerUrl}" style="display:inline-block;background-color:#10b981;color:#ffffff;text-decoration:none;font-size:15px;font-weight:600;padding:14px 32px;border-radius:999px;">Crear mi cuenta</a>
+              </td></tr></table>
+            </td>
+          </tr>
+          <tr><td style="padding:20px 32px;background-color:#f9fafb;text-align:center;"><a href="${frontendUrl}" style="color:#9ca3af;font-size:12px;text-decoration:none;">tratto.lat</a></td></tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`
+}
+
 export function buildTeamInviteEmailHtml(inviterName: string, companyName: string, role: string, loginUrl: string): string {
   const frontendUrl = process.env.FRONTEND_URL || 'https://tratto.lat'
   const roleLabel = { ADMIN: 'Administrador', EDITOR: 'Editor', VIEWER: 'Solo lectura' }[role] || role

@@ -30,12 +30,13 @@ export const auth = {
 }
 
 export const team = {
-  list: () => apiFetch<{ owner: any; members: any[] }>('/api/team'),
+  list: () => apiFetch<{ owner: any; members: any[]; pendingInvites: any[] }>('/api/team'),
   invite: (email: string, role: 'ADMIN' | 'EDITOR' | 'VIEWER') =>
-    apiFetch<{ member: any }>('/api/team', { method: 'POST', body: JSON.stringify({ email, role }) }),
+    apiFetch<{ status: 'added' | 'invited'; member?: any; invite?: any }>('/api/team', { method: 'POST', body: JSON.stringify({ email, role }) }),
   updateRole: (memberId: string, role: 'ADMIN' | 'EDITOR' | 'VIEWER') =>
     apiFetch<{ member: any }>(`/api/team/${memberId}`, { method: 'PATCH', body: JSON.stringify({ role }) }),
   remove: (memberId: string) => apiFetch<{ ok: boolean }>(`/api/team/${memberId}`, { method: 'DELETE' }),
+  cancelInvite: (inviteId: string) => apiFetch<{ ok: boolean }>(`/api/team/invites/${inviteId}`, { method: 'DELETE' }),
 }
 
 export const branches = {

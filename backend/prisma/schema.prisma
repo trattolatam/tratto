@@ -224,6 +224,7 @@ model Company {
   aiSummary     AiSummary?
   apiKeys       ApiKey[]
   members       CompanyMember[]
+  teamInvites   TeamInvite[]
   branches      Branch[]
   webhooks      Webhook[]
 
@@ -578,6 +579,29 @@ model CompanyMember {
 
   @@unique([companyId, userId])
   @@map("company_members")
+}
+
+enum TeamInviteStatus {
+  PENDING
+  ACCEPTED
+}
+
+// Invitación a alguien que TODAVÍA no tiene cuenta en Tratto — cuando se registra
+// con este email, queda asociado automáticamente a la empresa con este rol.
+model TeamInvite {
+  id          String            @id @default(uuid())
+  companyId   String
+  email       String
+  role        CompanyMemberRole @default(EDITOR)
+  status      TeamInviteStatus  @default(PENDING)
+  invitedById String
+  createdAt   DateTime          @default(now())
+  acceptedAt  DateTime?
+
+  company     Company           @relation(fields: [companyId], references: [id])
+
+  @@unique([companyId, email])
+  @@map("team_invites")
 }
 
 // ─── SUCURSALES — múltiples sedes bajo un mismo perfil (plan Enterprise) ──────

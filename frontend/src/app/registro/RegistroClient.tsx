@@ -12,7 +12,9 @@ export default function RegistroClient() {
   const searchParams = useSearchParams()
   const { login } = useAuthStore()
   const initialRole = searchParams.get('role') === 'BUSINESS' ? 'BUSINESS' : 'USER'
-  const [form, setForm] = useState({ name: '', email: '', password: '', country: 'UY', role: initialRole })
+  const invitedEmail = searchParams.get('email') || ''
+  const invitedCompany = searchParams.get('equipoDe') || ''
+  const [form, setForm] = useState({ name: '', email: invitedEmail, password: '', country: 'UY', role: initialRole })
   const [confirmPassword, setConfirmPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -24,10 +26,14 @@ export default function RegistroClient() {
     setLoading(true); setError('')
     try {
       await auth.register(form)
-      await login(form.email, form.password)
+      const loggedUser = await login(form.email, form.password)
 
       let next = '/'
-      if (form.role === 'BUSINESS') {
+      if (loggedUser.company) {
+        // Se registró con un email que tenía una invitación de equipo pendiente —
+        // ya quedó asociado a esa empresa, así que va directo al panel.
+        next = '/panel'
+      } else if (form.role === 'BUSINESS') {
         const empresa = searchParams.get('empresa')
         const crear = searchParams.get('crear')
         const slug = searchParams.get('slug')
@@ -53,6 +59,7 @@ export default function RegistroClient() {
           <h1 className="text-2xl font-bold text-brand-dark">Creá tu cuenta</h1><p className="text-sm text-brand-slate mt-1">Gratis, sin tarjeta de crédito</p>
         </div>
         <div className="card p-6">
+          {invitedCompany && <div className="bg-brand-green-dim border border-brand-green/20 rounded-lg px-3 py-2.5 mb-4 text-sm text-brand-dark flex items-center gap-2"><i className="ti ti-users text-brand-green text-base" />Te invitaron a sumarte al equipo de <strong>{invitedCompany}</strong>. Registrate con este email para quedar asociado automáticamente.</div>}
           {error && <div className="bg-red-50 border border-red-100 rounded-lg px-3 py-2.5 mb-4 text-sm text-brand-red flex items-center gap-2"><i className="ti ti-alert-circle text-base" />{error}</div>}
           <div className="grid grid-cols-2 gap-2 mb-4 p-1 bg-gray-50 rounded-lg">
             {[{ value: 'USER', label: '👤 Soy usuario', desc: 'Dejo reseñas' }, { value: 'BUSINESS', label: '🏢 Tengo empresa', desc: 'Gestiono mi perfil' }].map(opt => (
@@ -63,7 +70,7 @@ export default function RegistroClient() {
           </div>
           <form onSubmit={handleSubmit} className="space-y-3">
             <div><label className="label">Nombre completo</label><input type="text" required placeholder="Tu nombre" className="input" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} /></div>
-            <div><label className="label">Email</label><input type="email" required placeholder="tu@email.com" className="input" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} /></div>
+            <div><label className="label">Email</label><input type="email" required readOnly={!!invitedEmail} placeholder="tu@email.com" className={`input ${invitedEmail ? 'bg-gray-50 text-brand-slate' : ''}`} value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} /></div>
             <div><label className="label">País</label><select className="input" value={form.country} onChange={e => setForm(f => ({ ...f, country: e.target.value }))}>{COUNTRIES.map(c => <option key={c.code} value={c.code}>{c.name}</option>)}</select></div>
             <div><label className="label">Contraseña</label><input type="password" required placeholder="Mínimo 8 caracteres" className="input" value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} /></div>
             <div><label className="label">Repetir contraseña</label><input type="password" required placeholder="Repetí tu contraseña" className="input" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} /></div>
