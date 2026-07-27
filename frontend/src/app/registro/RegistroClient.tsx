@@ -59,7 +59,7 @@ export default function RegistroClient() {
           <h1 className="text-2xl font-bold text-brand-dark">Creá tu cuenta</h1><p className="text-sm text-brand-slate mt-1">Gratis, sin tarjeta de crédito</p>
         </div>
         <div className="card p-6">
-          {invitedCompany && <div className="bg-brand-green-dim border border-brand-green/20 rounded-lg px-3 py-2.5 mb-4 text-sm text-brand-dark flex items-center gap-2"><i className="ti ti-users text-brand-green text-base" />Te invitaron a sumarte al equipo de <strong>{invitedCompany}</strong>. Registrate con este email para quedar asociado automáticamente.</div>}
+          {invitedCompany && <div className="bg-brand-green-dim border border-brand-green/20 rounded-lg px-3 py-2.5 mb-4 text-sm text-brand-dark flex items-start gap-2"><i className="ti ti-users text-brand-green text-base mt-0.5 flex-shrink-0" /><span>Te invitaron a sumarte al equipo de <strong>{invitedCompany}</strong>. Registrate con este email para quedar asociado automáticamente.</span></div>}
           {error && <div className="bg-red-50 border border-red-100 rounded-lg px-3 py-2.5 mb-4 text-sm text-brand-red flex items-center gap-2"><i className="ti ti-alert-circle text-base" />{error}</div>}
           <div className="grid grid-cols-2 gap-2 mb-4 p-1 bg-gray-50 rounded-lg">
             {[{ value: 'USER', label: '👤 Soy usuario', desc: 'Dejo reseñas' }, { value: 'BUSINESS', label: '🏢 Tengo empresa', desc: 'Gestiono mi perfil' }].map(opt => (
