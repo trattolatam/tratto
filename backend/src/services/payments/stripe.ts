@@ -6,12 +6,13 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: '2025-02
 const PLAN_PRICES: Record<string, string> = {
   PROFESSIONAL: process.env.STRIPE_PRICE_PRO!,
   PREMIUM: process.env.STRIPE_PRICE_PREMIUM!,
+  ENTERPRISE: process.env.STRIPE_PRICE_ENTERPRISE!,
 }
 
-const PLAN_AMOUNTS: Record<string, number> = { PROFESSIONAL: 29, PREMIUM: 79 }
+const PLAN_AMOUNTS: Record<string, number> = { PROFESSIONAL: 29, PREMIUM: 79, ENTERPRISE: 199 }
 
 export async function createCheckoutSession({ companyId, plan, successUrl, cancelUrl, customerEmail }: {
-  companyId: string; plan: 'PROFESSIONAL' | 'PREMIUM'; successUrl: string; cancelUrl: string; customerEmail: string
+  companyId: string; plan: 'PROFESSIONAL' | 'PREMIUM' | 'ENTERPRISE'; successUrl: string; cancelUrl: string; customerEmail: string
 }): Promise<string> {
   const session = await stripe.checkout.sessions.create({
     mode: 'subscription', payment_method_types: ['card'], customer_email: customerEmail,

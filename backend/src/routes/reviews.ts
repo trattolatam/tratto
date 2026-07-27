@@ -6,6 +6,7 @@ import { createReviewRateLimit } from '../middleware/rateLimits'
 import { recalcCompanyRating } from '../services/rating'
 import { checkAndAwardMedals } from '../services/medals'
 import { sendNotification } from '../services/notifications'
+import { triggerWebhooks } from '../services/webhooks'
 
 export default async function reviewRoutes(app: FastifyInstance) {
 
@@ -152,6 +153,9 @@ export default async function reviewRoutes(app: FastifyInstance) {
     if (body.data.status === 'APPROVED') {
       await recalcCompanyRating(review.companyId)
       await checkAndAwardMedals(review.companyId)
+      await triggerWebhooks(review.companyId, 'review.created', {
+        reviewId: review.id, rating: review.rating, title: review.title, body: review.body,
+      })
     }
 
     return reply.send({ review, message: `Reseña ${body.data.status === 'APPROVED' ? 'aprobada' : 'rechazada'}` })

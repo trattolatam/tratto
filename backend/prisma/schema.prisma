@@ -115,6 +115,7 @@ model User {
   notifications  Notification[]
   contactReveals ContactReveal[]
   claimDisputes  ClaimDispute[]   @relation("DisputesFiled")
+  companyMemberships CompanyMember[]
   referredBy     User?            @relation("Referrals", fields: [referredById], references: [id])
   referrals      User[]           @relation("Referrals")
   adAccounts     AdAccount[]
@@ -221,6 +222,9 @@ model Company {
   disputes      ClaimDispute[]   @relation("CompanyDisputes")
   aiSummary     AiSummary?
   apiKeys       ApiKey[]
+  members       CompanyMember[]
+  branches      Branch[]
+  webhooks      Webhook[]
 
   @@index([country, city, categoryId])
   @@index([ratingAvg])
@@ -548,4 +552,61 @@ model ApiKey {
   company      Company   @relation(fields: [companyId], references: [id])
 
   @@map("api_keys")
+}
+
+// ─── EQUIPO — múltiples usuarios por empresa (plan Enterprise) ────────────────
+// El dueño original de la empresa sigue siendo Company.owner (sin cambios);
+// esto es solo para las personas ADICIONALES que el dueño invita a su equipo.
+
+enum CompanyMemberRole {
+  ADMIN
+  EDITOR
+  VIEWER
+}
+
+model CompanyMember {
+  id         String            @id @default(uuid())
+  companyId  String
+  userId     String
+  role       CompanyMemberRole @default(EDITOR)
+  invitedAt  DateTime          @default(now())
+
+  company    Company           @relation(fields: [companyId], references: [id])
+  user       User              @relation(fields: [userId], references: [id])
+
+  @@unique([companyId, userId])
+  @@map("company_members")
+}
+
+// ─── SUCURSALES — múltiples sedes bajo un mismo perfil (plan Enterprise) ──────
+
+model Branch {
+  id        String   @id @default(uuid())
+  companyId String
+  name      String
+  address   String
+  city      String
+  phone     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company   Company  @relation(fields: [companyId], references: [id])
+
+  @@map("branches")
+}
+
+// ─── WEBHOOKS — notificaciones en tiempo real a sistemas externos (Enterprise) ─
+
+model Webhook {
+  id        String   @id @default(uuid())
+  companyId String
+  url       String
+  secret    String
+  events    String[] @default([])
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  company   Company  @relation(fields: [companyId], references: [id])
+
+  @@map("webhooks")
 }

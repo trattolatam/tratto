@@ -79,8 +79,19 @@ export default async function authRoutes(app: FastifyInstance) {
       return reply.status(401).send({ error: true, message: 'Credenciales incorrectas' })
     }
 
+    // Si no es dueño de ninguna empresa, puede ser un miembro de equipo invitado
+    // (plan Enterprise) — en ese caso, su acceso es a la empresa que lo invitó.
+    let effectiveCompany = user.company
+    if (!effectiveCompany) {
+      const membership = await prisma.companyMember.findFirst({
+        where: { userId: user.id },
+        include: { company: { select: { id: true, name: true, slug: true, plan: true, isVerified: true, ratingAvg: true, reviewCount: true, logoUrl: true } } },
+      })
+      if (membership) effectiveCompany = membership.company
+    }
+
     const token = app.jwt.sign(
-      { userId: user.id, role: user.role, companyId: user.company?.id },
+      { userId: user.id, role: user.role, companyId: effectiveCompany?.id },
       { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
     )
 
@@ -88,7 +99,7 @@ export default async function authRoutes(app: FastifyInstance) {
       user: {
         id: user.id, email: user.email, name: user.name, role: user.role,
         country: user.country, city: user.city, phone: user.phone, avatarUrl: user.avatarUrl,
-        isVerified: user.isVerified, isPro: user.isPro, company: user.company,
+        isVerified: user.isVerified, isPro: user.isPro, company: effectiveCompany,
       },
       token,
     })
@@ -108,7 +119,18 @@ export default async function authRoutes(app: FastifyInstance) {
     })
 
     if (!me) return reply.status(404).send({ error: true, message: 'Usuario no encontrado' })
-    return reply.send({ user: me })
+
+    // Mismo fallback que en /login: si no es dueño, puede ser miembro de un equipo Enterprise
+    let company = me.company
+    if (!company) {
+      const membership = await prisma.companyMember.findFirst({
+        where: { userId: me.id },
+        include: { company: { select: { id: true, name: true, slug: true, plan: true, isVerified: true, ratingAvg: true, reviewCount: true, logoUrl: true } } },
+      })
+      if (membership) company = membership.company
+    }
+
+    return reply.send({ user: { ...me, company } })
   })
 
   app.get('/verify-email', async (request, reply) => {

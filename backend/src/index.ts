@@ -20,6 +20,10 @@ import { aiRoutes } from './services/ai/routes'
 import apiKeyRoutes from './routes/apiKeys'
 import publicApiRoutes from './routes/publicApi'
 import widgetRoutes from './routes/widget'
+import teamRoutes from './routes/team'
+import branchRoutes from './routes/branches'
+import webhookConfigRoutes from './routes/webhookConfig'
+import exportRoutes from './routes/export'
 
 const app = Fastify({ logger: true })
 
@@ -64,6 +68,12 @@ async function start() {
   app.register(apiKeyRoutes,   { prefix: '/api/api-keys' })
   app.register(publicApiRoutes, { prefix: '/api/v1' })
   app.register(widgetRoutes,    { prefix: '/api/v1/widget' })
+
+  // Enterprise: equipo, sucursales, webhooks, exportación
+  app.register(teamRoutes,           { prefix: '/api/team' })
+  app.register(branchRoutes,         { prefix: '/api/companies' })
+  app.register(webhookConfigRoutes,  { prefix: '/api/webhook-subscriptions' })
+  app.register(exportRoutes,         { prefix: '/api/export' })
 
   app.get('/health', async () => ({
     status: 'ok', version: '1.0.0',

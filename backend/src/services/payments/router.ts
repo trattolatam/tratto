@@ -8,9 +8,16 @@ import { createDLPayment, createDLAdRechargePayment, handleDLWebhook } from './d
 export async function paymentRoutes(app: FastifyInstance) {
 
   app.post('/checkout', { preHandler: requireBusinessOwner }, async (request, reply) => {
-    const schema = z.object({ plan: z.enum(['PROFESSIONAL', 'PREMIUM']), provider: z.enum(['STRIPE', 'DLOCALGO']) })
+    const schema = z.object({ plan: z.enum(['PROFESSIONAL', 'PREMIUM', 'ENTERPRISE']), provider: z.enum(['STRIPE', 'DLOCALGO']) })
     const body = schema.safeParse(request.body)
     if (!body.success) return reply.status(400).send({ error: true, message: 'Datos inválidos' })
+
+    // Enterprise solo por Stripe: dLocal Go es un pago único sin cobro recurrente
+    // real (ver checkExpiredSubscriptions.ts), y no tiene sentido ofrecerlo para
+    // el plan más caro, pensado para clientes grandes que esperan facturación prolija.
+    if (body.data.plan === 'ENTERPRISE' && body.data.provider === 'DLOCALGO') {
+      return reply.status(400).send({ error: true, message: 'El plan Enterprise solo está disponible con tarjeta internacional por ahora. Escribinos si necesitás otro medio de pago.' })
+    }
 
     const user = await prisma.user.findUnique({ where: { id: request.user.userId }, include: { company: true } })
     if (!user?.company) return reply.status(404).send({ error: true, message: 'Sin empresa asociada' })
@@ -23,7 +30,7 @@ export async function paymentRoutes(app: FastifyInstance) {
     if (body.data.provider === 'STRIPE') {
       checkoutUrl = await createCheckoutSession({ companyId: user.company.id, plan: body.data.plan, successUrl, cancelUrl, customerEmail: user.email })
     } else {
-      checkoutUrl = await createDLPayment({ companyId: user.company.id, plan: body.data.plan, successUrl, failureUrl: cancelUrl, payerEmail: user.email, payerName: user.name })
+      checkoutUrl = await createDLPayment({ companyId: user.company.id, plan: body.data.plan as 'PROFESSIONAL' | 'PREMIUM', successUrl, failureUrl: cancelUrl, payerEmail: user.email, payerName: user.name })
     }
 
     return reply.send({ checkoutUrl, provider: body.data.provider })

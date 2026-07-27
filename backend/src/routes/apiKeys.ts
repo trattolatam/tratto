@@ -31,6 +31,7 @@ export default async function apiKeyRoutes(app: FastifyInstance) {
       apiKey: {
         name: apiKey.name,
         isActive: apiKey.isActive,
+        planTier: apiKey.planTier,
         monthlyLimit: apiKey.monthlyLimit,
         usageCount: apiKey.usageCount,
         lastUsedAt: apiKey.lastUsedAt,
@@ -48,10 +49,19 @@ export default async function apiKeyRoutes(app: FastifyInstance) {
     const { companyId } = request.user as JwtPayload
     if (!companyId) return reply.status(400).send({ error: true, message: 'Sin empresa asociada' })
 
+    const company = await prisma.company.findUnique({ where: { id: companyId }, select: { plan: true } })
+    // Enterprise tiene más límite mensual y acceso a más endpoints (reviews/leads,
+    // no solo rating) — publicApi.ts chequea este planTier antes de servir esos datos.
+    const isEnterprise = company?.plan === 'ENTERPRISE'
+
     const rawKey = generateRawKey()
     await prisma.apiKey.updateMany({ where: { companyId, isActive: true }, data: { isActive: false } })
     await prisma.apiKey.create({
-      data: { companyId, name: 'Key de integración', keyHash: hashKey(rawKey), monthlyLimit: 1000 },
+      data: {
+        companyId, name: 'Key de integración', keyHash: hashKey(rawKey),
+        planTier: isEnterprise ? 'enterprise' : 'basic',
+        monthlyLimit: isEnterprise ? 10000 : 1000,
+      },
     })
 
     // La key completa se devuelve UNA SOLA VEZ, en esta respuesta — a partir de acá

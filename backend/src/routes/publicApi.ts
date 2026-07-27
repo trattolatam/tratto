@@ -44,6 +44,7 @@ export default async function publicApiRoutes(app: FastifyInstance) {
     })
 
     ;(request as any).apiKeyCompanyId = apiKey.companyId
+    ;(request as any).apiKeyPlanTier = apiKey.planTier
   })
 
   // ─── Rating de MI empresa (la asociada a la key que estoy usando) ──────────
@@ -63,5 +64,39 @@ export default async function publicApiRoutes(app: FastifyInstance) {
       verified: company.isVerified,
       profileUrl: `${process.env.FRONTEND_URL || 'https://tratto.lat'}/empresa/${company.slug}`,
     })
+  })
+
+  // ─── Reseñas y consultas — solo para keys de plan Enterprise ───────────────
+  // La API "básica" (Premium) solo da el rating agregado; el detalle de reseñas
+  // y consultas es más sensible/valioso, así que va con el escalón de arriba.
+  app.addHook('preHandler', async (request, reply) => {
+    const path = request.url.split('?')[0]
+    if (path.endsWith('/reviews') || path.endsWith('/leads')) {
+      if ((request as any).apiKeyPlanTier !== 'enterprise') {
+        return reply.status(403).send({ error: true, message: 'Este endpoint requiere una API key de plan Enterprise' })
+      }
+    }
+  })
+
+  app.get('/reviews', async (request, reply) => {
+    const companyId = (request as any).apiKeyCompanyId as string
+    const reviews = await prisma.review.findMany({
+      where: { companyId, status: 'APPROVED' },
+      select: { id: true, rating: true, title: true, body: true, isVerified: true, createdAt: true, user: { select: { name: true } } },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+    })
+    return reply.send({ reviews })
+  })
+
+  app.get('/leads', async (request, reply) => {
+    const companyId = (request as any).apiKeyCompanyId as string
+    const leads = await prisma.lead.findMany({
+      where: { companyId },
+      select: { id: true, name: true, email: true, phone: true, message: true, createdAt: true },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+    })
+    return reply.send({ leads })
   })
 }

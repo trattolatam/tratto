@@ -12,6 +12,8 @@ const PLANS = [
     features: [{ text: 'Botón "Solicitar presupuesto"', ok: true }, { text: 'Respondés reseñas públicamente', ok: true }, { text: 'Sello empresa verificada', ok: true }, { text: 'Resumen IA de tus reseñas', ok: true }, { text: 'Alerta WhatsApp por nueva reseña', ok: true }, { text: 'Certificado PDF descargable', ok: true }] },
   { id: 'PREMIUM' as const, name: 'Premium', price: 79, desc: 'Para empresas que quieren dominar su categoría.', color: 'border-brand-blue', btn: 'Elegir Premium', btnClass: 'bg-brand-dark text-white hover:bg-brand-dark/90',
     features: [{ text: 'Todo lo del plan Profesional', ok: true }, { text: 'Posición destacada en búsquedas', ok: true }, { text: 'Inteligencia competitiva', ok: true }, { text: 'API para integrar calificaciones', ok: true }, { text: 'Account manager dedicado', ok: true }] },
+  { id: 'ENTERPRISE' as const, name: 'Enterprise', price: 199, desc: 'Para cadenas y empresas con equipos y varias sedes.', color: 'border-purple-300', btn: 'Elegir Enterprise', btnClass: 'bg-purple-700 text-white hover:bg-purple-800',
+    features: [{ text: 'Todo lo del plan Premium', ok: true }, { text: 'Equipo con roles (varios usuarios)', ok: true }, { text: 'Múltiples sucursales', ok: true }, { text: 'API ampliada + webhooks en tiempo real', ok: true }, { text: 'Exportación masiva de datos', ok: true }] },
 ]
 
 export default function PreciosPage() {
@@ -20,7 +22,7 @@ export default function PreciosPage() {
   const [provider, setProvider] = useState<'STRIPE' | 'DLOCALGO'>('STRIPE')
   const [loading, setLoading] = useState<string | null>(null)
 
-  const handlePlan = async (planId: 'PROFESSIONAL' | 'PREMIUM') => {
+  const handlePlan = async (planId: 'PROFESSIONAL' | 'PREMIUM' | 'ENTERPRISE') => {
     if (!user) { router.push('/registro?role=BUSINESS'); return }
     if (user.role !== 'BUSINESS' || !user.company) { router.push('/reclamar'); return }
     setLoading(planId)
@@ -43,7 +45,7 @@ export default function PreciosPage() {
         </div>
       </div>
 
-      <div className="grid md:grid-cols-3 gap-5 mb-12">
+      <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-5 mb-12">
         {PLANS.map(plan => (
           <div key={plan.id} className={`card relative flex flex-col ${plan.popular ? `border-2 ${plan.color}` : `border ${plan.color}`}`}>
             {plan.popular && <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-brand-green text-brand-dark text-xs font-bold px-4 py-1 rounded-full whitespace-nowrap">Más elegido</div>}
@@ -63,7 +65,7 @@ export default function PreciosPage() {
                   <div className="w-full text-center py-2.5 rounded-lg border border-gray-200 text-sm font-medium text-gray-400">{user.company.plan === 'FREE' ? 'Plan actual' : 'Plan gratuito'}</div>
                 )
               ) : (
-                <button onClick={() => handlePlan(plan.id as 'PROFESSIONAL' | 'PREMIUM')} disabled={loading === plan.id} className={`w-full py-2.5 rounded-lg text-sm font-semibold transition-all disabled:opacity-60 flex items-center justify-center gap-2 ${plan.btnClass}`}>
+                <button onClick={() => handlePlan(plan.id as 'PROFESSIONAL' | 'PREMIUM' | 'ENTERPRISE')} disabled={loading === plan.id} className={`w-full py-2.5 rounded-lg text-sm font-semibold transition-all disabled:opacity-60 flex items-center justify-center gap-2 ${plan.btnClass}`}>
                   {loading === plan.id ? <><i className="ti ti-loader-2 animate-spin text-base" /> Redirigiendo...</> : <>{plan.btn}</>}
                 </button>
               )}

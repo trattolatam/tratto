@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuthStore } from '@/lib/store'
-import { companies as companiesApi, reviews as reviewsApi, leads as leadsApi, upload, ai as aiApi, apiKeys as apiKeysApi } from '@/lib/api'
+import { companies as companiesApi, reviews as reviewsApi, leads as leadsApi, upload, ai as aiApi, apiKeys as apiKeysApi, team as teamApi, branches as branchesApi, webhookSubscriptions as webhooksApi, dataExport } from '@/lib/api'
 
 const TAX_ID_LABELS: Record<string, string> = { UY: 'RUT', AR: 'CUIT', CL: 'RUT', MX: 'RFC', CO: 'NIT', PE: 'RUC', BR: 'CNPJ' }
 
@@ -13,7 +13,7 @@ export default function PanelPage() {
   const [stats, setStats] = useState<any>(null)
   const [pendingReviews, setPendingReviews] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<'overview' | 'reviews' | 'leads' | 'competencia' | 'integraciones' | 'editar'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'reviews' | 'leads' | 'competencia' | 'integraciones' | 'equipo' | 'editar'>('overview')
   const [uploadingLogo, setUploadingLogo] = useState(false)
   const [downloadingCert, setDownloadingCert] = useState(false)
   const [intel, setIntel] = useState<any>(null)
@@ -40,6 +40,21 @@ export default function PanelPage() {
   const [newRawKey, setNewRawKey] = useState('')
   const [apiKeyError, setApiKeyError] = useState('')
   const [widgetCopied, setWidgetCopied] = useState(false)
+  const [teamData, setTeamData] = useState<{ owner: any; members: any[] } | null>(null)
+  const [loadingTeam, setLoadingTeam] = useState(false)
+  const [inviteEmail, setInviteEmail] = useState('')
+  const [inviteRole, setInviteRole] = useState<'ADMIN' | 'EDITOR' | 'VIEWER'>('EDITOR')
+  const [invitingMember, setInvitingMember] = useState(false)
+  const [teamError, setTeamError] = useState('')
+  const [companyBranches, setCompanyBranches] = useState<any[] | null>(null)
+  const [branchForm, setBranchForm] = useState({ name: '', address: '', city: '', phone: '' })
+  const [addingBranch, setAddingBranch] = useState(false)
+  const [webhooksList, setWebhooksList] = useState<any[] | null>(null)
+  const [webhookUrl, setWebhookUrl] = useState('')
+  const [webhookEvents, setWebhookEvents] = useState<string[]>([])
+  const [creatingWebhook, setCreatingWebhook] = useState(false)
+  const [newWebhookSecret, setNewWebhookSecret] = useState('')
+  const [exporting, setExporting] = useState<string | null>(null)
   const photoInputRef = useRef<HTMLInputElement>(null)
   const logoInputRef = useRef<HTMLInputElement>(null)
   const [companyDetails, setCompanyDetails] = useState<any>(null)
@@ -109,6 +124,7 @@ export default function PanelPage() {
   const company = user.company!
   const isPro = ['PROFESSIONAL', 'PREMIUM', 'ENTERPRISE'].includes(company.plan)
   const isPremium = ['PREMIUM', 'ENTERPRISE'].includes(company.plan)
+  const isEnterprise = company.plan === 'ENTERPRISE'
 
   const handleGenerateSummary = async () => {
     setGeneratingSummary(true); setSummaryError(''); setSummaryMsg('')
@@ -177,6 +193,7 @@ export default function PanelPage() {
 
   const handleOpenIntegraciones = async () => {
     setActiveTab('integraciones')
+    if (isEnterprise) handleLoadWebhooks()
     if (!isPremium || apiKeyInfo) return
     setLoadingApiKey(true)
     try { const data = await apiKeysApi.get(); setApiKeyInfo(data.apiKey) }
@@ -202,6 +219,114 @@ export default function PanelPage() {
     navigator.clipboard.writeText(snippet)
     setWidgetCopied(true)
     setTimeout(() => setWidgetCopied(false), 2000)
+  }
+
+  // ─── Equipo ──────────────────────────────────────────────────────────────────
+  const handleOpenEquipo = async () => {
+    setActiveTab('equipo')
+    if (!isEnterprise) return
+    setLoadingTeam(true)
+    try {
+      const [teamRes, branchesRes] = await Promise.all([teamApi.list(), branchesApi.list(company.id)])
+      setTeamData(teamRes)
+      setCompanyBranches(branchesRes.branches)
+    } catch (err: any) { setTeamError(err.message) }
+    finally { setLoadingTeam(false) }
+  }
+
+  const handleInviteMember = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setInvitingMember(true)
+    setTeamError('')
+    try {
+      await teamApi.invite(inviteEmail, inviteRole)
+      const teamRes = await teamApi.list()
+      setTeamData(teamRes)
+      setInviteEmail('')
+    } catch (err: any) { setTeamError(err.message) }
+    finally { setInvitingMember(false) }
+  }
+
+  const handleRemoveMember = async (memberId: string) => {
+    if (!confirm('¿Sacar a esta persona del equipo?')) return
+    try {
+      await teamApi.remove(memberId)
+      const teamRes = await teamApi.list()
+      setTeamData(teamRes)
+    } catch (err: any) { setTeamError(err.message) }
+  }
+
+  const handleAddBranch = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setAddingBranch(true)
+    setTeamError('')
+    try {
+      await branchesApi.create(company.id, branchForm)
+      const branchesRes = await branchesApi.list(company.id)
+      setCompanyBranches(branchesRes.branches)
+      setBranchForm({ name: '', address: '', city: '', phone: '' })
+    } catch (err: any) { setTeamError(err.message) }
+    finally { setAddingBranch(false) }
+  }
+
+  const handleRemoveBranch = async (branchId: string) => {
+    if (!confirm('¿Borrar esta sucursal?')) return
+    try {
+      await branchesApi.remove(company.id, branchId)
+      const branchesRes = await branchesApi.list(company.id)
+      setCompanyBranches(branchesRes.branches)
+    } catch (err: any) { setTeamError(err.message) }
+  }
+
+  // ─── Webhooks ────────────────────────────────────────────────────────────────
+  const handleLoadWebhooks = async () => {
+    if (webhooksList) return
+    try { const data = await webhooksApi.list(); setWebhooksList(data.webhooks) }
+    catch (err: any) { console.error(err) }
+  }
+
+  const handleToggleWebhookEvent = (event: string) => {
+    setWebhookEvents((prev) => prev.includes(event) ? prev.filter((e) => e !== event) : [...prev, event])
+  }
+
+  const handleCreateWebhook = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (webhookEvents.length === 0) { setApiKeyError('Elegí al menos un evento'); return }
+    setCreatingWebhook(true)
+    setApiKeyError('')
+    try {
+      const data = await webhooksApi.create(webhookUrl, webhookEvents)
+      setNewWebhookSecret(data.secret)
+      const refreshed = await webhooksApi.list()
+      setWebhooksList(refreshed.webhooks)
+      setWebhookUrl('')
+      setWebhookEvents([])
+    } catch (err: any) { setApiKeyError(err.message) }
+    finally { setCreatingWebhook(false) }
+  }
+
+  const handleRemoveWebhook = async (id: string) => {
+    if (!confirm('¿Borrar este webhook?')) return
+    try {
+      await webhooksApi.remove(id)
+      const refreshed = await webhooksApi.list()
+      setWebhooksList(refreshed.webhooks)
+    } catch (err: any) { console.error(err) }
+  }
+
+  // ─── Exportación ─────────────────────────────────────────────────────────────
+  const handleExport = async (type: 'reviews' | 'leads') => {
+    setExporting(type)
+    try {
+      const blob = await dataExport.download(type)
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `tratto-${type}-${new Date().toISOString().slice(0, 10)}.csv`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (err: any) { alert(err.message) }
+    finally { setExporting(null) }
   }
 
   const handleRevokeApiKey = async () => {
@@ -276,8 +401,8 @@ export default function PanelPage() {
       )}
 
       <div className="flex border-b border-gray-100 gap-4 mb-5">
-        {(['overview', 'reviews', 'leads', 'competencia', 'integraciones', 'editar'] as const).map(tab => (
-          <button key={tab} onClick={() => tab === 'competencia' ? handleOpenCompetencia() : tab === 'leads' ? handleOpenLeads() : tab === 'integraciones' ? handleOpenIntegraciones() : setActiveTab(tab)} className={`pb-3 text-sm font-medium border-b-2 transition-colors ${activeTab === tab ? 'border-brand-green text-brand-green' : 'border-transparent text-brand-slate hover:text-brand-dark'}`}>{{ overview: 'Resumen', reviews: 'Reseñas', leads: 'Consultas', competencia: 'Competencia', integraciones: 'Integraciones', editar: 'Editar perfil' }[tab]}</button>
+        {(['overview', 'reviews', 'leads', 'competencia', 'integraciones', 'equipo', 'editar'] as const).map(tab => (
+          <button key={tab} onClick={() => tab === 'competencia' ? handleOpenCompetencia() : tab === 'leads' ? handleOpenLeads() : tab === 'integraciones' ? handleOpenIntegraciones() : tab === 'equipo' ? handleOpenEquipo() : setActiveTab(tab)} className={`pb-3 text-sm font-medium border-b-2 transition-colors ${activeTab === tab ? 'border-brand-green text-brand-green' : 'border-transparent text-brand-slate hover:text-brand-dark'}`}>{{ overview: 'Resumen', reviews: 'Reseñas', leads: 'Consultas', competencia: 'Competencia', integraciones: 'Integraciones', equipo: 'Equipo', editar: 'Editar perfil' }[tab]}</button>
         ))}
       </div>
 
@@ -524,6 +649,118 @@ export default function PanelPage() {
                 <pre className="bg-gray-50 rounded-lg p-4 text-xs overflow-x-auto"><code>{`<div id="tratto-widget"></div>\n<script src="${process.env.NEXT_PUBLIC_API_URL || 'https://tratto-api-dk42.onrender.com'}/api/v1/widget/${company.id}.js"></script>`}</code></pre>
                 <button onClick={handleCopyWidgetSnippet} className="btn-secondary text-xs py-2 px-4 mt-3">{widgetCopied ? '¡Copiado!' : 'Copiar código'}</button>
                 <p className="text-xs text-brand-slate mt-3">Además suma un dato para buscadores (schema.org) que ayuda a que Google pueda mostrar tus estrellas en el resultado de búsqueda de tu empresa.</p>
+              </div>
+
+              {isEnterprise && (
+                <>
+                  <div className="card p-5">
+                    <p className="text-sm font-semibold text-brand-dark mb-1">Webhooks en tiempo real</p>
+                    <p className="text-xs text-brand-slate mb-4">Avisamos a tu sistema apenas entra una reseña o consulta nueva, sin que tengas que ir a buscar el dato.</p>
+
+                    {apiKeyError && <p className="text-xs text-red-500 mb-3">{apiKeyError}</p>}
+                    {newWebhookSecret && (
+                      <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4">
+                        <p className="text-xs font-semibold text-amber-800 mb-2">Guardá este secret ahora — lo necesitás para verificar la firma de cada webhook:</p>
+                        <code className="block bg-white border border-amber-200 rounded px-3 py-2 text-xs break-all select-all">{newWebhookSecret}</code>
+                      </div>
+                    )}
+
+                    <div className="space-y-2 mb-4">
+                      {(webhooksList || []).map((w) => (
+                        <div key={w.id} className="flex items-center justify-between text-sm border border-gray-100 rounded-lg px-3 py-2">
+                          <div className="min-w-0">
+                            <p className="text-brand-dark truncate">{w.url}</p>
+                            <p className="text-xs text-brand-slate">{w.events.join(', ')} · {w.isActive ? 'activo' : 'pausado'}</p>
+                          </div>
+                          <button onClick={() => handleRemoveWebhook(w.id)} className="text-xs text-red-500 hover:underline flex-shrink-0 ml-2">Borrar</button>
+                        </div>
+                      ))}
+                    </div>
+
+                    <form onSubmit={handleCreateWebhook} className="space-y-3">
+                      <input type="url" required placeholder="https://tu-sistema.com/webhook" className="input text-sm" value={webhookUrl} onChange={e => setWebhookUrl(e.target.value)} />
+                      <div className="flex gap-4 text-sm">
+                        <label className="flex items-center gap-2"><input type="checkbox" checked={webhookEvents.includes('review.created')} onChange={() => handleToggleWebhookEvent('review.created')} /> Nueva reseña</label>
+                        <label className="flex items-center gap-2"><input type="checkbox" checked={webhookEvents.includes('lead.created')} onChange={() => handleToggleWebhookEvent('lead.created')} /> Nueva consulta</label>
+                      </div>
+                      <button type="submit" disabled={creatingWebhook} className="btn-secondary text-xs py-2 px-4 disabled:opacity-50">{creatingWebhook ? 'Creando...' : 'Agregar webhook'}</button>
+                    </form>
+                  </div>
+
+                  <div className="card p-5">
+                    <p className="text-sm font-semibold text-brand-dark mb-1">Exportar tus datos</p>
+                    <p className="text-xs text-brand-slate mb-4">Bajá tus reseñas y consultas en CSV para tus reportes internos.</p>
+                    <div className="flex gap-2">
+                      <button onClick={() => handleExport('reviews')} disabled={exporting === 'reviews'} className="btn-secondary text-xs py-2 px-4 disabled:opacity-50">{exporting === 'reviews' ? 'Exportando...' : 'Exportar reseñas'}</button>
+                      <button onClick={() => handleExport('leads')} disabled={exporting === 'leads'} className="btn-secondary text-xs py-2 px-4 disabled:opacity-50">{exporting === 'leads' ? 'Exportando...' : 'Exportar consultas'}</button>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+      {activeTab === 'equipo' && (
+        <div>
+          {!isEnterprise ? (
+            <div className="card p-8 text-center">
+              <i className="ti ti-lock text-4xl text-gray-200 block mb-3" />
+              <p className="text-sm text-brand-dark font-medium mb-1">Función del plan Enterprise</p>
+              <p className="text-xs text-brand-slate mb-4">Sumá gente a tu equipo con roles, y administrá varias sucursales bajo un mismo perfil.</p>
+              <Link href="/precios" className="btn-primary text-sm py-2.5 px-6">Ver planes</Link>
+            </div>
+          ) : loadingTeam ? (
+            <div className="card p-8 text-center"><i className="ti ti-loader-2 animate-spin text-2xl text-brand-slate" /></div>
+          ) : (
+            <div className="space-y-4">
+              {teamError && <p className="text-xs text-red-500">{teamError}</p>}
+
+              <div className="card p-5">
+                <p className="text-sm font-semibold text-brand-dark mb-3">Equipo</p>
+                <div className="space-y-2 mb-4">
+                  {teamData?.owner && (
+                    <div className="flex items-center justify-between text-sm border border-gray-100 rounded-lg px-3 py-2">
+                      <div><p className="text-brand-dark">{teamData.owner.name}</p><p className="text-xs text-brand-slate">{teamData.owner.email}</p></div>
+                      <span className="text-xs text-brand-slate">Dueño</span>
+                    </div>
+                  )}
+                  {(teamData?.members || []).map((m) => (
+                    <div key={m.id} className="flex items-center justify-between text-sm border border-gray-100 rounded-lg px-3 py-2">
+                      <div><p className="text-brand-dark">{m.user.name}</p><p className="text-xs text-brand-slate">{m.user.email}</p></div>
+                      <div className="flex items-center gap-2"><span className="text-xs text-brand-slate">{m.role}</span><button onClick={() => handleRemoveMember(m.id)} className="text-xs text-red-500 hover:underline">Sacar</button></div>
+                    </div>
+                  ))}
+                </div>
+                <form onSubmit={handleInviteMember} className="flex gap-2">
+                  <input type="email" required placeholder="email@delapersona.com" className="input text-sm flex-1" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} />
+                  <select className="input text-sm w-32" value={inviteRole} onChange={e => setInviteRole(e.target.value as any)}>
+                    <option value="ADMIN">Admin</option>
+                    <option value="EDITOR">Editor</option>
+                    <option value="VIEWER">Solo ver</option>
+                  </select>
+                  <button type="submit" disabled={invitingMember} className="btn-secondary text-xs py-2 px-4 disabled:opacity-50 flex-shrink-0">{invitingMember ? 'Invitando...' : 'Invitar'}</button>
+                </form>
+                <p className="text-xs text-brand-slate mt-2">La persona ya tiene que tener una cuenta en Tratto con ese email.</p>
+              </div>
+
+              <div className="card p-5">
+                <p className="text-sm font-semibold text-brand-dark mb-3">Sucursales</p>
+                <div className="space-y-2 mb-4">
+                  {(companyBranches || []).map((b) => (
+                    <div key={b.id} className="flex items-center justify-between text-sm border border-gray-100 rounded-lg px-3 py-2">
+                      <div><p className="text-brand-dark">{b.name}</p><p className="text-xs text-brand-slate">{b.address}, {b.city} {b.phone ? `· ${b.phone}` : ''}</p></div>
+                      <button onClick={() => handleRemoveBranch(b.id)} className="text-xs text-red-500 hover:underline">Borrar</button>
+                    </div>
+                  ))}
+                </div>
+                <form onSubmit={handleAddBranch} className="grid grid-cols-2 gap-2">
+                  <input required placeholder="Nombre de la sede" className="input text-sm" value={branchForm.name} onChange={e => setBranchForm(f => ({ ...f, name: e.target.value }))} />
+                  <input required placeholder="Ciudad" className="input text-sm" value={branchForm.city} onChange={e => setBranchForm(f => ({ ...f, city: e.target.value }))} />
+                  <input required placeholder="Dirección" className="input text-sm col-span-2" value={branchForm.address} onChange={e => setBranchForm(f => ({ ...f, address: e.target.value }))} />
+                  <input placeholder="Teléfono (opcional)" className="input text-sm" value={branchForm.phone} onChange={e => setBranchForm(f => ({ ...f, phone: e.target.value }))} />
+                  <button type="submit" disabled={addingBranch} className="btn-secondary text-xs py-2 px-4 disabled:opacity-50">{addingBranch ? 'Agregando...' : 'Agregar sucursal'}</button>
+                </form>
               </div>
             </div>
           )}

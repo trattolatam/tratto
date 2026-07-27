@@ -29,6 +29,46 @@ export const auth = {
     apiFetch<{ message: string }>('/api/auth/reset-password', { method: 'POST', body: JSON.stringify({ token, newPassword }) }),
 }
 
+export const team = {
+  list: () => apiFetch<{ owner: any; members: any[] }>('/api/team'),
+  invite: (email: string, role: 'ADMIN' | 'EDITOR' | 'VIEWER') =>
+    apiFetch<{ member: any }>('/api/team', { method: 'POST', body: JSON.stringify({ email, role }) }),
+  updateRole: (memberId: string, role: 'ADMIN' | 'EDITOR' | 'VIEWER') =>
+    apiFetch<{ member: any }>(`/api/team/${memberId}`, { method: 'PATCH', body: JSON.stringify({ role }) }),
+  remove: (memberId: string) => apiFetch<{ ok: boolean }>(`/api/team/${memberId}`, { method: 'DELETE' }),
+}
+
+export const branches = {
+  list: (companyId: string) => apiFetch<{ branches: any[] }>(`/api/companies/${companyId}/branches`),
+  create: (companyId: string, body: { name: string; address: string; city: string; phone?: string }) =>
+    apiFetch<{ branch: any }>(`/api/companies/${companyId}/branches`, { method: 'POST', body: JSON.stringify(body) }),
+  remove: (companyId: string, branchId: string) =>
+    apiFetch<{ ok: boolean }>(`/api/companies/${companyId}/branches/${branchId}`, { method: 'DELETE' }),
+}
+
+export const webhookSubscriptions = {
+  list: () => apiFetch<{ webhooks: any[] }>('/api/webhook-subscriptions'),
+  create: (url: string, events: string[]) =>
+    apiFetch<{ webhook: any; secret: string; warning: string }>('/api/webhook-subscriptions', { method: 'POST', body: JSON.stringify({ url, events }) }),
+  toggle: (id: string, isActive: boolean) =>
+    apiFetch<{ webhook: any }>(`/api/webhook-subscriptions/${id}`, { method: 'PATCH', body: JSON.stringify({ isActive }) }),
+  remove: (id: string) => apiFetch<{ ok: boolean }>(`/api/webhook-subscriptions/${id}`, { method: 'DELETE' }),
+}
+
+export const dataExport = {
+  download: async (type: 'reviews' | 'leads'): Promise<Blob> => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('tratto_token') : null
+    const res = await fetch(`${API_URL}/api/export?type=${type}&format=csv`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      throw new Error(data.message || 'Error al exportar')
+    }
+    return res.blob()
+  },
+}
+
 export const apiKeys = {
   get: () => apiFetch<{ apiKey: any | null }>('/api/api-keys'),
   generate: () => apiFetch<{ key: string; warning: string }>('/api/api-keys', { method: 'POST', body: JSON.stringify({}) }),
@@ -86,7 +126,7 @@ export const ads = {
 
 export const subscriptions = {
   my: () => apiFetch<{ subscription: any }>('/api/subscriptions/my'),
-  checkout: (plan: 'PROFESSIONAL' | 'PREMIUM', provider: 'STRIPE' | 'DLOCALGO') =>
+  checkout: (plan: 'PROFESSIONAL' | 'PREMIUM' | 'ENTERPRISE', provider: 'STRIPE' | 'DLOCALGO') =>
     apiFetch<{ checkoutUrl: string }>('/api/payments/checkout', { method: 'POST', body: JSON.stringify({ plan, provider }) }),
   cancel: () => apiFetch('/api/payments/cancel', { method: 'POST' }),
 }

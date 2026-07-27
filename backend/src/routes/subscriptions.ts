@@ -41,6 +41,11 @@ export async function leadRoutes(app: FastifyInstance) {
 
     const lead = await prisma.lead.create({ data: { ...body.data, source: 'profile' } })
 
+    const { triggerWebhooks } = await import('../services/webhooks')
+    await triggerWebhooks(body.data.companyId, 'lead.created', {
+      leadId: lead.id, name: body.data.name, email: body.data.email, phone: body.data.phone, message: body.data.message,
+    })
+
     const { sendNotification } = await import('../services/notifications')
     if (company.owner) {
       const contactLines = [
