@@ -75,6 +75,7 @@ enum NotificationType {
   AD_APPROVED
   AD_REJECTED
   LEAD_RECEIVED
+  TEAM_INVITE
 }
 
 // ─── USUARIOS ─────────────────────────────────────────────────────────────────

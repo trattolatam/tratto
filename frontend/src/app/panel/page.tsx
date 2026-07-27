@@ -8,7 +8,7 @@ import { companies as companiesApi, reviews as reviewsApi, leads as leadsApi, up
 const TAX_ID_LABELS: Record<string, string> = { UY: 'RUT', AR: 'CUIT', CL: 'RUT', MX: 'RFC', CO: 'NIT', PE: 'RUC', BR: 'CNPJ' }
 
 export default function PanelPage() {
-  const { user, fetchMe } = useAuthStore()
+  const { user, fetchMe, authChecked } = useAuthStore()
   const router = useRouter()
   const [stats, setStats] = useState<any>(null)
   const [pendingReviews, setPendingReviews] = useState<any[]>([])
@@ -80,6 +80,7 @@ export default function PanelPage() {
   }
 
   useEffect(() => {
+    if (!authChecked) return
     if (!user) { router.push('/login'); return }
     if (user.role !== 'BUSINESS' && user.role !== 'ADMIN') { router.push('/'); return }
     const companyId = user.company?.id
@@ -88,7 +89,7 @@ export default function PanelPage() {
     Promise.all([companiesApi.stats(companyId), reviewsApi.list(companyId, { limit: '5' })])
       .then(([statsData, reviewsData]) => { setStats(statsData); setPendingReviews(reviewsData.reviews) })
       .finally(() => setLoading(false))
-  }, [user])
+  }, [user, authChecked])
 
   useEffect(() => {
     if (activeTab !== 'editar' || !user?.company || companyDetails) return
@@ -128,7 +129,13 @@ export default function PanelPage() {
 
   const handleGenerateSummary = async () => {
     setGeneratingSummary(true); setSummaryError(''); setSummaryMsg('')
-    try { const result = await aiApi.generateSummary(company.id); setSummaryMsg(result.message) }
+    try {
+      const result = await aiApi.generateSummary(company.id)
+      setSummaryMsg(result.message)
+      // El resumen se genera en segundo plano — esperamos un poco y volvemos a
+      // pedir las stats para que aparezca acá sin que el usuario tenga que recargar.
+      setTimeout(() => { companiesApi.stats(company.id).then(setStats).catch(() => {}) }, 6000)
+    }
     catch (err: any) { setSummaryError(err.message || 'Error al generar el resumen') }
     finally { setGeneratingSummary(false) }
   }
@@ -414,7 +421,23 @@ export default function PanelPage() {
       </div>
 
       {activeTab === 'overview' && (
-        <div className="grid md:grid-cols-2 gap-4">
+        <div className="space-y-4">
+          {stats?.aiSummary && (
+            <div className="card p-5 border border-brand-green/20 bg-brand-green-dim/30">
+              <h2 className="flex items-center gap-2 text-sm font-semibold text-brand-dark mb-3"><i className="ti ti-robot text-brand-green" />Resumen IA — {stats.aiSummary.reviewsCount} reseñas analizadas</h2>
+              <p className="text-sm text-brand-slate mb-4">{stats.aiSummary.summaryText}</p>
+              <div className="space-y-2">
+                {stats.aiSummary.insightBars.map((bar: any, i: number) => (
+                  <div key={i} className="flex items-center gap-3">
+                    <span className="text-xs text-brand-slate w-40 flex-shrink-0">{bar.label}</span>
+                    <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden"><div className={`h-full rounded-full ${bar.isNegative ? 'bg-brand-red' : 'bg-brand-green'}`} style={{ width: `${bar.percentage}%` }} /></div>
+                    <span className="text-xs font-semibold text-brand-dark w-8 text-right">{bar.percentage}%</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          <div className="grid md:grid-cols-2 gap-4">
           <div className="card p-4">
             <h2 className="text-sm font-semibold text-brand-dark mb-3 flex items-center gap-2"><i className="ti ti-message text-brand-green" /> Reseñas recientes</h2>
             <div className="space-y-2">
@@ -448,7 +471,7 @@ export default function PanelPage() {
                   {photoError && <p className="text-xs text-brand-red px-2.5">{photoError}</p>}
                   {company.reviewCount >= 5 && (
                     <button onClick={handleGenerateSummary} disabled={generatingSummary} className="w-full flex items-center gap-2 p-2.5 rounded-lg hover:bg-gray-50 transition-colors text-sm text-brand-dark text-left disabled:opacity-50">
-                      <i className={`ti ${generatingSummary ? 'ti-loader-2 animate-spin' : 'ti-sparkles'} text-brand-slate`} /> {generatingSummary ? 'Generando...' : 'Generar resumen IA'}
+                      <i className={`ti ${generatingSummary ? 'ti-loader-2 animate-spin' : 'ti-sparkles'} text-brand-slate`} /> {generatingSummary ? 'Generando...' : stats?.aiSummary ? 'Regenerar resumen IA' : 'Generar resumen IA'}
                     </button>
                   )}
                   {summaryMsg && <p className="text-xs text-brand-green px-2.5">{summaryMsg}</p>}
@@ -457,11 +480,27 @@ export default function PanelPage() {
               )}
             </div>
           </div>
+          </div>
         </div>
       )}
 
       {activeTab === 'reviews' && (
         <div className="space-y-3">
+          {stats?.aiSummary && (
+            <div className="card p-5 border border-brand-green/20 bg-brand-green-dim/30">
+              <h2 className="flex items-center gap-2 text-sm font-semibold text-brand-dark mb-3"><i className="ti ti-robot text-brand-green" />Resumen IA — {stats.aiSummary.reviewsCount} reseñas analizadas</h2>
+              <p className="text-sm text-brand-slate mb-4">{stats.aiSummary.summaryText}</p>
+              <div className="space-y-2">
+                {stats.aiSummary.insightBars.map((bar: any, i: number) => (
+                  <div key={i} className="flex items-center gap-3">
+                    <span className="text-xs text-brand-slate w-40 flex-shrink-0">{bar.label}</span>
+                    <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden"><div className={`h-full rounded-full ${bar.isNegative ? 'bg-brand-red' : 'bg-brand-green'}`} style={{ width: `${bar.percentage}%` }} /></div>
+                    <span className="text-xs font-semibold text-brand-dark w-8 text-right">{bar.percentage}%</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           {pendingReviews.map(r => (
             <div key={r.id} className="card p-4">
               <div className="flex items-start justify-between gap-3">

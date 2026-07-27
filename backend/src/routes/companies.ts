@@ -292,7 +292,7 @@ export default async function companyRoutes(app: FastifyInstance) {
 
   app.get('/:id/stats', { preHandler: requireBusinessOwner }, async (request, reply) => {
     const { id } = request.params as { id: string }
-    const company = await prisma.company.findUnique({ where: { id } })
+    const company = await prisma.company.findUnique({ where: { id }, include: { aiSummary: true } })
     if (!company || company.claimedById !== request.user.userId) {
       return reply.status(403).send({ error: true, message: 'Sin permiso' })
     }
@@ -311,6 +311,7 @@ export default async function companyRoutes(app: FastifyInstance) {
       totalReviews, verifiedReviews,
       verifiedPct: totalReviews > 0 ? Math.round((verifiedReviews / totalReviews) * 100) : 0,
       recentReviews, leads, contactReveals, ratingDistribution, ratingAvg: company.ratingAvg,
+      aiSummary: company.aiSummary,
     })
   })
 

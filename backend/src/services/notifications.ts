@@ -48,7 +48,7 @@ export async function sendNotification(payload: NotificationPayload): Promise<vo
 }
 
 function shouldSendEmail(type: NotificationType): boolean {
-  return ['NEW_REVIEW', 'MEDAL_EARNED', 'MONTHLY_REPORT', 'SUBSCRIPTION_RENEWAL', 'AD_APPROVED', 'AD_REJECTED', 'LEAD_RECEIVED'].includes(type)
+  return ['NEW_REVIEW', 'MEDAL_EARNED', 'MONTHLY_REPORT', 'SUBSCRIPTION_RENEWAL', 'AD_APPROVED', 'AD_REJECTED', 'LEAD_RECEIVED', 'TEAM_INVITE'].includes(type)
 }
 
 function shouldSendWhatsApp(type: NotificationType): boolean {
@@ -115,6 +115,40 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
  * pero con diseño y un botón que lleva directo a /precios para convertir.
  * No incluye precios a propósito: la idea es que decidan mirando la página, no acá.
  */
+export function buildTeamInviteEmailHtml(inviterName: string, companyName: string, role: string, loginUrl: string): string {
+  const frontendUrl = process.env.FRONTEND_URL || 'https://tratto.lat'
+  const roleLabel = { ADMIN: 'Administrador', EDITOR: 'Editor', VIEWER: 'Solo lectura' }[role] || role
+  return `
+<!DOCTYPE html>
+<html lang="es">
+<body style="margin:0;padding:0;background-color:#f4f5f7;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f5f7;padding:32px 16px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" style="max-width:480px;background-color:#ffffff;border-radius:16px;overflow:hidden;">
+          <tr><td style="background-color:#0f172a;padding:24px 32px;"><span style="color:#ffffff;font-size:20px;font-weight:700;">Tratto</span></td></tr>
+          <tr>
+            <td style="padding:32px;">
+              <p style="margin:0 0 16px 0;font-size:16px;line-height:1.5;color:#1f2937;">
+                <strong>${inviterName}</strong> te sumó al equipo de <strong>${companyName}</strong> en Tratto.
+              </p>
+              <p style="margin:0 0 24px 0;font-size:14px;line-height:1.5;color:#4b5563;">
+                Tu rol es <strong>${roleLabel}</strong>. Entrá con tu cuenta de siempre para acceder al panel de la empresa.
+              </p>
+              <table role="presentation" width="100%"><tr><td align="center">
+                <a href="${loginUrl}" style="display:inline-block;background-color:#10b981;color:#ffffff;text-decoration:none;font-size:15px;font-weight:600;padding:14px 32px;border-radius:999px;">Entrar a Tratto</a>
+              </td></tr></table>
+            </td>
+          </tr>
+          <tr><td style="padding:20px 32px;background-color:#f9fafb;text-align:center;"><a href="${frontendUrl}" style="color:#9ca3af;font-size:12px;text-decoration:none;">tratto.lat</a></td></tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`
+}
+
 function buildMonthlyReportEmailHtml(contactReveals: number, companyName: string): string {
   const frontendUrl = process.env.FRONTEND_URL || 'https://tratto.lat'
   const pricingUrl = `${frontendUrl}/precios`

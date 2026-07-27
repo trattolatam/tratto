@@ -2,7 +2,7 @@ import { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { prisma } from '../lib/prisma'
 import { requireBusinessOwner, requirePlan, JwtPayload } from '../middleware/auth'
-import { sendNotification } from '../services/notifications'
+import { sendNotification, buildTeamInviteEmailHtml } from '../services/notifications'
 
 /**
  * Equipo — varias personas manejando el mismo perfil de empresa (plan Enterprise).
@@ -72,10 +72,13 @@ export default async function teamRoutes(app: FastifyInstance) {
     })
 
     const company = await prisma.company.findUnique({ where: { id: companyId }, select: { name: true } })
+    const inviter = await prisma.user.findUnique({ where: { id: userId }, select: { name: true } })
+    const loginUrl = `${process.env.FRONTEND_URL || 'https://tratto.lat'}/login`
     await sendNotification({
-      userId: invitedUser.id, type: 'MEDAL_EARNED', // reutilizamos un tipo existente que ya manda email; no amerita un tipo nuevo solo para esto
+      userId: invitedUser.id, type: 'TEAM_INVITE',
       title: `Te sumaron al equipo de ${company?.name} en Tratto`,
-      body: `Ahora tenés acceso al panel de ${company?.name} como ${body.data.role.toLowerCase()}. Entrá con tu cuenta de siempre.`,
+      body: `${inviter?.name} te sumó al equipo de ${company?.name} en Tratto. Ahora tenés acceso al panel como ${body.data.role.toLowerCase()}. Entrá con tu cuenta de siempre.`,
+      html: buildTeamInviteEmailHtml(inviter?.name || 'Un compañero', company?.name || 'la empresa', body.data.role, loginUrl),
     })
 
     return reply.send({ member: { id: member.id, user: member.user, role: member.role, invitedAt: member.invitedAt } })
