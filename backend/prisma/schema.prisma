@@ -77,13 +77,6 @@ enum NotificationType {
   LEAD_RECEIVED
 }
 
-enum BookingStatus {
-  PENDING
-  CONFIRMED
-  COMPLETED
-  CANCELLED
-}
-
 // ─── USUARIOS ─────────────────────────────────────────────────────────────────
 
 model User {
@@ -116,7 +109,6 @@ model User {
   reviewHelpful  ReviewHelpful[]
   company        Company?         @relation("CompanyOwner")
   notifications  Notification[]
-  bookings       Booking[]
   contactReveals ContactReveal[]
   claimDisputes  ClaimDispute[]   @relation("DisputesFiled")
   referredBy     User?            @relation("Referrals", fields: [referredById], references: [id])
@@ -224,8 +216,7 @@ model Company {
   contactReveals ContactReveal[]
   disputes      ClaimDispute[]   @relation("CompanyDisputes")
   aiSummary     AiSummary?
-  bookingSlots  BookingSlot[]
-  bookings      Booking[]
+  apiKeys       ApiKey[]
 
   @@index([country, city, categoryId])
   @@index([ratingAvg])
@@ -535,63 +526,22 @@ model AiSummary {
   @@map("ai_summaries")
 }
 
-// ─── API KEYS (Tier 2) ────────────────────────────────────────────────────────
+// ─── API KEYS — integración de calificaciones (plan Premium) ─────────────────
 
 model ApiKey {
-  id          String    @id @default(uuid())
-  name        String
-  keyHash     String    @unique
-  companyId   String?
-  planTier    String    @default("basic")
-  monthlyLimit Int      @default(1000)
-  usageCount  Int       @default(0)
-  lastUsedAt  DateTime?
-  isActive    Boolean   @default(true)
-  createdAt   DateTime  @default(now())
+  id           String    @id @default(uuid())
+  name         String
+  keyHash      String    @unique
+  companyId    String
+  planTier     String    @default("basic")
+  monthlyLimit Int       @default(1000)
+  usageCount   Int       @default(0)
+  usageResetAt DateTime  @default(now())
+  lastUsedAt   DateTime?
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+
+  company      Company   @relation(fields: [companyId], references: [id])
 
   @@map("api_keys")
-}
-
-// ─── RESERVAS (Tier 3) ────────────────────────────────────────────────────────
-
-model BookingSlot {
-  id          String    @id @default(uuid())
-  companyId   String
-  startsAt    DateTime
-  endsAt      DateTime
-  isAvailable Boolean   @default(true)
-  price       Float?
-  service     String?
-
-  company     Company   @relation(fields: [companyId], references: [id])
-  booking     Booking?
-
-  @@index([companyId, startsAt])
-  @@map("booking_slots")
-}
-
-model Booking {
-  id              String        @id @default(uuid())
-  companyId       String
-  userId          String
-  slotId          String        @unique
-  serviceAmount   Float
-  commissionPct   Float         @default(0.06)
-  commissionUsd   Float
-  status          BookingStatus @default(PENDING)
-  notes           String?
-
-  insuranceId     String?
-  insurancePolicyUrl String?
-
-  confirmedAt     DateTime?
-  completedAt     DateTime?
-  cancelledAt     DateTime?
-  createdAt       DateTime      @default(now())
-
-  company         Company       @relation(fields: [companyId], references: [id])
-  user            User          @relation(fields: [userId], references: [id])
-  slot            BookingSlot   @relation(fields: [slotId], references: [id])
-
-  @@map("bookings")
 }

@@ -25,6 +25,12 @@ export const auth = {
     apiFetch('/api/auth/resend-verification', { method: 'POST', body: JSON.stringify({ email }) }),
 }
 
+export const apiKeys = {
+  get: () => apiFetch<{ apiKey: any | null }>('/api/api-keys'),
+  generate: () => apiFetch<{ key: string; warning: string }>('/api/api-keys', { method: 'POST', body: JSON.stringify({}) }),
+  revoke: () => apiFetch<{ ok: boolean; message: string }>('/api/api-keys', { method: 'DELETE' }),
+}
+
 export const companies = {
   list: (params: Record<string, string> = {}) => apiFetch<{ companies: any[]; pagination: any }>(`/api/companies?${new URLSearchParams(params).toString()}`),
   get: (slug: string) => apiFetch<{ company: any; ads: any[] }>(`/api/companies/${slug}`),

@@ -17,6 +17,8 @@ import uploadRoutes from './routes/uploads'
 import { subscriptionRoutes, leadRoutes, medalRoutes, notificationRoutes } from './routes/subscriptions'
 import { paymentRoutes, webhookPaymentRoutes } from './services/payments/router'
 import { aiRoutes } from './services/ai/routes'
+import apiKeyRoutes from './routes/apiKeys'
+import publicApiRoutes from './routes/publicApi'
 
 const app = Fastify({ logger: true })
 
@@ -56,6 +58,10 @@ async function start() {
 
   // AI (Claude API)
   app.register(aiRoutes, { prefix: '/api/ai' })
+
+  // API para integrar calificaciones (plan Premium)
+  app.register(apiKeyRoutes,   { prefix: '/api/api-keys' })
+  app.register(publicApiRoutes, { prefix: '/api/v1' })
 
   app.get('/health', async () => ({
     status: 'ok', version: '1.0.0',

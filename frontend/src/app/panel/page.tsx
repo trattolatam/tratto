@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuthStore } from '@/lib/store'
-import { companies as companiesApi, reviews as reviewsApi, leads as leadsApi, upload, ai as aiApi } from '@/lib/api'
+import { companies as companiesApi, reviews as reviewsApi, leads as leadsApi, upload, ai as aiApi, apiKeys as apiKeysApi } from '@/lib/api'
 
 const TAX_ID_LABELS: Record<string, string> = { UY: 'RUT', AR: 'CUIT', CL: 'RUT', MX: 'RFC', CO: 'NIT', PE: 'RUC', BR: 'CNPJ' }
 
@@ -13,7 +13,7 @@ export default function PanelPage() {
   const [stats, setStats] = useState<any>(null)
   const [pendingReviews, setPendingReviews] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<'overview' | 'reviews' | 'leads' | 'competencia' | 'editar'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'reviews' | 'leads' | 'competencia' | 'integraciones' | 'editar'>('overview')
   const [uploadingLogo, setUploadingLogo] = useState(false)
   const [downloadingCert, setDownloadingCert] = useState(false)
   const [intel, setIntel] = useState<any>(null)
@@ -33,6 +33,12 @@ export default function PanelPage() {
   const [loadingContacts, setLoadingContacts] = useState(false)
   const [myLeads, setMyLeads] = useState<any[] | null>(null)
   const [loadingLeads, setLoadingLeads] = useState(false)
+  const [apiKeyInfo, setApiKeyInfo] = useState<any>(null)
+  const [loadingApiKey, setLoadingApiKey] = useState(false)
+  const [generatingKey, setGeneratingKey] = useState(false)
+  const [revokingKey, setRevokingKey] = useState(false)
+  const [newRawKey, setNewRawKey] = useState('')
+  const [apiKeyError, setApiKeyError] = useState('')
   const photoInputRef = useRef<HTMLInputElement>(null)
   const logoInputRef = useRef<HTMLInputElement>(null)
   const [companyDetails, setCompanyDetails] = useState<any>(null)
@@ -168,6 +174,38 @@ export default function PanelPage() {
     finally { setLoadingIntel(false) }
   }
 
+  const handleOpenIntegraciones = async () => {
+    setActiveTab('integraciones')
+    if (!isPremium || apiKeyInfo) return
+    setLoadingApiKey(true)
+    try { const data = await apiKeysApi.get(); setApiKeyInfo(data.apiKey) }
+    catch (err: any) { setApiKeyError(err.message) }
+    finally { setLoadingApiKey(false) }
+  }
+
+  const handleGenerateApiKey = async () => {
+    setGeneratingKey(true)
+    setApiKeyError('')
+    try {
+      const data = await apiKeysApi.generate()
+      setNewRawKey(data.key)
+      const refreshed = await apiKeysApi.get()
+      setApiKeyInfo(refreshed.apiKey)
+    } catch (err: any) { setApiKeyError(err.message) }
+    finally { setGeneratingKey(false) }
+  }
+
+  const handleRevokeApiKey = async () => {
+    if (!confirm('¿Revocar la API key? Cualquier integración que la esté usando va a dejar de funcionar.')) return
+    setRevokingKey(true)
+    try {
+      await apiKeysApi.revoke()
+      setApiKeyInfo(null)
+      setNewRawKey('')
+    } catch (err: any) { setApiKeyError(err.message) }
+    finally { setRevokingKey(false) }
+  }
+
   const handleDownloadCertificate = async () => {
     setDownloadingCert(true)
     try {
@@ -229,8 +267,8 @@ export default function PanelPage() {
       )}
 
       <div className="flex border-b border-gray-100 gap-4 mb-5">
-        {(['overview', 'reviews', 'leads', 'competencia', 'editar'] as const).map(tab => (
-          <button key={tab} onClick={() => tab === 'competencia' ? handleOpenCompetencia() : tab === 'leads' ? handleOpenLeads() : setActiveTab(tab)} className={`pb-3 text-sm font-medium border-b-2 transition-colors ${activeTab === tab ? 'border-brand-green text-brand-green' : 'border-transparent text-brand-slate hover:text-brand-dark'}`}>{{ overview: 'Resumen', reviews: 'Reseñas', leads: 'Consultas', competencia: 'Competencia', editar: 'Editar perfil' }[tab]}</button>
+        {(['overview', 'reviews', 'leads', 'competencia', 'integraciones', 'editar'] as const).map(tab => (
+          <button key={tab} onClick={() => tab === 'competencia' ? handleOpenCompetencia() : tab === 'leads' ? handleOpenLeads() : tab === 'integraciones' ? handleOpenIntegraciones() : setActiveTab(tab)} className={`pb-3 text-sm font-medium border-b-2 transition-colors ${activeTab === tab ? 'border-brand-green text-brand-green' : 'border-transparent text-brand-slate hover:text-brand-dark'}`}>{{ overview: 'Resumen', reviews: 'Reseñas', leads: 'Consultas', competencia: 'Competencia', integraciones: 'Integraciones', editar: 'Editar perfil' }[tab]}</button>
         ))}
       </div>
 
@@ -396,6 +434,65 @@ export default function PanelPage() {
             </div>
           ) : (
             <div className="card p-8 text-center"><p className="text-sm text-brand-slate">No pudimos cargar la información. Probá de nuevo.</p></div>
+          )}
+        </div>
+      )}
+      {activeTab === 'integraciones' && (
+        <div>
+          {!isPremium ? (
+            <div className="card p-8 text-center">
+              <i className="ti ti-lock text-4xl text-gray-200 block mb-3" />
+              <p className="text-sm text-brand-dark font-medium mb-1">Función del plan Premium</p>
+              <p className="text-xs text-brand-slate mb-4">Traé tu calificación de Tratto a tu propia web con una API key.</p>
+              <Link href="/precios" className="btn-primary text-sm py-2.5 px-6">Ver planes</Link>
+            </div>
+          ) : loadingApiKey ? (
+            <div className="card p-8 text-center"><i className="ti ti-loader-2 animate-spin text-2xl text-brand-slate" /></div>
+          ) : (
+            <div className="space-y-4">
+              <div className="card p-5">
+                <p className="text-sm font-semibold text-brand-dark mb-1">API para integrar tu calificación</p>
+                <p className="text-xs text-brand-slate mb-4">Generá una key para traer tu rating de Tratto a tu propia web (un widget, tu footer, donde quieras) sin que el visitante tenga que salir de tu sitio.</p>
+
+                {newRawKey && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4">
+                    <p className="text-xs font-semibold text-amber-800 mb-2">Guardá esta key ahora — no la vamos a mostrar de nuevo:</p>
+                    <code className="block bg-white border border-amber-200 rounded px-3 py-2 text-xs break-all select-all">{newRawKey}</code>
+                  </div>
+                )}
+
+                {apiKeyError && <p className="text-xs text-red-500 mb-3">{apiKeyError}</p>}
+
+                {apiKeyInfo ? (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-brand-slate">Key actual</span>
+                      <code className="text-xs text-brand-dark">{apiKeyInfo.preview}</code>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-brand-slate">Uso este mes</span>
+                      <span className="text-brand-dark">{apiKeyInfo.usageCount} / {apiKeyInfo.monthlyLimit}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-brand-slate">Último uso</span>
+                      <span className="text-brand-dark">{apiKeyInfo.lastUsedAt ? new Date(apiKeyInfo.lastUsedAt).toLocaleDateString() : 'Todavía sin usar'}</span>
+                    </div>
+                    <div className="flex gap-2 pt-2">
+                      <button onClick={handleGenerateApiKey} disabled={generatingKey} className="btn-secondary text-xs py-2 px-4 disabled:opacity-50">{generatingKey ? 'Generando...' : 'Rotar key'}</button>
+                      <button onClick={handleRevokeApiKey} disabled={revokingKey} className="text-xs py-2 px-4 text-red-500 hover:underline disabled:opacity-50">{revokingKey ? 'Revocando...' : 'Revocar'}</button>
+                    </div>
+                  </div>
+                ) : (
+                  <button onClick={handleGenerateApiKey} disabled={generatingKey} className="btn-primary text-sm py-2.5 px-6 disabled:opacity-50">{generatingKey ? 'Generando...' : 'Generar API key'}</button>
+                )}
+              </div>
+
+              <div className="card p-5">
+                <p className="text-sm font-semibold text-brand-dark mb-3">Cómo usarla</p>
+                <pre className="bg-gray-50 rounded-lg p-4 text-xs overflow-x-auto"><code>{`curl https://tratto-api-dk42.onrender.com/api/v1/rating \\\n  -H "Authorization: Bearer TU_API_KEY"`}</code></pre>
+                <p className="text-xs text-brand-slate mt-3">Devuelve tu nombre, calificación, cantidad de reseñas y si estás verificado — hasta {apiKeyInfo?.monthlyLimit || 1000} solicitudes por mes.</p>
+              </div>
+            </div>
           )}
         </div>
       )}
