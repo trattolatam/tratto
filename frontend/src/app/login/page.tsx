@@ -39,6 +39,7 @@ export default function LoginPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div><label className="label">Email</label><input type="email" required placeholder="tu@email.com" className="input" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} /></div>
             <div><label className="label">Contraseña</label><input type="password" required placeholder="••••••••" className="input" value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} /></div>
+            <p className="text-right -mt-2"><Link href="/olvide-password" className="text-xs text-brand-slate hover:text-brand-green hover:underline">¿Olvidaste tu contraseña?</Link></p>
             <button type="submit" disabled={loading} className="btn-primary w-full py-3 text-sm disabled:opacity-50">{loading ? <><i className="ti ti-loader-2 animate-spin" /> Ingresando...</> : 'Iniciar sesión'}</button>
           </form>
         </div>

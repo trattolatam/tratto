@@ -96,6 +96,10 @@ model User {
   emailVerificationToken      String?
   emailVerificationExpiresAt  DateTime?
 
+  // Recuperación de contraseña
+  passwordResetToken      String?
+  passwordResetExpiresAt  DateTime?
+
   // Tier 2 — Pro user
   isPro         Boolean   @default(false)
   proSince      DateTime?

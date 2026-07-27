@@ -5,6 +5,7 @@ import { prisma } from '../lib/prisma'
 import { requireAuth } from '../middleware/auth'
 import { authRateLimit, passwordResetRateLimit } from '../middleware/rateLimits'
 import { sendVerificationEmail, verifyEmailToken, resendVerificationEmail } from '../services/emailVerification'
+import { requestPasswordReset, resetPasswordWithToken } from '../services/passwordReset'
 
 const registerSchema = z.object({
   email: z.string().email(),
@@ -125,6 +126,24 @@ export default async function authRoutes(app: FastifyInstance) {
     if (!body.success) return reply.status(400).send({ error: true, message: 'Email inválido' })
 
     const result = await resendVerificationEmail(body.data.email)
+    return reply.send({ message: result.message })
+  })
+
+  app.post('/forgot-password', { config: { rateLimit: passwordResetRateLimit } }, async (request, reply) => {
+    const body = z.object({ email: z.string().email() }).safeParse(request.body)
+    if (!body.success) return reply.status(400).send({ error: true, message: 'Email inválido' })
+
+    const result = await requestPasswordReset(body.data.email)
+    return reply.send({ message: result.message })
+  })
+
+  app.post('/reset-password', { config: { rateLimit: passwordResetRateLimit } }, async (request, reply) => {
+    const body = z.object({ token: z.string().min(1), newPassword: z.string().min(8) }).safeParse(request.body)
+    if (!body.success) return reply.status(400).send({ error: true, message: 'Datos inválidos', details: body.error.issues })
+
+    const result = await resetPasswordWithToken(body.data.token, body.data.newPassword)
+    if (!result.success) return reply.status(400).send({ error: true, message: result.message })
+
     return reply.send({ message: result.message })
   })
 
