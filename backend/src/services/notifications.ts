@@ -6,6 +6,7 @@ interface NotificationPayload {
   type: NotificationType
   title: string
   body: string
+  html?: string
   data?: Record<string, any>
 }
 
@@ -32,7 +33,7 @@ export async function sendNotification(payload: NotificationPayload): Promise<vo
   const notifyEmail = user.company?.email || user.email
 
   const sends: Promise<void>[] = []
-  if (notifyEmail && shouldSendEmail(payload.type)) sends.push(sendEmail(notifyEmail, payload.title, payload.body, payload.data))
+  if (notifyEmail && shouldSendEmail(payload.type)) sends.push(sendEmail(notifyEmail, payload.title, payload.body, payload.html))
   if (notifyPhone && whatsappAllowed) sends.push(sendWhatsApp(normalizePhone(notifyPhone, notifyPhoneCountry), payload.title, payload.body))
 
   await Promise.allSettled(sends)
@@ -68,7 +69,7 @@ function normalizePhone(phone: string, country: string | null): string {
   return `+${code}${withoutLeadingZero}`
 }
 
-async function sendEmail(to: string, subject: string, body: string, data?: Record<string, any>): Promise<void> {
+async function sendEmail(to: string, subject: string, body: string, html?: string): Promise<void> {
   if (!process.env.RESEND_API_KEY) return
   try {
     const response = await fetch('https://api.resend.com/emails', {
@@ -79,6 +80,7 @@ async function sendEmail(to: string, subject: string, body: string, data?: Recor
         to: [to],
         subject,
         text: body,
+        ...(html ? { html } : {}),
       }),
     })
     if (!response.ok) console.error('Resend error:', await response.text())
@@ -107,6 +109,78 @@ async function sendWhatsApp(to: string, title: string, body: string): Promise<vo
 }
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
+/**
+ * Arma el HTML del reporte mensual — mismo mensaje que la versión de texto plano,
+ * pero con diseño y un botón que lleva directo a /precios para convertir.
+ * No incluye precios a propósito: la idea es que decidan mirando la página, no acá.
+ */
+function buildMonthlyReportEmailHtml(contactReveals: number, companyName: string): string {
+  const frontendUrl = process.env.FRONTEND_URL || 'https://tratto.lat'
+  const pricingUrl = `${frontendUrl}/precios`
+  const personas = contactReveals === 1 ? '1 persona quiso' : `${contactReveals} personas quisieron`
+
+  const features = [
+    'Botón "Solicitar presupuesto"',
+    'Respondés reseñas públicamente',
+    'Sello empresa verificada',
+    'Resumen IA de tus reseñas',
+    'Alerta WhatsApp por nueva reseña',
+    'Certificado PDF descargable',
+  ]
+
+  const featuresHtml = features
+    .map((f) => `<tr><td style="padding:6px 0;font-size:14px;color:#1f2937;"><span style="color:#10b981;font-weight:bold;margin-right:8px;">✓</span>${f}</td></tr>`)
+    .join('')
+
+  return `
+<!DOCTYPE html>
+<html lang="es">
+<body style="margin:0;padding:0;background-color:#f4f5f7;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f5f7;padding:32px 16px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" style="max-width:480px;background-color:#ffffff;border-radius:16px;overflow:hidden;">
+          <tr>
+            <td style="background-color:#0f172a;padding:24px 32px;">
+              <span style="color:#ffffff;font-size:20px;font-weight:700;">Tratto</span>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:32px;">
+              <p style="margin:0 0 16px 0;font-size:16px;line-height:1.5;color:#1f2937;">
+                <strong>${personas} tu contacto este mes</strong>, pero tu perfil de <strong>${companyName}</strong> todavía no tiene el botón de contacto activado.
+              </p>
+              <p style="margin:0 0 24px 0;font-size:14px;line-height:1.5;color:#4b5563;">
+                Activá el plan Profesional y no dejes pasar más clientes que ya te están buscando.
+              </p>
+              <table role="presentation" width="100%" style="border:1px solid #d1fae5;border-radius:12px;padding:20px;margin-bottom:24px;">
+                <tr><td style="padding:0 4px;"><span style="display:inline-block;background-color:#10b981;color:#ffffff;font-size:11px;font-weight:600;padding:4px 10px;border-radius:999px;margin-bottom:12px;">MÁS ELEGIDO</span></td></tr>
+                <tr><td style="padding:4px;"><span style="font-size:17px;font-weight:700;color:#0f172a;">Plan Profesional</span></td></tr>
+                <tr><td style="padding:8px 4px 4px 4px;"><table role="presentation">${featuresHtml}</table></td></tr>
+              </table>
+              <table role="presentation" width="100%">
+                <tr>
+                  <td align="center">
+                    <a href="${pricingUrl}" style="display:inline-block;background-color:#10b981;color:#ffffff;text-decoration:none;font-size:15px;font-weight:600;padding:14px 32px;border-radius:999px;">Empezar 30 días gratis</a>
+                  </td>
+                </tr>
+              </table>
+              <p style="margin:16px 0 0 0;text-align:center;font-size:12px;color:#9ca3af;">30 días gratis · cancelás cuando quieras</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:20px 32px;background-color:#f9fafb;text-align:center;">
+              <a href="${frontendUrl}" style="color:#9ca3af;font-size:12px;text-decoration:none;">tratto.lat</a>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`
+}
 
 /**
  * Reporte mensual para empresas en plan Gratuito que ya reclamaron su perfil.
@@ -145,6 +219,7 @@ export async function sendMonthlyLostOpportunityReport(): Promise<{ sent: number
           await sendNotification({
             userId: company.owner.id, type: 'MONTHLY_REPORT', title: 'Tu reporte mensual de Tratto',
             body: `${contactReveals} ${contactReveals === 1 ? 'persona quiso' : 'personas quisieron'} tu contacto este mes, pero tu perfil no tiene el botón de contacto activado — activá el plan Profesional para no perder más clientes.`,
+            html: buildMonthlyReportEmailHtml(contactReveals, company.name),
             data: { contactReveals, companyId: company.id, companyName: company.name },
           })
           sent++
