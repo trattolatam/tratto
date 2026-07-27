@@ -82,6 +82,25 @@ export function requirePlan(minPlan: 'PROFESSIONAL' | 'PREMIUM' | 'ENTERPRISE') 
           requiredPlan: minPlan,
         })
       }
+
+      // dLocal Go no tiene cobro recurrente automático (es un pago único por período),
+      // así que acá chequeamos en vivo si ya venció — si no lo hiciéramos, una empresa
+      // que pagó una sola vez se quedaría con el plan Pro gratis para siempre.
+      // Stripe no necesita este chequeo: sus webhooks mantienen el plan al día solos.
+      const sub = await prisma.subscription.findUnique({ where: { companyId: payload.companyId } })
+      if (sub && sub.provider === 'DLOCALGO' && sub.status === 'ACTIVE' && sub.currentPeriodEnd < new Date()) {
+        await prisma.$transaction([
+          prisma.subscription.update({ where: { companyId: payload.companyId }, data: { status: 'CANCELLED' } }),
+          prisma.company.update({ where: { id: payload.companyId }, data: { plan: 'FREE' } }),
+        ])
+        return reply.status(403).send({
+          error: true,
+          message: `Tu plan ${minPlan} venció. Renová tu suscripción para seguir usando esta función.`,
+          upgradeRequired: true,
+          currentPlan: 'FREE',
+          requiredPlan: minPlan,
+        })
+      }
     } catch {
       reply.status(401).send({ error: true, message: 'Token inválido o expirado' })
     }

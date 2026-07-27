@@ -42,6 +42,24 @@ export async function cancelSubscription(companyId: string): Promise<void> {
   await prisma.subscription.update({ where: { companyId }, data: { cancelAtPeriodEnd: true } })
 }
 
+/**
+ * Cancelación INMEDIATA (no al final del período) — para cuando un admin suspende
+ * una empresa. A diferencia de cancelSubscription (que es la que usa el dueño desde
+ * su panel y respeta lo que ya pagó), acá cortamos el cobro ahí mismo: no tendría
+ * sentido seguir cobrándole a una empresa que suspendimos por infringir las normas.
+ */
+export async function cancelSubscriptionImmediately(companyId: string): Promise<void> {
+  const sub = await prisma.subscription.findUnique({ where: { companyId } })
+  if (!sub || sub.provider !== 'STRIPE') return
+  try {
+    await stripe.subscriptions.cancel(sub.providerSubId)
+  } catch (err: any) {
+    // Si Stripe ya no tiene la suscripción (por ej. se canceló por otro lado), seguimos igual
+    console.error(`Error cancelando suscripción de Stripe para company ${companyId}:`, err.message)
+  }
+  await prisma.subscription.update({ where: { companyId }, data: { status: 'CANCELLED', cancelAtPeriodEnd: false } })
+}
+
 export async function handleStripeWebhook(payload: Buffer, signature: string): Promise<void> {
   let event: Stripe.Event
   try {

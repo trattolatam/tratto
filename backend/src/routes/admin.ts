@@ -2,6 +2,7 @@ import { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { prisma } from '../lib/prisma'
 import { requireAdmin } from '../middleware/auth'
+import { cancelSubscriptionImmediately } from '../services/payments/stripe'
 
 export default async function adminRoutes(app: FastifyInstance) {
   app.addHook('preHandler', requireAdmin)
@@ -101,6 +102,18 @@ export default async function adminRoutes(app: FastifyInstance) {
   app.patch('/companies/:id/suspend', async (request, reply) => {
     const { id } = request.params as { id: string }
     await prisma.review.updateMany({ where: { companyId: id, status: 'APPROVED' }, data: { status: 'REJECTED' } })
+
+    // Si tenía una suscripción paga activa, la cortamos acá mismo — no tiene sentido
+    // suspender a una empresa en la plataforma y seguir cobrándole por atrás.
+    const sub = await prisma.subscription.findUnique({ where: { companyId: id } })
+    if (sub && sub.status !== 'CANCELLED') {
+      if (sub.provider === 'STRIPE') {
+        await cancelSubscriptionImmediately(id)
+      } else {
+        await prisma.subscription.update({ where: { companyId: id }, data: { status: 'CANCELLED' } })
+      }
+    }
+
     const company = await prisma.company.update({ where: { id }, data: { isVerified: false, plan: 'FREE' } })
     return reply.send({ company, message: 'Empresa suspendida' })
   })
