@@ -1,4 +1,5 @@
 import { FastifyInstance } from 'fastify'
+import cors from '@fastify/cors'
 import { prisma } from '../lib/prisma'
 
 /**
@@ -12,6 +13,16 @@ import { prisma } from '../lib/prisma'
  * Uso: <div id="tratto-widget"></div><script src=".../api/v1/widget/COMPANY_ID.js"></script>
  */
 export default async function widgetRoutes(app: FastifyInstance) {
+  // El CORS global de la app solo permite pedidos desde FRONTEND_URL (tratto.lat) —
+  // correcto para el resto de la API, pero el widget está pensado justamente para
+  // que lo llame el navegador de un visitante desde la web DE LA EMPRESA (un dominio
+  // de un tercero), no desde tratto.lat. Sin esto, el fetch() del script se bloquea
+  // por CORS en cualquier sitio que no sea el propio tratto.lat — es decir, el
+  // widget fallaría en el único lugar donde tiene sentido que funcione.
+  // Fastify encapsula los plugins, así que este cors adicional solo aplica a las
+  // rutas de este archivo, sin aflojar la seguridad del resto de la API.
+  await app.register(cors, { origin: true })
+
   // ─── Datos públicos para el widget (JSON, cacheado 5 min) ───────────────────
   app.get('/:companyId/data', async (request, reply) => {
     const { companyId } = request.params as { companyId: string }
