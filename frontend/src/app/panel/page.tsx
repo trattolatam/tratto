@@ -586,8 +586,13 @@ export default function PanelPage() {
 
               {intel.competitorInsight && (
                 <div className="card p-5 bg-brand-dark/5 border-brand-green/20">
-                  <p className="text-xs font-semibold text-brand-green mb-2 flex items-center gap-1.5"><i className="ti ti-sparkles text-sm" /> Qué dice la gente de tu competencia</p>
-                  <p className="text-sm text-brand-dark leading-relaxed">{intel.competitorInsight}</p>
+                  <p className="text-xs font-semibold text-brand-green mb-3 flex items-center gap-1.5"><i className="ti ti-sparkles text-sm" /> Qué dice la gente de tu competencia</p>
+                  <div className="space-y-2">
+                    <div className="flex items-start gap-2"><i className="ti ti-check text-brand-green text-sm mt-0.5 flex-shrink-0" /><span className="text-sm text-brand-dark leading-relaxed"><strong>Elogian:</strong> {intel.competitorInsight.strengths}</span></div>
+                    {intel.competitorInsight.weaknesses && (
+                      <div className="flex items-start gap-2"><i className="ti ti-x text-brand-red text-sm mt-0.5 flex-shrink-0" /><span className="text-sm text-brand-dark leading-relaxed"><strong>Critican:</strong> {intel.competitorInsight.weaknesses}</span></div>
+                    )}
+                  </div>
                 </div>
               )}
 
@@ -604,6 +609,12 @@ export default function PanelPage() {
                         </div>
                       ))}
                     </div>
+                    {intel.howToOvertake && (
+                      <div className="mt-3 pt-3 border-t border-gray-50 flex items-start gap-2">
+                        <i className="ti ti-bulb text-brand-amber text-sm mt-0.5 flex-shrink-0" />
+                        <p className="text-xs text-brand-dark leading-relaxed">{intel.howToOvertake}</p>
+                      </div>
+                    )}
                   </>
                 ) : <p className="text-xs text-brand-slate">¡Estás primero en el ranking de tu rubro!</p>}
               </div>

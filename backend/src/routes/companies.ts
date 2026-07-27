@@ -387,10 +387,30 @@ export default async function companyRoutes(app: FastifyInstance) {
     const myPosition = sorted.findIndex((p) => p.id === id) + 1
     const above = sorted.slice(0, Math.max(0, myPosition - 1)).slice(-3).reverse()
 
+    // Qué hace falta para superar a la empresa inmediatamente arriba tuyo —
+    // no alcanza con mostrar el número, hay que decir qué hacer con él.
+    let howToOvertake: string | null = null
+    const nextAbove = above[0]
+    if (nextAbove) {
+      if (planRank[nextAbove.plan] > planRank[company.plan]) {
+        howToOvertake = `${nextAbove.name} está en un plan más alto que el tuyo — activando ${nextAbove.plan === 'ENTERPRISE' ? 'Enterprise' : nextAbove.plan === 'PREMIUM' ? 'Premium' : 'Profesional'} pasás por encima automáticamente, sin importar el rating.`
+      } else if (nextAbove.ratingAvg > company.ratingAvg) {
+        // Cuántas reseñas de 5★ más harían falta para que tu promedio alcance el de ellos
+        const R = company.reviewCount, A = company.ratingAvg, T = nextAbove.ratingAvg
+        const n = T < 5 ? Math.ceil((R * (T - A)) / (5 - T)) : Infinity
+        howToOvertake = Number.isFinite(n) && n > 0
+          ? `Con aproximadamente ${n} reseñas de 5★ más, tu promedio alcanzaría el de ${nextAbove.name} (${T.toFixed(1)}).`
+          : `Necesitás subir tu calificación promedio para acercarte a ${nextAbove.name} (${T.toFixed(1)}).`
+      } else if (nextAbove.reviewCount > company.reviewCount) {
+        const diff = nextAbove.reviewCount - company.reviewCount + 1
+        howToOvertake = `Con ${diff} reseña${diff === 1 ? '' : 's'} más (manteniendo tu calificación actual) superarías a ${nextAbove.name}.`
+      }
+    }
+
     // Resumen con IA de qué se dice de la competencia (no de mi propia empresa) —
     // se genera al vuelo, no se guarda; son pocas palabras y se pide solo si hay
     // suficiente material real de otras empresas del rubro.
-    let competitorInsight: string | null = null
+    let competitorInsight: { strengths: string; weaknesses: string } | null = null
     const otherPeerIds = peerIds.filter((pid) => pid !== id)
     if (otherPeerIds.length > 0) {
       const sampleReviews = await prisma.review.findMany({
@@ -414,6 +434,7 @@ export default async function companyRoutes(app: FastifyInstance) {
       categoryAvg: { ratingAvg: Math.round(avgRating * 10) / 10, reviewCount: Math.round(avgReviews) },
       rank: { position: myPosition, total: sorted.length },
       companiesAbove: above.map((c) => ({ name: c.name, plan: c.plan, ratingAvg: c.ratingAvg, reviewCount: c.reviewCount })),
+      howToOvertake,
       verified: { mine: Math.round(myVerifiedPct), categoryAvg: Math.round(avgVerifiedPct) },
       medals: { mine: myMedalCount, categoryAvg: Math.round(avgMedalCount * 10) / 10 },
       planMix,

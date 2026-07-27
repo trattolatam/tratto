@@ -62,7 +62,7 @@ Reglas: exactamente 5 insights basados en lo que realmente mencionan las reseña
   console.log(`✅ AI summary generado para: ${company.name}`)
 }
 
-export async function generateCompetitorInsight(reviews: { body: string; rating: number }[], categoryName: string): Promise<string> {
+export async function generateCompetitorInsight(reviews: { body: string; rating: number }[], categoryName: string): Promise<{ strengths: string; weaknesses: string } | null> {
   const reviewsText = reviews.map((r) => `[${r.rating}★] ${r.body}`).join('\n')
   const prompt = `Sos un analista de mercado para Tratto, una plataforma de reseñas verificadas de LATAM.
 
@@ -70,11 +70,25 @@ Estas son reseñas reales de OTRAS empresas del rubro "${categoryName}" (competi
 
 ${reviewsText}
 
-Escribí 1-2 oraciones cortas en español resumiendo qué elogia y qué critica la gente de estos competidores en general (ej: "Tus competidores reciben elogios por la rapidez de entrega, pero varias quejas por falta de comunicación durante el envío."). Sin nombrar empresas puntuales. Respondé SOLO con esas 1-2 oraciones, sin comillas ni markdown.`
+Analizá qué elogia y qué critica la gente de estos competidores en general. Respondé ÚNICAMENTE con un JSON válido con esta estructura exacta (sin texto adicional, sin markdown):
+{
+  "strengths": "una frase corta (máx 100 caracteres) sobre lo que más elogian de tus competidores",
+  "weaknesses": "una frase corta (máx 100 caracteres) sobre lo que más critican de tus competidores, o cadena vacía si no hay quejas claras"
+}
 
-  const message = await anthropic.messages.create({ model: 'claude-sonnet-4-6', max_tokens: 150, messages: [{ role: 'user', content: prompt }] })
+Sin nombrar empresas puntuales. En español.`
+
+  const message = await anthropic.messages.create({ model: 'claude-sonnet-4-6', max_tokens: 200, messages: [{ role: 'user', content: prompt }] })
   const content = message.content[0]
-  return content.type === 'text' ? content.text.trim() : ''
+  if (content.type !== 'text') return null
+  try {
+    const parsed = JSON.parse(content.text.replace(/```json|```/g, '').trim())
+    if (!parsed.strengths) return null
+    return { strengths: parsed.strengths, weaknesses: parsed.weaknesses || '' }
+  } catch {
+    console.error('Error parsing competitor insight:', content.text)
+    return null
+  }
 }
 
 export async function runBatchAiSummaries(): Promise<void> {
