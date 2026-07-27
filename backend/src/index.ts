@@ -19,6 +19,7 @@ import { paymentRoutes, webhookPaymentRoutes } from './services/payments/router'
 import { aiRoutes } from './services/ai/routes'
 import apiKeyRoutes from './routes/apiKeys'
 import publicApiRoutes from './routes/publicApi'
+import widgetRoutes from './routes/widget'
 
 const app = Fastify({ logger: true })
 
@@ -62,6 +63,7 @@ async function start() {
   // API para integrar calificaciones (plan Premium)
   app.register(apiKeyRoutes,   { prefix: '/api/api-keys' })
   app.register(publicApiRoutes, { prefix: '/api/v1' })
+  app.register(widgetRoutes,    { prefix: '/api/v1/widget' })
 
   app.get('/health', async () => ({
     status: 'ok', version: '1.0.0',

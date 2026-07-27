@@ -39,6 +39,7 @@ export default function PanelPage() {
   const [revokingKey, setRevokingKey] = useState(false)
   const [newRawKey, setNewRawKey] = useState('')
   const [apiKeyError, setApiKeyError] = useState('')
+  const [widgetCopied, setWidgetCopied] = useState(false)
   const photoInputRef = useRef<HTMLInputElement>(null)
   const logoInputRef = useRef<HTMLInputElement>(null)
   const [companyDetails, setCompanyDetails] = useState<any>(null)
@@ -193,6 +194,14 @@ export default function PanelPage() {
       setApiKeyInfo(refreshed.apiKey)
     } catch (err: any) { setApiKeyError(err.message) }
     finally { setGeneratingKey(false) }
+  }
+
+  const handleCopyWidgetSnippet = () => {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://tratto-api-dk42.onrender.com'
+    const snippet = `<div id="tratto-widget"></div>\n<script src="${apiUrl}/api/v1/widget/${company.id}.js"></script>`
+    navigator.clipboard.writeText(snippet)
+    setWidgetCopied(true)
+    setTimeout(() => setWidgetCopied(false), 2000)
   }
 
   const handleRevokeApiKey = async () => {
@@ -491,6 +500,30 @@ export default function PanelPage() {
                 <p className="text-sm font-semibold text-brand-dark mb-3">Cómo usarla</p>
                 <pre className="bg-gray-50 rounded-lg p-4 text-xs overflow-x-auto"><code>{`curl https://tratto-api-dk42.onrender.com/api/v1/rating \\\n  -H "Authorization: Bearer TU_API_KEY"`}</code></pre>
                 <p className="text-xs text-brand-slate mt-3">Devuelve tu nombre, calificación, cantidad de reseñas y si estás verificado — hasta {apiKeyInfo?.monthlyLimit || 1000} solicitudes por mes.</p>
+              </div>
+
+              <div className="card p-5">
+                <p className="text-sm font-semibold text-brand-dark mb-1">Widget para tu web</p>
+                <p className="text-xs text-brand-slate mb-4">Pegá este código en tu sitio y aparece tu calificación de Tratto — sin programar nada. No usa tu API key ni consume tu límite mensual.</p>
+
+                <div className="mb-4">
+                  <p className="text-xs text-brand-slate mb-2">Así se va a ver:</p>
+                  <a href="#" onClick={e => e.preventDefault()} style={{ all: 'initial', display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', border: '1px solid #e5e7eb', borderRadius: 12, background: '#ffffff', fontFamily: '-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif', textDecoration: 'none', maxWidth: 320, boxShadow: '0 1px 2px rgba(0,0,0,0.04)', cursor: 'pointer' }}>
+                    <div style={{ width: 32, height: 32, borderRadius: 8, background: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <span style={{ color: '#10b981', fontWeight: 700, fontSize: 15 }}>T</span>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 12, color: '#6b7280', lineHeight: 1.3 }}>{company.isVerified ? '✓ Verificado en Tratto' : 'En Tratto'}</div>
+                      <div style={{ fontSize: 14, color: '#0f172a', fontWeight: 600, lineHeight: 1.4 }}>
+                        <span style={{ color: '#f59e0b', letterSpacing: 1 }}>{'★'.repeat(Math.round(company.ratingAvg || 0)) + '☆'.repeat(5 - Math.round(company.ratingAvg || 0))}</span> {(company.ratingAvg || 0).toFixed(1)} · {company.reviewCount || 0} reseñas
+                      </div>
+                    </div>
+                  </a>
+                </div>
+
+                <pre className="bg-gray-50 rounded-lg p-4 text-xs overflow-x-auto"><code>{`<div id="tratto-widget"></div>\n<script src="${process.env.NEXT_PUBLIC_API_URL || 'https://tratto-api-dk42.onrender.com'}/api/v1/widget/${company.id}.js"></script>`}</code></pre>
+                <button onClick={handleCopyWidgetSnippet} className="btn-secondary text-xs py-2 px-4 mt-3">{widgetCopied ? '¡Copiado!' : 'Copiar código'}</button>
+                <p className="text-xs text-brand-slate mt-3">Además suma un dato para buscadores (schema.org) que ayuda a que Google pueda mostrar tus estrellas en el resultado de búsqueda de tu empresa.</p>
               </div>
             </div>
           )}
