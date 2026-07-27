@@ -55,7 +55,11 @@ export default async function widgetRoutes(app: FastifyInstance) {
   // ─── El script en sí — esto es lo que la empresa pega en su web ───────────
   app.get('/:companyId.js', async (request, reply) => {
     const { companyId } = request.params as { companyId: string }
-    const apiBase = process.env.API_URL || 'https://tratto-api-dk42.onrender.com'
+    // Usamos el host real del pedido que llegó, no una variable de entorno —
+    // así el script funciona sea cual sea el dominio desde el que se sirve (Render,
+    // un dominio propio si lo cambian, o incluso pruebas locales), sin depender de
+    // que alguien haya configurado bien API_URL en el entorno.
+    const apiBase = `https://${request.hostname}`
 
     reply.header('Content-Type', 'application/javascript; charset=utf-8')
     reply.header('Cache-Control', 'public, max-age=3600') // el script cambia poco — cachea más tiempo que los datos
