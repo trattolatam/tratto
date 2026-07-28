@@ -26,5 +26,5 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function EmpresaPage({ params }: Props) {
   const data = await getCompany(params.slug)
   if (!data) notFound()
-  return <CompanyProfile company={data.company} ads={data.ads} />
+  return <CompanyProfile company={data.company} />
 }

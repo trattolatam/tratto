@@ -76,19 +76,11 @@ export default async function companyRoutes(app: FastifyInstance) {
 
     if (!company) return reply.status(404).send({ error: true, message: 'Empresa no encontrada' })
 
-    const ads = await prisma.ad.findMany({
-      where: {
-        status: 'ACTIVE',
-        targetCategories: { some: { categoryId: company.categoryId } },
-        targetCountries: { has: company.country },
-        adAccount: { balance: { gt: 0 } },
-      },
-      take: 2,
-      orderBy: { cpcUsd: 'desc' },
-      include: { adAccount: { select: { companyName: true } } },
-    })
-
-    return reply.send({ company, ads })
+    // Los anuncios ya NO se arman acá — este endpoint es server-side sin login,
+    // así que no puede saber el perfil de segmentación del visitante. Ahora el
+    // frontend los pide aparte, del lado del navegador, con /api/ads/feed
+    // (ahí si viaja el token de sesión si está logueado).
+    return reply.send({ company })
   })
 
   // ─── Revelar teléfono / sitio web / dirección (con tracking para el incentivo Pro) ───

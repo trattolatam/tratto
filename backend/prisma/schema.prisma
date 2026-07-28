@@ -431,6 +431,14 @@ model Ad {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
+  // Segmentación demográfica — array vacío en cualquiera de estos = sin filtro
+  // en esa dimensión (le llega a todos). Se cruza contra el perfil que el
+  // usuario cargó (opcional) en /completar-perfil.
+  targetAgeRanges    AgeRange[]    @default([])
+  targetGenders      Gender[]      @default([])
+  targetInterests    String[]      @default([])
+  targetIncomeLevels IncomeLevel[] @default([])
+
   adAccount     AdAccount         @relation(fields: [adAccountId], references: [id])
   targetCategories AdTargetCategory[]
   adEvents      AdEvent[]

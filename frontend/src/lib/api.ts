@@ -136,6 +136,8 @@ export const subscriptions = {
   checkout: (plan: 'PROFESSIONAL' | 'PREMIUM' | 'ENTERPRISE', provider: 'STRIPE' | 'DLOCALGO') =>
     apiFetch<{ checkoutUrl: string }>('/api/payments/checkout', { method: 'POST', body: JSON.stringify({ plan, provider }) }),
   cancel: () => apiFetch('/api/payments/cancel', { method: 'POST' }),
+  rechargeAds: (amountUsd: number, provider: 'STRIPE' | 'DLOCALGO') =>
+    apiFetch<{ checkoutUrl: string }>('/api/payments/ads/recharge', { method: 'POST', body: JSON.stringify({ amountUsd, provider }) }),
 }
 
 export const upload = {
@@ -158,6 +160,13 @@ export const upload = {
     const form = new FormData(); form.append('file', file)
     const res = await fetch(`${API_URL}/api/upload/avatar`, { method: 'POST', headers: token ? { Authorization: `Bearer ${token}` } : {}, body: form })
     if (!res.ok) throw new Error('Error subiendo foto de perfil')
+    return res.json()
+  },
+  adImage: async (file: File): Promise<{ url: string }> => {
+    const token = localStorage.getItem('tratto_token')
+    const form = new FormData(); form.append('file', file)
+    const res = await fetch(`${API_URL}/api/upload/ad-image`, { method: 'POST', headers: token ? { Authorization: `Bearer ${token}` } : {}, body: form })
+    if (!res.ok) throw new Error('Error subiendo la imagen del anuncio')
     return res.json()
   },
   companyPhoto: async (file: File): Promise<{ url: string }> => {

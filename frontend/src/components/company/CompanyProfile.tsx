@@ -1,12 +1,12 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Company, Review, Ad, MEDAL_META, MedalType } from '@/types'
-import { reviews as reviewsApi, leads, companies, upload } from '@/lib/api'
+import { reviews as reviewsApi, leads, companies, upload, ads as adsApi } from '@/lib/api'
 import { useAuthStore } from '@/lib/store'
 
-export function CompanyProfile({ company, ads }: { company: Company; ads: Ad[] }) {
+export function CompanyProfile({ company }: { company: Company }) {
   const { user } = useAuthStore()
   const router = useRouter()
   const isOwner = user?.company?.id === company.id
@@ -18,6 +18,16 @@ export function CompanyProfile({ company, ads }: { company: Company; ads: Ad[] }
   const [contactRevealed, setContactRevealed] = useState<{ phone: string | null; website: string | null; address: string | null } | null>(null)
   const [revealing, setRevealing] = useState(false)
   const [showDisputeForm, setShowDisputeForm] = useState(false)
+  const [ads, setAds] = useState<Ad[]>([])
+
+  useEffect(() => {
+    // Se pide acá (no del lado del servidor) justamente para que, si hay
+    // sesión iniciada, el pedido lleve el token y el backend pueda cruzar la
+    // segmentación demográfica del visitante contra los anuncios disponibles.
+    adsApi.feed({ categoryId: company.categoryId, country: company.country })
+      .then((data: any) => setAds(data.ads))
+      .catch(() => setAds([]))
+  }, [company.categoryId, company.country])
   const [disputeReason, setDisputeReason] = useState('')
   const [disputeDocUrl, setDisputeDocUrl] = useState('')
   const [uploadingDisputeDoc, setUploadingDisputeDoc] = useState(false)

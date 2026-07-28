@@ -40,6 +40,7 @@ export function Navbar() {
           <Link href="/categorias" className="text-sm text-gray-600 hover:text-brand-dark px-3 py-1.5 rounded-lg hover:bg-gray-50 transition-colors">Categorías</Link>
           <Link href="/como-funciona" className="text-sm text-gray-600 hover:text-brand-dark px-3 py-1.5 rounded-lg hover:bg-gray-50 transition-colors">Cómo funciona</Link>
           <Link href="/precios" className="text-sm text-gray-600 hover:text-brand-dark px-3 py-1.5 rounded-lg hover:bg-gray-50 transition-colors">Para empresas</Link>
+          <Link href="/ads" className="text-sm text-gray-600 hover:text-brand-dark px-3 py-1.5 rounded-lg hover:bg-gray-50 transition-colors">Anunciar</Link>
         </div>
 
         <div className="flex items-center gap-2">
@@ -79,6 +80,7 @@ export function Navbar() {
           <Link href="/categorias" className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 rounded-lg hover:bg-gray-50" onClick={() => setMenuOpen(false)}><i className="ti ti-category text-base" /> Categorías</Link>
           <Link href="/como-funciona" className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 rounded-lg hover:bg-gray-50" onClick={() => setMenuOpen(false)}><i className="ti ti-help text-base" /> Cómo funciona</Link>
           <Link href="/precios" className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 rounded-lg hover:bg-gray-50" onClick={() => setMenuOpen(false)}><i className="ti ti-building-store text-base" /> Para empresas</Link>
+          <Link href="/ads" className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 rounded-lg hover:bg-gray-50" onClick={() => setMenuOpen(false)}><i className="ti ti-speakerphone text-base" /> Anunciar</Link>
           {!user && (
             <div className="pt-2 border-t border-gray-100 flex gap-2">
               <Link href="/login" className="btn-secondary flex-1 py-2 text-sm" onClick={() => setMenuOpen(false)}>Iniciar sesión</Link>

@@ -1,0 +1,278 @@
+'use client'
+import { useState, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import Link from 'next/link'
+import { ads as adsApi, categories as categoriesApi, upload, subscriptions as paymentsApi } from '@/lib/api'
+import { useAuthStore } from '@/lib/store'
+import { AGE_RANGES, GENDERS, INCOME_LEVELS, INTERESTS } from '@/lib/targeting'
+
+const COUNTRIES = [{ code: 'UY', name: 'Uruguay' }, { code: 'AR', name: 'Argentina' }, { code: 'CL', name: 'Chile' }, { code: 'MX', name: 'México' }, { code: 'CO', name: 'Colombia' }, { code: 'PE', name: 'Perú' }, { code: 'BR', name: 'Brasil' }]
+
+const STATUS_LABELS: Record<string, { label: string; className: string }> = {
+  PENDING: { label: 'En revisión', className: 'bg-brand-amber-dim text-brand-amber' },
+  ACTIVE: { label: 'Activo', className: 'bg-brand-green-dim text-brand-green' },
+  PAUSED: { label: 'Pausado', className: 'bg-gray-100 text-brand-slate' },
+  REJECTED: { label: 'Rechazado', className: 'bg-red-50 text-brand-red' },
+  EXHAUSTED: { label: 'Sin saldo', className: 'bg-red-50 text-brand-red' },
+}
+
+export default function AdsPage() {
+  const { user } = useAuthStore()
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const [account, setAccount] = useState<any>(null)
+  const [myAds, setMyAds] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [showCreate, setShowCreate] = useState(false)
+  const [showRecharge, setShowRecharge] = useState(false)
+  const [categoryOptions, setCategoryOptions] = useState<any[]>([])
+
+  const load = () => {
+    adsApi.my().then((data: any) => { setAccount(data.account); setMyAds(data.ads) }).finally(() => setLoading(false))
+  }
+
+  useEffect(() => {
+    if (!user) { router.push('/login'); return }
+    load()
+    categoriesApi.list().then((data: any) => setCategoryOptions(data.categories)).catch(() => {})
+  }, [user])
+
+  if (!user) return null
+
+  return (
+    <div className="max-w-3xl mx-auto px-4 py-8">
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-brand-dark">Tratto Ads</h1>
+          <p className="text-sm text-brand-slate mt-1">Mostrá tu negocio a los usuarios correctos, en el momento correcto.</p>
+        </div>
+        <Link href="/" className="text-sm text-brand-slate hover:text-brand-dark">← Volver</Link>
+      </div>
+
+      {searchParams.get('recharged') && <div className="bg-brand-green-dim border border-brand-green/20 rounded-lg px-4 py-3 mb-4 text-sm text-brand-dark">✓ Saldo recargado correctamente.</div>}
+      {searchParams.get('error') && <div className="bg-red-50 border border-red-100 rounded-lg px-4 py-3 mb-4 text-sm text-brand-red">Hubo un problema con el pago. Probá de nuevo.</div>}
+
+      {loading ? (
+        <div className="text-center py-12"><i className="ti ti-loader-2 animate-spin text-2xl text-brand-slate" /></div>
+      ) : (
+        <div className="space-y-4">
+          <div className="card p-5 flex items-center justify-between">
+            <div>
+              <p className="text-xs text-brand-slate">Saldo disponible</p>
+              <p className="text-2xl font-bold text-brand-dark">USD {(account?.balance || 0).toFixed(2)}</p>
+            </div>
+            <button onClick={() => setShowRecharge(!showRecharge)} className="btn-secondary text-sm py-2 px-4">Recargar saldo</button>
+          </div>
+
+          {showRecharge && <RechargeForm onClose={() => setShowRecharge(false)} />}
+
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-semibold text-brand-dark">Mis anuncios</p>
+            <button onClick={() => setShowCreate(!showCreate)} className="btn-primary text-sm py-2 px-4">{showCreate ? 'Cancelar' : '+ Crear anuncio'}</button>
+          </div>
+
+          {showCreate && <CreateAdForm categoryOptions={categoryOptions} onCreated={() => { setShowCreate(false); load() }} />}
+
+          <div className="space-y-3">
+            {myAds.length === 0 && !showCreate && <div className="card p-8 text-center text-sm text-brand-slate">Todavía no tenés ningún anuncio. Creá el primero arriba.</div>}
+            {myAds.map((ad) => {
+              const status = STATUS_LABELS[ad.status] || STATUS_LABELS.PENDING
+              return (
+                <div key={ad.id} className="card p-4 flex gap-4">
+                  <img src={ad.imageUrl} alt={ad.title} className="w-20 h-20 rounded-lg object-cover flex-shrink-0 bg-gray-100" />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <p className="text-sm font-semibold text-brand-dark truncate">{ad.title}</p>
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${status.className}`}>{status.label}</span>
+                    </div>
+                    <p className="text-xs text-brand-slate truncate mb-2">{ad.description}</p>
+                    <div className="flex gap-4 text-xs text-brand-slate">
+                      <span>{ad.impressions} vistas</span>
+                      <span>{ad.clicks} clics</span>
+                      <span>USD {ad.totalSpent.toFixed(2)} gastado</span>
+                      <span>{ad.model === 'CPC' ? `USD ${ad.cpcUsd}/clic` : `USD ${ad.cpmUsd || 0}/mil vistas`}</span>
+                    </div>
+                    {ad.rejectionNote && <p className="text-xs text-brand-red mt-2">Motivo del rechazo: {ad.rejectionNote}</p>}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function RechargeForm({ onClose }: { onClose: () => void }) {
+  const [amount, setAmount] = useState('20')
+  const [provider, setProvider] = useState<'STRIPE' | 'DLOCALGO'>('STRIPE')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLoading(true); setError('')
+    try {
+      const data = await paymentsApi.rechargeAds(Number(amount), provider)
+      window.location.href = data.checkoutUrl
+    } catch (err: any) { setError(err.message); setLoading(false) }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="card p-5 space-y-3">
+      <p className="text-sm font-semibold text-brand-dark">Recargar saldo</p>
+      {error && <p className="text-xs text-brand-red">{error}</p>}
+      <div className="flex gap-2">
+        <input type="number" min={20} max={500} required className="input text-sm flex-1" value={amount} onChange={e => setAmount(e.target.value)} />
+        <select className="input text-sm w-40" value={provider} onChange={e => setProvider(e.target.value as any)}>
+          <option value="STRIPE">Tarjeta internacional</option>
+          <option value="DLOCALGO">dLocal Go</option>
+        </select>
+      </div>
+      <p className="text-xs text-brand-slate">Mínimo USD 20, máximo USD 500 por recarga.</p>
+      <div className="flex gap-2">
+        <button type="submit" disabled={loading} className="btn-primary text-sm py-2 px-4 disabled:opacity-50">{loading ? 'Redirigiendo...' : 'Ir a pagar'}</button>
+        <button type="button" onClick={onClose} className="text-sm text-brand-slate hover:underline">Cancelar</button>
+      </div>
+    </form>
+  )
+}
+
+function CreateAdForm({ categoryOptions, onCreated }: { categoryOptions: any[]; onCreated: () => void }) {
+  const [form, setForm] = useState({ title: '', description: '', price: '', ctaText: 'Consultar precio', ctaUrl: '', model: 'CPC' as 'CPC' | 'CPM', dailyBudget: '5', companyName: '' })
+  const [imageUrl, setImageUrl] = useState('')
+  const [uploadingImage, setUploadingImage] = useState(false)
+  const [categoryIds, setCategoryIds] = useState<string[]>([])
+  const [targetCountries, setTargetCountries] = useState<string[]>(['UY'])
+  const [ageRanges, setAgeRanges] = useState<string[]>([])
+  const [genders, setGenders] = useState<string[]>([])
+  const [interests, setInterests] = useState<string[]>([])
+  const [incomeLevels, setIncomeLevels] = useState<string[]>([])
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
+
+  const toggle = (arr: string[], setArr: (v: string[]) => void, value: string) =>
+    setArr(arr.includes(value) ? arr.filter((v) => v !== value) : [...arr, value])
+
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploadingImage(true); setError('')
+    try { const data = await upload.adImage(file); setImageUrl(data.url) }
+    catch (err: any) { setError(err.message) }
+    finally { setUploadingImage(false) }
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError('')
+    if (!imageUrl) { setError('Subí una imagen para el anuncio'); return }
+    if (categoryIds.length === 0) { setError('Elegí al menos un rubro'); return }
+    if (targetCountries.length === 0) { setError('Elegí al menos un país'); return }
+
+    setSubmitting(true)
+    try {
+      const result: any = await adsApi.create({
+        ...form,
+        price: form.price ? Number(form.price) : undefined,
+        dailyBudget: Number(form.dailyBudget),
+        ctaUrl: form.ctaUrl || undefined,
+        categoryIds, targetCountries,
+        targetAgeRanges: ageRanges, targetGenders: genders, targetInterests: interests, targetIncomeLevels: incomeLevels,
+      })
+      setSuccess(result.message)
+      setTimeout(onCreated, 1500)
+    } catch (err: any) { setError(err.message) }
+    finally { setSubmitting(false) }
+  }
+
+  if (success) {
+    return <div className="card p-6 text-center"><i className="ti ti-circle-check text-3xl text-brand-green block mb-2" /><p className="text-sm text-brand-dark">{success}</p></div>
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="card p-5 space-y-4">
+      {error && <p className="text-xs text-brand-red">{error}</p>}
+
+      <div>
+        <label className="label">Imagen del anuncio</label>
+        <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleImageChange} className="text-sm" />
+        {uploadingImage && <p className="text-xs text-brand-slate mt-1">Subiendo...</p>}
+        {imageUrl && <img src={imageUrl} alt="preview" className="w-24 h-24 rounded-lg object-cover mt-2" />}
+      </div>
+
+      <div><label className="label">Nombre de tu empresa/marca</label><input required className="input text-sm" value={form.companyName} onChange={e => setForm(f => ({ ...f, companyName: e.target.value }))} /></div>
+      <div><label className="label">Título del anuncio</label><input required maxLength={80} className="input text-sm" value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} /></div>
+      <div><label className="label">Descripción</label><textarea required maxLength={300} rows={2} className="input text-sm" value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} /></div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div><label className="label">Precio (opcional)</label><input type="number" className="input text-sm" value={form.price} onChange={e => setForm(f => ({ ...f, price: e.target.value }))} /></div>
+        <div><label className="label">Texto del botón</label><input className="input text-sm" value={form.ctaText} onChange={e => setForm(f => ({ ...f, ctaText: e.target.value }))} /></div>
+        <div><label className="label">Link de destino (opcional)</label><input type="url" placeholder="https://..." className="input text-sm" value={form.ctaUrl} onChange={e => setForm(f => ({ ...f, ctaUrl: e.target.value }))} /></div>
+        <div>
+          <label className="label">Modelo de cobro</label>
+          <select className="input text-sm" value={form.model} onChange={e => setForm(f => ({ ...f, model: e.target.value as any }))}>
+            <option value="CPC">Por clic (CPC)</option>
+            <option value="CPM">Por cada mil vistas (CPM)</option>
+          </select>
+        </div>
+      </div>
+
+      <div><label className="label">Presupuesto diario (USD, mínimo 3)</label><input type="number" min={3} required className="input text-sm w-32" value={form.dailyBudget} onChange={e => setForm(f => ({ ...f, dailyBudget: e.target.value }))} /></div>
+
+      <div>
+        <label className="label">Rubros</label>
+        <div className="flex flex-wrap gap-2">
+          {categoryOptions.map((c) => (
+            <button key={c.id} type="button" onClick={() => toggle(categoryIds, setCategoryIds, c.id)} className={`text-xs py-1.5 px-3 rounded-full border transition-all ${categoryIds.includes(c.id) ? 'bg-brand-green-dim border-brand-green text-brand-green-text font-semibold' : 'border-gray-200 text-brand-slate'}`}>{c.name}</button>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <label className="label">Países</label>
+        <div className="flex flex-wrap gap-2">
+          {COUNTRIES.map((c) => (
+            <button key={c.code} type="button" onClick={() => toggle(targetCountries, setTargetCountries, c.code)} className={`text-xs py-1.5 px-3 rounded-full border transition-all ${targetCountries.includes(c.code) ? 'bg-brand-green-dim border-brand-green text-brand-green-text font-semibold' : 'border-gray-200 text-brand-slate'}`}>{c.name}</button>
+          ))}
+        </div>
+      </div>
+
+      <div className="pt-2 border-t border-gray-100">
+        <p className="text-sm font-semibold text-brand-dark mb-1">Segmentación por público <span className="font-normal text-xs text-brand-slate">(opcional — sin elegir nada, le llega a todos)</span></p>
+        <p className="text-xs text-brand-slate mb-3">Solo se cruza contra usuarios que cargaron estos datos en su perfil — a los que no los cargaron, este anuncio no les va a llegar si elegís algún filtro acá.</p>
+
+        <div className="space-y-3">
+          <div>
+            <label className="label">Rango de edad</label>
+            <div className="flex flex-wrap gap-2">
+              {AGE_RANGES.map((r) => <button key={r.value} type="button" onClick={() => toggle(ageRanges, setAgeRanges, r.value)} className={`text-xs py-1.5 px-3 rounded-full border transition-all ${ageRanges.includes(r.value) ? 'bg-brand-green-dim border-brand-green text-brand-green-text font-semibold' : 'border-gray-200 text-brand-slate'}`}>{r.label}</button>)}
+            </div>
+          </div>
+          <div>
+            <label className="label">Género</label>
+            <div className="flex flex-wrap gap-2">
+              {GENDERS.map((g) => <button key={g.value} type="button" onClick={() => toggle(genders, setGenders, g.value)} className={`text-xs py-1.5 px-3 rounded-full border transition-all ${genders.includes(g.value) ? 'bg-brand-green-dim border-brand-green text-brand-green-text font-semibold' : 'border-gray-200 text-brand-slate'}`}>{g.label}</button>)}
+            </div>
+          </div>
+          <div>
+            <label className="label">Intereses</label>
+            <div className="flex flex-wrap gap-2">
+              {INTERESTS.map((i) => <button key={i} type="button" onClick={() => toggle(interests, setInterests, i)} className={`text-xs py-1.5 px-3 rounded-full border transition-all ${interests.includes(i) ? 'bg-brand-green-dim border-brand-green text-brand-green-text font-semibold' : 'border-gray-200 text-brand-slate'}`}>{i}</button>)}
+            </div>
+          </div>
+          <div>
+            <label className="label">Nivel de ingresos</label>
+            <div className="flex flex-wrap gap-2">
+              {INCOME_LEVELS.map((l) => <button key={l.value} type="button" onClick={() => toggle(incomeLevels, setIncomeLevels, l.value)} className={`text-xs py-1.5 px-3 rounded-full border transition-all ${incomeLevels.includes(l.value) ? 'bg-brand-green-dim border-brand-green text-brand-green-text font-semibold' : 'border-gray-200 text-brand-slate'}`}>{l.label}</button>)}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <button type="submit" disabled={submitting || uploadingImage} className="btn-primary w-full py-3 text-sm disabled:opacity-50">{submitting ? 'Enviando...' : 'Enviar a revisión'}</button>
+    </form>
+  )
+}
