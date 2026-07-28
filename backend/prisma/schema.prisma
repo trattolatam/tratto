@@ -133,6 +133,7 @@ model User {
   interests     String[]     @default([])
   incomeLevel   IncomeLevel?
   targetingAskedAt DateTime?
+  targetingSkipCount Int     @default(0)
 
   // Tier 2 — Pro user
   isPro         Boolean   @default(false)

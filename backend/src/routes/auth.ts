@@ -254,9 +254,20 @@ export default async function authRoutes(app: FastifyInstance) {
   })
 
   // ─── Solo marcar como "ya visto" sin guardar nada — para cuando el usuario saltea todo ──
+  // No se rinde a la primera: deja pasar hasta 3 veces por si la próxima vez
+  // tiene más ganas de completarlo. Recién en la tercera lo deja de preguntar.
+  const MAX_SKIPS = 3
   app.post('/targeting/skip', { preHandler: requireAuth }, async (request, reply) => {
-    await prisma.user.update({ where: { id: request.user.userId }, data: { targetingAskedAt: new Date() } })
-    return reply.send({ ok: true })
+    const user = await prisma.user.findUnique({ where: { id: request.user.userId }, select: { targetingSkipCount: true } })
+    const newCount = (user?.targetingSkipCount || 0) + 1
+    const givingUp = newCount >= MAX_SKIPS
+
+    await prisma.user.update({
+      where: { id: request.user.userId },
+      data: { targetingSkipCount: newCount, ...(givingUp ? { targetingAskedAt: new Date() } : {}) },
+    })
+
+    return reply.send({ ok: true, willAskAgain: !givingUp })
   })
 
   app.post('/change-password', { preHandler: requireAuth }, async (request, reply) => {
