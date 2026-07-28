@@ -6,6 +6,7 @@ export type MedalType = 'TOP_CATEGORY' | 'FIFTY_REVIEWS' | 'CONSISTENT_12M' | 'T
 export interface User {
   id: string; email: string; name: string; role: UserRole; country: string; city?: string; phone?: string
   avatarUrl?: string; isVerified: boolean; isPro: boolean; company?: CompanyBasic
+  targetingAskedAt?: string | null; companyRole?: 'OWNER' | 'ADMIN' | 'EDITOR' | 'VIEWER'
 }
 
 export interface CompanyBasic { id: string; name: string; slug: string; plan: CompanyPlan; isVerified: boolean; ratingAvg: number; reviewCount: number; logoUrl?: string }

@@ -28,7 +28,7 @@ export default function RegistroClient() {
       await auth.register(form)
       const loggedUser = await login(form.email, form.password)
 
-      let next = '/'
+      let next = '/completar-perfil'
       if (loggedUser.company) {
         // Se registró con un email que tenía una invitación de equipo pendiente —
         // ya quedó asociado a esa empresa, así que va directo al panel.

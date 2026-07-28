@@ -6,6 +6,7 @@ import { requireAuth } from '../middleware/auth'
 import { authRateLimit, passwordResetRateLimit } from '../middleware/rateLimits'
 import { sendVerificationEmail, verifyEmailToken, resendVerificationEmail } from '../services/emailVerification'
 import { requestPasswordReset, resetPasswordWithToken } from '../services/passwordReset'
+import { INTERESTS } from '../constants/targeting'
 
 const registerSchema = z.object({
   email: z.string().email(),
@@ -41,7 +42,7 @@ export default async function authRoutes(app: FastifyInstance) {
 
     const user = await prisma.user.create({
       data: { email, passwordHash, name, country, city, phone, role },
-      select: { id: true, email: true, name: true, role: true, country: true, createdAt: true },
+      select: { id: true, email: true, name: true, role: true, country: true, createdAt: true, targetingAskedAt: true },
     })
 
     sendVerificationEmail(user.id, user.email, user.name).catch(err =>
@@ -130,7 +131,7 @@ export default async function authRoutes(app: FastifyInstance) {
       user: {
         id: user.id, email: user.email, name: user.name, role: user.role,
         country: user.country, city: user.city, phone: user.phone, avatarUrl: user.avatarUrl,
-        isVerified: user.isVerified, isPro: user.isPro, company: effectiveCompany, companyRole,
+        isVerified: user.isVerified, isPro: user.isPro, company: effectiveCompany, companyRole, targetingAskedAt: user.targetingAskedAt,
       },
       token,
     })
@@ -142,7 +143,7 @@ export default async function authRoutes(app: FastifyInstance) {
       select: {
         id: true, email: true, name: true, role: true,
         country: true, city: true, phone: true, avatarUrl: true,
-        isVerified: true, isPro: true, createdAt: true,
+        isVerified: true, isPro: true, createdAt: true, targetingAskedAt: true,
         company: {
           select: { id: true, name: true, slug: true, plan: true, isVerified: true, ratingAvg: true, reviewCount: true, logoUrl: true },
         },
@@ -222,6 +223,40 @@ export default async function authRoutes(app: FastifyInstance) {
     })
 
     return reply.send({ user: updated })
+  })
+
+  // ─── Datos de segmentación para publicidad (opcionales, post-registro) ─────
+  // Se guarda "targetingAskedAt" siempre que se llame, aunque el usuario no
+  // haya completado ningún campo — así "saltear" también cuenta como visto
+  // y no le volvemos a mostrar la pantalla la próxima vez que entre.
+  app.patch('/targeting', { preHandler: requireAuth }, async (request, reply) => {
+    const body = z.object({
+      ageRange: z.enum(['R18_24', 'R25_34', 'R35_44', 'R45_54', 'R55_64', 'R65_PLUS']).optional(),
+      gender: z.enum(['MALE', 'FEMALE', 'OTHER', 'PREFER_NOT_TO_SAY']).optional(),
+      interests: z.array(z.string()).max(INTERESTS.length).optional(),
+      incomeLevel: z.enum(['LOW', 'MEDIUM', 'HIGH', 'PREFER_NOT_TO_SAY']).optional(),
+    }).safeParse(request.body)
+
+    if (!body.success) return reply.status(400).send({ error: true, message: 'Datos inválidos', details: body.error.issues })
+
+    if (body.data.interests) {
+      const invalid = body.data.interests.filter((i) => !(INTERESTS as readonly string[]).includes(i))
+      if (invalid.length > 0) return reply.status(400).send({ error: true, message: `Interés inválido: ${invalid[0]}` })
+    }
+
+    const updated = await prisma.user.update({
+      where: { id: request.user.userId },
+      data: { ...body.data, targetingAskedAt: new Date() },
+      select: { id: true, ageRange: true, gender: true, interests: true, incomeLevel: true },
+    })
+
+    return reply.send({ user: updated })
+  })
+
+  // ─── Solo marcar como "ya visto" sin guardar nada — para cuando el usuario saltea todo ──
+  app.post('/targeting/skip', { preHandler: requireAuth }, async (request, reply) => {
+    await prisma.user.update({ where: { id: request.user.userId }, data: { targetingAskedAt: new Date() } })
+    return reply.send({ ok: true })
   })
 
   app.post('/change-password', { preHandler: requireAuth }, async (request, reply) => {

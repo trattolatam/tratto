@@ -80,6 +80,29 @@ enum NotificationType {
 
 // ─── USUARIOS ─────────────────────────────────────────────────────────────────
 
+enum AgeRange {
+  R18_24
+  R25_34
+  R35_44
+  R45_54
+  R55_64
+  R65_PLUS
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+  PREFER_NOT_TO_SAY
+}
+
+enum IncomeLevel {
+  LOW
+  MEDIUM
+  HIGH
+  PREFER_NOT_TO_SAY
+}
+
 model User {
   id            String    @id @default(uuid())
   email         String    @unique
@@ -100,6 +123,16 @@ model User {
   // Recuperación de contraseña
   passwordResetToken      String?
   passwordResetExpiresAt  DateTime?
+
+  // Datos de segmentación para publicidad — opcionales, se piden después del
+  // registro (no en el formulario en sí, para no perder gente por fricción).
+  // targetingAskedAt queda seteado apenas pasó por esa pantalla, haya
+  // completado algo o salteado todo — así no se la volvemos a mostrar.
+  ageRange      AgeRange?
+  gender        Gender?
+  interests     String[]     @default([])
+  incomeLevel   IncomeLevel?
+  targetingAskedAt DateTime?
 
   // Tier 2 — Pro user
   isPro         Boolean   @default(false)

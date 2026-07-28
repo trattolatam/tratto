@@ -27,6 +27,9 @@ export const auth = {
     apiFetch<{ message: string }>('/api/auth/forgot-password', { method: 'POST', body: JSON.stringify({ email }) }),
   resetPassword: (token: string, newPassword: string) =>
     apiFetch<{ message: string }>('/api/auth/reset-password', { method: 'POST', body: JSON.stringify({ token, newPassword }) }),
+  updateTargeting: (body: { ageRange?: string; gender?: string; interests?: string[]; incomeLevel?: string }) =>
+    apiFetch<{ user: any }>('/api/auth/targeting', { method: 'PATCH', body: JSON.stringify(body) }),
+  skipTargeting: () => apiFetch<{ ok: boolean }>('/api/auth/targeting/skip', { method: 'POST' }),
 }
 
 export const team = {
