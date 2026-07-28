@@ -1,7 +1,7 @@
 import { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { prisma } from '../lib/prisma'
-import { requireAuth, requireBusinessOwner, requireAdmin } from '../middleware/auth'
+import { requireAuth, requireBusinessOwner, requireAdmin, requireCompanyRank } from '../middleware/auth'
 import { leadRateLimit } from '../middleware/rateLimits'
 
 export async function subscriptionRoutes(app: FastifyInstance) {
@@ -71,7 +71,7 @@ export async function leadRoutes(app: FastifyInstance) {
   // ─── Marcar una consulta como ya contactada ────────────────────────────────
   // Esto es lo que alimenta el tiempo de respuesta a consultas en el panel de
   // Competencia — sin este botón no hay forma de saber cuándo se respondió.
-  app.patch('/:id/respond', { preHandler: requireBusinessOwner }, async (request, reply) => {
+  app.patch('/:id/respond', { preHandler: [requireBusinessOwner, requireCompanyRank('EDITOR')] }, async (request, reply) => {
     const { id } = request.params as { id: string }
     const company = await prisma.company.findFirst({ where: { claimedById: request.user.userId } })
     if (!company) return reply.status(404).send({ error: true, message: 'Sin empresa' })

@@ -2,7 +2,7 @@ import { FastifyInstance } from 'fastify'
 import crypto from 'crypto'
 import { z } from 'zod'
 import { prisma } from '../lib/prisma'
-import { requireBusinessOwner, requirePlan, JwtPayload } from '../middleware/auth'
+import { requireBusinessOwner, requirePlan, requireCompanyRank, JwtPayload } from '../middleware/auth'
 
 const VALID_EVENTS = ['review.created', 'lead.created'] as const
 
@@ -22,7 +22,7 @@ export default async function webhookConfigRoutes(app: FastifyInstance) {
   })
 
   // ─── Crear un webhook nuevo ──────────────────────────────────────────────────
-  app.post('/', async (request, reply) => {
+  app.post('/', { preHandler: requireCompanyRank('ADMIN') }, async (request, reply) => {
     const { companyId } = request.user as JwtPayload
     if (!companyId) return reply.status(400).send({ error: true, message: 'Sin empresa asociada' })
 
@@ -45,7 +45,7 @@ export default async function webhookConfigRoutes(app: FastifyInstance) {
   })
 
   // ─── Activar/desactivar un webhook ───────────────────────────────────────────
-  app.patch('/:id', async (request, reply) => {
+  app.patch('/:id', { preHandler: requireCompanyRank('ADMIN') }, async (request, reply) => {
     const { companyId } = request.user as JwtPayload
     const { id } = request.params as { id: string }
     const body = z.object({ isActive: z.boolean() }).safeParse(request.body)
@@ -59,7 +59,7 @@ export default async function webhookConfigRoutes(app: FastifyInstance) {
   })
 
   // ─── Borrar un webhook ────────────────────────────────────────────────────────
-  app.delete('/:id', async (request, reply) => {
+  app.delete('/:id', { preHandler: requireCompanyRank('ADMIN') }, async (request, reply) => {
     const { companyId } = request.user as JwtPayload
     const { id } = request.params as { id: string }
 

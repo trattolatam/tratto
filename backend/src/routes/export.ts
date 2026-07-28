@@ -1,6 +1,6 @@
 import { FastifyInstance } from 'fastify'
 import { prisma } from '../lib/prisma'
-import { requireBusinessOwner, requirePlan, JwtPayload } from '../middleware/auth'
+import { requireBusinessOwner, requirePlan, requireCompanyRank, JwtPayload } from '../middleware/auth'
 
 function toCsv(rows: Record<string, any>[]): string {
   if (rows.length === 0) return ''
@@ -21,6 +21,7 @@ function toCsv(rows: Record<string, any>[]): string {
 export default async function exportRoutes(app: FastifyInstance) {
   app.addHook('preHandler', requireBusinessOwner)
   app.addHook('preHandler', requirePlan('ENTERPRISE'))
+  app.addHook('preHandler', requireCompanyRank('ADMIN'))
 
   app.get('/', async (request, reply) => {
     const { companyId } = request.user as JwtPayload

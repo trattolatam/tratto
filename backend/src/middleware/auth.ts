@@ -5,6 +5,7 @@ export interface JwtPayload {
   userId: string
   role: string
   companyId?: string
+  companyRole?: 'OWNER' | 'ADMIN' | 'EDITOR' | 'VIEWER'
 }
 
 export async function requireAuth(request: FastifyRequest, reply: FastifyReply) {
@@ -53,6 +54,32 @@ export async function requireBusinessOwner(request: FastifyRequest, reply: Fasti
     }
   } catch {
     reply.status(401).send({ error: true, message: 'Token inválido o expirado' })
+  }
+}
+
+// ─── Permisos por rol dentro del equipo (plan Enterprise) ─────────────────────
+// El dueño de la empresa (companyRole = OWNER, o sin CompanyMember en absoluto)
+// siempre tiene acceso total. Para el resto, el rol viene grabado en el JWT desde
+// el login — ATENCIÓN: si el dueño le cambia el rol a alguien, esa persona sigue
+// con el rol viejo hasta que vuelva a iniciar sesión (limitación conocida de JWT).
+const COMPANY_ROLE_RANK = { VIEWER: 0, EDITOR: 1, ADMIN: 2, OWNER: 3 } as const
+
+export function requireCompanyRank(minRank: keyof typeof COMPANY_ROLE_RANK) {
+  return async (request: FastifyRequest, reply: FastifyReply) => {
+    try {
+      await request.jwtVerify()
+      const payload = request.user as JwtPayload
+      if (payload.role !== 'BUSINESS' && payload.role !== 'ADMIN') {
+        return reply.status(403).send({ error: true, message: 'Solo empresas pueden acceder' })
+      }
+      // Sin companyRole grabado (cuentas viejas, o el dueño mismo) = acceso total.
+      const myRank = payload.companyRole ? COMPANY_ROLE_RANK[payload.companyRole] : COMPANY_ROLE_RANK.OWNER
+      if (myRank < COMPANY_ROLE_RANK[minRank]) {
+        return reply.status(403).send({ error: true, message: 'Tu rol en el equipo no tiene permiso para hacer esto' })
+      }
+    } catch {
+      reply.status(401).send({ error: true, message: 'Token inválido o expirado' })
+    }
   }
 }
 

@@ -1,5 +1,5 @@
 import { FastifyInstance } from 'fastify'
-import { requireAuth, requireBusinessOwner, requirePlan } from '../middleware/auth'
+import { requireAuth, requireBusinessOwner, requirePlan, requireCompanyRank } from '../middleware/auth'
 import { uploadFile, streamToBuffer, BUCKETS } from '../services/storage'
 import { uploadRateLimit } from '../middleware/rateLimits'
 import path from 'path'
@@ -48,7 +48,7 @@ export default async function uploadRoutes(app: FastifyInstance) {
     return reply.send({ url })
   })
 
-  app.post('/company-logo', { preHandler: requireBusinessOwner, config: { rateLimit: uploadRateLimit } }, async (request, reply) => {
+  app.post('/company-logo', { preHandler: [requireBusinessOwner, requireCompanyRank('ADMIN')], config: { rateLimit: uploadRateLimit } }, async (request, reply) => {
     const data = await request.file()
     if (!data) return reply.status(400).send({ error: true, message: 'No se recibió ningún archivo' })
 
@@ -68,7 +68,7 @@ export default async function uploadRoutes(app: FastifyInstance) {
     return reply.send({ url })
   })
 
-  app.post('/company-photo', { preHandler: [requireBusinessOwner, requirePlan('PROFESSIONAL')], config: { rateLimit: uploadRateLimit } }, async (request, reply) => {
+  app.post('/company-photo', { preHandler: [requireBusinessOwner, requirePlan('PROFESSIONAL'), requireCompanyRank('ADMIN')], config: { rateLimit: uploadRateLimit } }, async (request, reply) => {
     const data = await request.file()
     if (!data) return reply.status(400).send({ error: true, message: 'No se recibió ningún archivo' })
 
@@ -92,7 +92,7 @@ export default async function uploadRoutes(app: FastifyInstance) {
     return reply.send({ url })
   })
 
-  app.delete('/company-photo', { preHandler: [requireBusinessOwner, requirePlan('PROFESSIONAL')] }, async (request, reply) => {
+  app.delete('/company-photo', { preHandler: [requireBusinessOwner, requirePlan('PROFESSIONAL'), requireCompanyRank('ADMIN')] }, async (request, reply) => {
     const body = z.object({ url: z.string() }).parse(request.body)
     const { prisma } = await import('../lib/prisma')
     if (!request.user.companyId) return reply.status(400).send({ error: true, message: 'Sin empresa asociada' })

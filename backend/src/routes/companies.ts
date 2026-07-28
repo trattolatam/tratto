@@ -1,7 +1,7 @@
 import { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { prisma } from '../lib/prisma'
-import { requireAuth, requireVerifiedEmail, requireBusinessOwner, requirePlan } from '../middleware/auth'
+import { requireAuth, requireVerifiedEmail, requireBusinessOwner, requirePlan, requireCompanyRank } from '../middleware/auth'
 import { generateCertificatePdf } from '../services/certificate'
 import { validateTaxId, validatePersonalId } from '../services/taxIdValidation'
 import { contactRevealRateLimit } from '../middleware/rateLimits'
@@ -266,7 +266,7 @@ export default async function companyRoutes(app: FastifyInstance) {
     return reply.status(201).send({ dispute, message: 'Denuncia recibida. La vamos a revisar en las próximas 48hs.' })
   })
 
-  app.patch('/:id', { preHandler: requireBusinessOwner }, async (request, reply) => {
+  app.patch('/:id', { preHandler: [requireBusinessOwner, requireCompanyRank('ADMIN')] }, async (request, reply) => {
     const { id } = request.params as { id: string }
     const company = await prisma.company.findUnique({ where: { id } })
     if (!company || company.claimedById !== request.user.userId) {
@@ -483,7 +483,7 @@ export default async function companyRoutes(app: FastifyInstance) {
   })
 
   // ─── Certificado PDF descargable (plan Profesional+) ─────────────────────
-  app.get('/:id/certificate', { preHandler: [requireBusinessOwner, requirePlan('PROFESSIONAL')] }, async (request, reply) => {
+  app.get('/:id/certificate', { preHandler: [requireBusinessOwner, requirePlan('PROFESSIONAL'), requireCompanyRank('ADMIN')] }, async (request, reply) => {
     const { id } = request.params as { id: string }
     const company = await prisma.company.findUnique({ where: { id }, include: { category: { select: { name: true } } } })
 

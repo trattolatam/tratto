@@ -1,7 +1,7 @@
 import { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { prisma } from '../lib/prisma'
-import { requireBusinessOwner, requirePlan, JwtPayload } from '../middleware/auth'
+import { requireBusinessOwner, requirePlan, requireCompanyRank, JwtPayload } from '../middleware/auth'
 
 /**
  * Sucursales — varias sedes bajo un mismo perfil de empresa (plan Enterprise).
@@ -18,7 +18,7 @@ export default async function branchRoutes(app: FastifyInstance) {
   })
 
   // ─── Agregar una sucursal ────────────────────────────────────────────────────
-  app.post('/:companyId/branches', { preHandler: [requireBusinessOwner, requirePlan('ENTERPRISE')] }, async (request, reply) => {
+  app.post('/:companyId/branches', { preHandler: [requireBusinessOwner, requirePlan('ENTERPRISE'), requireCompanyRank('ADMIN')] }, async (request, reply) => {
     const { companyId: paramCompanyId } = request.params as { companyId: string }
     const { companyId } = request.user as JwtPayload
     if (companyId !== paramCompanyId) return reply.status(403).send({ error: true, message: 'No autorizado' })
@@ -33,7 +33,7 @@ export default async function branchRoutes(app: FastifyInstance) {
   })
 
   // ─── Editar una sucursal ─────────────────────────────────────────────────────
-  app.patch('/:companyId/branches/:branchId', { preHandler: [requireBusinessOwner, requirePlan('ENTERPRISE')] }, async (request, reply) => {
+  app.patch('/:companyId/branches/:branchId', { preHandler: [requireBusinessOwner, requirePlan('ENTERPRISE'), requireCompanyRank('ADMIN')] }, async (request, reply) => {
     const { companyId: paramCompanyId, branchId } = request.params as { companyId: string; branchId: string }
     const { companyId } = request.user as JwtPayload
     if (companyId !== paramCompanyId) return reply.status(403).send({ error: true, message: 'No autorizado' })
@@ -51,7 +51,7 @@ export default async function branchRoutes(app: FastifyInstance) {
   })
 
   // ─── Borrar una sucursal ─────────────────────────────────────────────────────
-  app.delete('/:companyId/branches/:branchId', { preHandler: [requireBusinessOwner, requirePlan('ENTERPRISE')] }, async (request, reply) => {
+  app.delete('/:companyId/branches/:branchId', { preHandler: [requireBusinessOwner, requirePlan('ENTERPRISE'), requireCompanyRank('ADMIN')] }, async (request, reply) => {
     const { companyId: paramCompanyId, branchId } = request.params as { companyId: string; branchId: string }
     const { companyId } = request.user as JwtPayload
     if (companyId !== paramCompanyId) return reply.status(403).send({ error: true, message: 'No autorizado' })

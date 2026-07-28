@@ -1,7 +1,7 @@
 import { FastifyInstance } from 'fastify'
 import crypto from 'crypto'
 import { prisma } from '../lib/prisma'
-import { requireBusinessOwner, requirePlan, JwtPayload } from '../middleware/auth'
+import { requireBusinessOwner, requirePlan, requireCompanyRank, JwtPayload } from '../middleware/auth'
 
 // Prefijo público que identifica de un vistazo que es una key de Tratto
 // (mismo patrón que usan Stripe/otros: fácil de reconocer si se filtra por error).
@@ -45,7 +45,7 @@ export default async function apiKeyRoutes(app: FastifyInstance) {
   // ─── Generar (o rotar) mi API key ───────────────────────────────────────────
   // Generar una nueva desactiva cualquier key anterior de la empresa: solo una activa a la vez,
   // para que quede claro cuál es la vigente y no queden keys viejas dando vueltas sin que se note.
-  app.post('/', async (request, reply) => {
+  app.post('/', { preHandler: requireCompanyRank('ADMIN') }, async (request, reply) => {
     const { companyId } = request.user as JwtPayload
     if (!companyId) return reply.status(400).send({ error: true, message: 'Sin empresa asociada' })
 
@@ -70,7 +70,7 @@ export default async function apiKeyRoutes(app: FastifyInstance) {
   })
 
   // ─── Revocar mi API key ──────────────────────────────────────────────────────
-  app.delete('/', async (request, reply) => {
+  app.delete('/', { preHandler: requireCompanyRank('ADMIN') }, async (request, reply) => {
     const { companyId } = request.user as JwtPayload
     if (!companyId) return reply.status(400).send({ error: true, message: 'Sin empresa asociada' })
 
