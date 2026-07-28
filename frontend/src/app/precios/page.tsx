@@ -8,11 +8,11 @@ import { useAuthStore } from '@/lib/store'
 const PLANS = [
   { id: 'FREE' as const, name: 'Gratuito', price: 0, desc: 'Presencia mínima. Aparecés en el ranking pero sin poder actuar.', color: 'border-gray-200', btn: 'Plan actual',
     features: [{ text: 'Aparecés en el ranking', ok: true }, { text: 'Recibís reseñas', ok: true }, { text: 'Botón de contacto directo', ok: false }, { text: 'Respondés reseñas', ok: false }, { text: 'Sello empresa verificada', ok: false }, { text: 'Resumen IA de reseñas', ok: false }] },
-  { id: 'PROFESSIONAL' as const, name: 'Profesional', price: 29, desc: 'El plan que convierte visitas en clientes reales.', color: 'border-brand-green', popular: true, btn: 'Empezar 30 días gratis', btnClass: 'bg-brand-green text-brand-dark hover:bg-brand-green/90',
+  { id: 'PROFESSIONAL' as const, name: 'Profesional', price: 10, desc: 'El plan que convierte visitas en clientes reales.', color: 'border-brand-green', popular: true, btn: 'Empezar 30 días gratis', btnClass: 'bg-brand-green text-brand-dark hover:bg-brand-green/90',
     features: [{ text: 'Botón "Solicitar presupuesto"', ok: true }, { text: 'Respondés reseñas públicamente', ok: true }, { text: 'Sello empresa verificada', ok: true }, { text: 'Resumen IA de tus reseñas', ok: true }, { text: 'Alerta WhatsApp por nueva reseña', ok: true }, { text: 'Certificado PDF descargable', ok: true }] },
-  { id: 'PREMIUM' as const, name: 'Premium', price: 79, desc: 'Para empresas que quieren dominar su categoría.', color: 'border-brand-blue', btn: 'Elegir Premium', btnClass: 'bg-brand-dark text-white hover:bg-brand-dark/90',
+  { id: 'PREMIUM' as const, name: 'Premium', price: 25, desc: 'Para empresas que quieren dominar su categoría.', color: 'border-brand-blue', btn: 'Elegir Premium', btnClass: 'bg-brand-dark text-white hover:bg-brand-dark/90',
     features: [{ text: 'Todo lo del plan Profesional', ok: true }, { text: 'Posición destacada en búsquedas', ok: true }, { text: 'Inteligencia competitiva', ok: true }, { text: 'API para integrar calificaciones', ok: true }, { text: 'Account manager dedicado', ok: true }] },
-  { id: 'ENTERPRISE' as const, name: 'Enterprise', price: 199, desc: 'Para cadenas y empresas con equipos y varias sedes.', color: 'border-purple-300', btn: 'Elegir Enterprise', btnClass: 'bg-purple-700 text-white hover:bg-purple-800',
+  { id: 'ENTERPRISE' as const, name: 'Enterprise', price: 50, desc: 'Para cadenas y empresas con equipos y varias sedes.', color: 'border-purple-300', btn: 'Elegir Enterprise', btnClass: 'bg-purple-700 text-white hover:bg-purple-800',
     features: [{ text: 'Todo lo del plan Premium', ok: true }, { text: 'Equipo con roles (varios usuarios)', ok: true }, { text: 'Múltiples sucursales', ok: true }, { text: 'API ampliada + webhooks en tiempo real', ok: true }, { text: 'Exportación masiva de datos', ok: true }] },
 ]
 
