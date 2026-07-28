@@ -15,6 +15,7 @@ export interface Company extends CompanyBasic {
   address?: string; phone?: string; website?: string; email?: string; taxId?: string; taxIdType?: string
   logoUrl?: string; coverUrl?: string; photos: string[]; verifiedReviewCount: number
   medals: Medal[]; aiSummary?: AiSummary; claimedById?: string; claimedAt?: string; bookingEnabled: boolean
+  branches?: { id: string; name: string; address: string; city: string; phone?: string }[]
 }
 
 export interface Category { id: string; name: string; slug: string; emoji: string; phase: number; priority: boolean; _count?: { companies: number } }
@@ -23,7 +24,7 @@ export interface Review {
   id: string; companyId: string; userId: string; rating: number; title?: string; body: string
   proofUrl?: string; proofType?: string; isVerified: boolean; verifiedAt?: string; status: ReviewStatus
   helpfulCount: number; createdAt: string; user: { name: string; avatarUrl?: string; country: string }; response?: ReviewResponse
-  photos?: string[]
+  photos?: string[]; branch?: { id: string; name: string }
 }
 
 export interface ReviewResponse { id: string; body: string; createdAt: string }

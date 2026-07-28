@@ -145,6 +145,19 @@ export function CompanyProfile({ company, ads }: { company: Company; ads: Ad[] }
                 {company.description && <p className="text-sm text-brand-slate pt-2 border-t border-gray-50 leading-relaxed">{company.description}</p>}
               </div>
             )}
+            {activeTab === 'info' && company.branches && company.branches.length > 0 && (
+              <div className="card p-5 mt-4">
+                <p className="text-sm font-semibold text-brand-dark mb-3"><i className="ti ti-building-store text-brand-green mr-1.5" />Sucursales</p>
+                <div className="space-y-3">
+                  {company.branches.map((b: any) => (
+                    <div key={b.id} className="flex items-start gap-3 text-sm pb-3 border-b border-gray-50 last:border-0 last:pb-0">
+                      <i className="ti ti-map-pin text-brand-slate text-base w-5 mt-0.5" />
+                      <div><p className="text-brand-dark font-medium">{b.name}</p><p className="text-brand-slate text-xs mt-0.5">{b.address}, {b.city}</p></div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
             {activeTab === 'info' && company.photos && company.photos.length > 0 && (
               <div className="card p-5 mt-4">
                 <p className="text-sm font-semibold text-brand-dark mb-3">Trabajos realizados</p>
@@ -286,7 +299,7 @@ function ReviewItem({ review, canRespond, onResponded }: { review: Review; canRe
       <div className="flex items-start justify-between gap-3 mb-2">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-full bg-brand-blue/10 flex items-center justify-center text-brand-blue text-xs font-semibold flex-shrink-0">{review.user.name.charAt(0)}</div>
-          <div><p className="text-sm font-semibold text-brand-dark">{review.user.name}</p><p className="text-xs text-brand-slate">{new Date(review.createdAt).toLocaleDateString('es-AR', { year: 'numeric', month: 'long' })}</p></div>
+          <div><p className="text-sm font-semibold text-brand-dark">{review.user.name}</p><p className="text-xs text-brand-slate">{new Date(review.createdAt).toLocaleDateString('es-AR', { year: 'numeric', month: 'long' })}{review.branch && <span> · <i className="ti ti-map-pin text-xs" /> {review.branch.name}</span>}</p></div>
         </div>
         {review.isVerified && <span className="badge-verified text-xs flex-shrink-0"><span className="badge-verified-dot" />Verificada</span>}
       </div>

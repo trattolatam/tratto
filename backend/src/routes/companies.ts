@@ -63,11 +63,12 @@ export default async function companyRoutes(app: FastifyInstance) {
         category: true,
         medals: { where: { visible: true, OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] } },
         aiSummary: true,
+        branches: { orderBy: { createdAt: 'asc' } },
         reviews: {
           where: { status: 'APPROVED' },
           orderBy: [{ isVerified: 'desc' }, { createdAt: 'desc' }],
           take: 10,
-          include: { user: { select: { name: true, avatarUrl: true, country: true } }, response: true },
+          include: { user: { select: { name: true, avatarUrl: true, country: true } }, response: true, branch: { select: { id: true, name: true } } },
         },
         _count: { select: { reviews: true } },
       },

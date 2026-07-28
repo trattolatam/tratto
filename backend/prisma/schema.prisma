@@ -239,6 +239,7 @@ model Review {
   id            String        @id @default(uuid())
   companyId     String
   userId        String
+  branchId      String?
   rating        Int
   title         String?
   body          String
@@ -260,6 +261,7 @@ model Review {
 
   company       Company       @relation(fields: [companyId], references: [id])
   user          User          @relation(fields: [userId], references: [id])
+  branch        Branch?       @relation(fields: [branchId], references: [id])
   response      ReviewResponse?
   helpful       ReviewHelpful[]
 
@@ -617,6 +619,7 @@ model Branch {
   updatedAt DateTime @updatedAt
 
   company   Company  @relation(fields: [companyId], references: [id])
+  reviews   Review[]
 
   @@map("branches")
 }

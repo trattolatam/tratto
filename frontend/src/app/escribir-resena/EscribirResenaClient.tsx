@@ -1,8 +1,8 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { reviews as reviewsApi, upload } from '@/lib/api'
+import { reviews as reviewsApi, upload, branches as branchesApi } from '@/lib/api'
 import { useAuthStore } from '@/lib/store'
 
 export default function EscribirResenaClient() {
@@ -13,6 +13,8 @@ export default function EscribirResenaClient() {
   const [rating, setRating] = useState(0)
   const [hoverRating, setHoverRating] = useState(0)
   const [form, setForm] = useState({ title: '', body: '', proofType: '' })
+  const [companyBranches, setCompanyBranches] = useState<any[]>([])
+  const [branchId, setBranchId] = useState('')
   const [proofFile, setProofFile] = useState<File | null>(null)
   const [proofUrl, setProofUrl] = useState('')
   const [uploading, setUploading] = useState(false)
@@ -21,6 +23,11 @@ export default function EscribirResenaClient() {
   const [photoError, setPhotoError] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [success, setSuccess] = useState(false)
+
+  useEffect(() => {
+    if (!companyId) return
+    branchesApi.list(companyId).then(data => setCompanyBranches(data.branches)).catch(() => {})
+  }, [companyId])
 
   if (!user) {
     return (
@@ -62,7 +69,7 @@ export default function EscribirResenaClient() {
     if (form.body.length < 20) { alert('La reseña debe tener al menos 20 caracteres'); return }
     setSubmitting(true)
     try {
-      await reviewsApi.create({ companyId, rating, title: form.title || undefined, body: form.body, proofUrl: proofUrl || undefined, proofType: form.proofType || undefined, photos: reviewPhotos.length > 0 ? reviewPhotos : undefined })
+      await reviewsApi.create({ companyId, branchId: branchId || undefined, rating, title: form.title || undefined, body: form.body, proofUrl: proofUrl || undefined, proofType: form.proofType || undefined, photos: reviewPhotos.length > 0 ? reviewPhotos : undefined })
       setSuccess(true)
     } catch (err: any) { alert(err.message) } finally { setSubmitting(false) }
   }
@@ -89,6 +96,15 @@ export default function EscribirResenaClient() {
         <div><p className="text-sm font-semibold text-brand-green-text">Reseña verificada = 3× más visibilidad</p></div>
       </div>
       <form onSubmit={handleSubmit} className="space-y-5">
+        {companyBranches.length > 0 && (
+          <div>
+            <label className="label">Sucursal <span className="font-normal normal-case text-gray-400">(opcional)</span></label>
+            <select className="input" value={branchId} onChange={e => setBranchId(e.target.value)}>
+              <option value="">¿Cuál usaste? (elegí si aplica)</option>
+              {companyBranches.map(b => <option key={b.id} value={b.id}>{b.name} — {b.city}</option>)}
+            </select>
+          </div>
+        )}
         <div>
           <label className="label">Calificación *</label>
           <div className="flex gap-2 mt-1">

@@ -41,7 +41,7 @@ export default async function reviewRoutes(app: FastifyInstance) {
       prisma.review.findMany({
         where, skip: (page - 1) * limit, take: limit,
         orderBy: [{ status: 'asc' }, { isVerified: 'desc' }, { helpfulCount: 'desc' }, { createdAt: 'desc' }],
-        include: { user: { select: { name: true, avatarUrl: true, country: true } }, response: true },
+        include: { user: { select: { name: true, avatarUrl: true, country: true } }, response: true, branch: { select: { id: true, name: true } } },
       }),
       prisma.review.count({ where }),
     ])
@@ -53,6 +53,7 @@ export default async function reviewRoutes(app: FastifyInstance) {
   app.post('/', { preHandler: requireVerifiedEmail, config: { rateLimit: createReviewRateLimit } }, async (request, reply) => {
     const schema = z.object({
       companyId: z.string().uuid(),
+      branchId: z.string().uuid().optional(),
       rating: z.number().int().min(1).max(5),
       title: z.string().max(100).optional(),
       body: z.string().min(20).max(2000),
@@ -67,6 +68,11 @@ export default async function reviewRoutes(app: FastifyInstance) {
     const company = await prisma.company.findUnique({ where: { id: body.data.companyId } })
     if (!company) return reply.status(404).send({ error: true, message: 'Empresa no encontrada' })
     if (company.claimedById === request.user.userId) return reply.status(403).send({ error: true, message: 'No podés reseñar tu propia empresa' })
+
+    if (body.data.branchId) {
+      const branch = await prisma.branch.findFirst({ where: { id: body.data.branchId, companyId: body.data.companyId } })
+      if (!branch) return reply.status(400).send({ error: true, message: 'Esa sucursal no pertenece a esta empresa' })
+    }
 
     const REVIEW_COOLDOWN_DAYS = 30
     const cooldownStart = new Date(Date.now() - REVIEW_COOLDOWN_DAYS * 24 * 60 * 60 * 1000)
@@ -84,7 +90,7 @@ export default async function reviewRoutes(app: FastifyInstance) {
 
     const review = await prisma.review.create({
       data: { ...body.data, userId: request.user.userId, isVerified, verifiedAt: isVerified ? new Date() : null, status: 'PENDING' },
-      include: { user: { select: { name: true, avatarUrl: true } }, company: { select: { name: true, claimedById: true } } },
+      include: { user: { select: { name: true, avatarUrl: true } }, company: { select: { name: true, claimedById: true } }, branch: { select: { id: true, name: true } } },
     })
 
     if (review.company.claimedById) {
