@@ -299,7 +299,13 @@ function ReviewItem({ review, canRespond, onResponded }: { review: Review; canRe
       <div className="flex items-start justify-between gap-3 mb-2">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-full bg-brand-blue/10 flex items-center justify-center text-brand-blue text-xs font-semibold flex-shrink-0">{review.user.name.charAt(0)}</div>
-          <div><p className="text-sm font-semibold text-brand-dark">{review.user.name}</p><p className="text-xs text-brand-slate">{new Date(review.createdAt).toLocaleDateString('es-AR', { year: 'numeric', month: 'long' })}{review.branch && <span> · <i className="ti ti-map-pin text-xs" /> {review.branch.name}</span>}</p></div>
+          <div>
+            <p className="text-sm font-semibold text-brand-dark">{review.user.name}</p>
+            <div className="flex items-center gap-2 flex-wrap">
+              <p className="text-xs text-brand-slate">{new Date(review.createdAt).toLocaleDateString('es-AR', { year: 'numeric', month: 'long' })}</p>
+              {review.branch && <span className="inline-flex items-center gap-1 text-xs font-medium text-brand-green bg-brand-green-dim px-2 py-0.5 rounded-full"><i className="ti ti-map-pin text-xs" />{review.branch.name}</span>}
+            </div>
+          </div>
         </div>
         {review.isVerified && <span className="badge-verified text-xs flex-shrink-0"><span className="badge-verified-dot" />Verificada</span>}
       </div>
