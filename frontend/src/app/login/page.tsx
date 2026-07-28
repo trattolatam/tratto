@@ -16,7 +16,7 @@ export default function LoginPage() {
     setLoading(true); setError('')
     try {
       const loggedUser = await login(form.email, form.password)
-      const next = loggedUser.role === 'BUSINESS' ? '/panel' : '/'
+      const next = loggedUser.role === 'BUSINESS' ? '/panel' : (!loggedUser.targetingAskedAt ? '/completar-perfil' : '/')
       if (!loggedUser.isVerified) {
         router.push(`/confirmar-cuenta?email=${encodeURIComponent(loggedUser.email)}&next=${encodeURIComponent(next)}`)
       } else {
