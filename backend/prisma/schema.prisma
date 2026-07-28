@@ -407,7 +407,7 @@ model Ad {
   adAccountId   String
   title         String
   description   String
-  imageUrl      String
+  imageUrls     String[]
   price         Float?
   ctaText       String    @default("Consultar precio")
   ctaUrl        String?

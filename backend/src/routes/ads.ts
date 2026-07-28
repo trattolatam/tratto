@@ -38,7 +38,7 @@ export default async function adRoutes(app: FastifyInstance) {
     const candidates = await prisma.ad.findMany({
       where, take: Math.min(limit * 5, 20), orderBy: { cpcUsd: 'desc' },
       select: {
-        id: true, title: true, description: true, imageUrl: true, price: true, ctaText: true, ctaUrl: true,
+        id: true, title: true, description: true, imageUrls: true, price: true, ctaText: true, ctaUrl: true,
         targetAgeRanges: true, targetGenders: true, targetInterests: true, targetIncomeLevels: true,
         adAccount: { select: { companyName: true } },
       },
@@ -107,7 +107,7 @@ export default async function adRoutes(app: FastifyInstance) {
     const schema = z.object({
       title: z.string().min(5).max(80),
       description: z.string().min(10).max(300),
-      imageUrl: z.string().url(),
+      imageUrls: z.array(z.string().url()).min(1).max(3),
       price: z.number().positive().optional(),
       ctaText: z.string().default('Consultar precio'),
       ctaUrl: z.string().url().optional(),

@@ -355,21 +355,43 @@ function ReviewItem({ review, canRespond, onResponded }: { review: Review; canRe
 }
 
 function AdCard({ ad }: { ad: Ad }) {
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
+  const images = ad.imageUrls && ad.imageUrls.length > 0 ? ad.imageUrls : []
+
   const handleClick = async () => {
     try { const { ads: adsApi } = await import('@/lib/api'); const result = await adsApi.click(ad.id) as any; if (result.redirectUrl) window.open(result.redirectUrl, '_blank') }
     catch (e) { console.error(e) }
   }
+
   return (
-    <div className="card p-3 border border-brand-amber/20 mb-2">
-      <div className="flex items-start gap-3">
-        <img src={ad.imageUrl} alt={ad.title} className="w-12 h-12 rounded-lg object-cover flex-shrink-0 bg-gray-100" onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
-        <div className="flex-1 min-w-0">
-          <div className="flex items-start justify-between gap-1"><p className="text-xs font-semibold text-brand-dark leading-tight">{ad.title}</p><span className="text-xs text-brand-amber bg-brand-amber-dim px-1.5 py-0.5 rounded flex-shrink-0">Patrocinado</span></div>
-          <p className="text-xs text-brand-slate mt-0.5 line-clamp-2">{ad.description}</p>
-          {ad.price && <p className="text-sm font-bold text-brand-green mt-1">USD {ad.price.toFixed(2)}</p>}
-          <button onClick={handleClick} className="mt-2 text-xs btn-dark py-1.5 px-3">{ad.ctaText}</button>
+    <>
+      <div className="card p-3 border border-brand-amber/20 mb-2">
+        <div className="flex items-start gap-3">
+          <button type="button" onClick={() => images.length > 0 && setLightboxIndex(0)} className="relative flex-shrink-0">
+            <img src={images[0]} alt={ad.title} className="w-12 h-12 rounded-lg object-cover bg-gray-100" onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+            {images.length > 1 && <span className="absolute -bottom-1 -right-1 bg-brand-dark text-white text-[9px] leading-none px-1 py-0.5 rounded-full">+{images.length - 1}</span>}
+          </button>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-start justify-between gap-1"><p className="text-xs font-semibold text-brand-dark leading-tight">{ad.title}</p><span className="text-xs text-brand-amber bg-brand-amber-dim px-1.5 py-0.5 rounded flex-shrink-0">Patrocinado</span></div>
+            <p className="text-xs text-brand-slate mt-0.5 line-clamp-2">{ad.description}</p>
+            {ad.price && <p className="text-sm font-bold text-brand-green mt-1">USD {ad.price.toFixed(2)}</p>}
+            <button onClick={handleClick} className="mt-2 text-xs btn-dark py-1.5 px-3">{ad.ctaText}</button>
+          </div>
         </div>
       </div>
-    </div>
+
+      {lightboxIndex !== null && (
+        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4" onClick={() => setLightboxIndex(null)}>
+          <button onClick={() => setLightboxIndex(null)} className="absolute top-4 right-4 text-white text-2xl leading-none">✕</button>
+          {images.length > 1 && lightboxIndex > 0 && (
+            <button onClick={(e) => { e.stopPropagation(); setLightboxIndex(lightboxIndex - 1) }} className="absolute left-4 text-white text-3xl">‹</button>
+          )}
+          <img src={images[lightboxIndex]} alt={ad.title} className="max-w-full max-h-full rounded-lg" onClick={(e) => e.stopPropagation()} />
+          {images.length > 1 && lightboxIndex < images.length - 1 && (
+            <button onClick={(e) => { e.stopPropagation(); setLightboxIndex(lightboxIndex + 1) }} className="absolute right-4 text-white text-3xl">›</button>
+          )}
+        </div>
+      )}
+    </>
   )
 }

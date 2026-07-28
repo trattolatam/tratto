@@ -79,7 +79,7 @@ export default function AdsPage() {
               const status = STATUS_LABELS[ad.status] || STATUS_LABELS.PENDING
               return (
                 <div key={ad.id} className="card p-4 flex gap-4">
-                  <img src={ad.imageUrl} alt={ad.title} className="w-20 h-20 rounded-lg object-cover flex-shrink-0 bg-gray-100" />
+                  <img src={ad.imageUrls?.[0]} alt={ad.title} className="w-20 h-20 rounded-lg object-cover flex-shrink-0 bg-gray-100" />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <p className="text-sm font-semibold text-brand-dark truncate">{ad.title}</p>
@@ -141,7 +141,7 @@ function RechargeForm({ onClose }: { onClose: () => void }) {
 
 function CreateAdForm({ categoryOptions, onCreated }: { categoryOptions: any[]; onCreated: () => void }) {
   const [form, setForm] = useState({ title: '', description: '', price: '', ctaText: 'Consultar precio', ctaUrl: '', model: 'CPC' as 'CPC' | 'CPM', dailyBudget: '5', companyName: '' })
-  const [imageUrl, setImageUrl] = useState('')
+  const [imageUrls, setImageUrls] = useState<string[]>([])
   const [uploadingImage, setUploadingImage] = useState(false)
   const [categoryIds, setCategoryIds] = useState<string[]>([])
   const [targetCountries, setTargetCountries] = useState<string[]>(['UY'])
@@ -159,16 +159,19 @@ function CreateAdForm({ categoryOptions, onCreated }: { categoryOptions: any[]; 
   const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
+    if (imageUrls.length >= 3) { setError('Máximo 3 imágenes por anuncio'); return }
     setUploadingImage(true); setError('')
-    try { const data = await upload.adImage(file); setImageUrl(data.url) }
+    try { const data = await upload.adImage(file); setImageUrls((prev) => [...prev, data.url]) }
     catch (err: any) { setError(err.message) }
-    finally { setUploadingImage(false) }
+    finally { setUploadingImage(false); e.target.value = '' }
   }
+
+  const handleRemoveImage = (index: number) => setImageUrls((prev) => prev.filter((_, i) => i !== index))
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
-    if (!imageUrl) { setError('Subí una imagen para el anuncio'); return }
+    if (imageUrls.length === 0) { setError('Subí al menos una imagen para el anuncio'); return }
     if (categoryIds.length === 0) { setError('Elegí al menos un rubro'); return }
     if (targetCountries.length === 0) { setError('Elegí al menos un país'); return }
 
@@ -176,6 +179,7 @@ function CreateAdForm({ categoryOptions, onCreated }: { categoryOptions: any[]; 
     try {
       const result: any = await adsApi.create({
         ...form,
+        imageUrls,
         price: form.price ? Number(form.price) : undefined,
         dailyBudget: Number(form.dailyBudget),
         ctaUrl: form.ctaUrl || undefined,
@@ -197,10 +201,17 @@ function CreateAdForm({ categoryOptions, onCreated }: { categoryOptions: any[]; 
       {error && <p className="text-xs text-brand-red">{error}</p>}
 
       <div>
-        <label className="label">Imagen del anuncio</label>
-        <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleImageChange} className="text-sm" />
+        <label className="label">Imágenes del anuncio <span className="font-normal normal-case text-gray-400">(hasta 3)</span></label>
+        <div className="flex gap-2 flex-wrap mb-2">
+          {imageUrls.map((url, i) => (
+            <div key={i} className="relative">
+              <img src={url} alt={`preview ${i + 1}`} className="w-20 h-20 rounded-lg object-cover" />
+              <button type="button" onClick={() => handleRemoveImage(i)} className="absolute -top-1.5 -right-1.5 bg-brand-dark text-white w-5 h-5 rounded-full text-xs leading-none">✕</button>
+            </div>
+          ))}
+        </div>
+        {imageUrls.length < 3 && <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleImageChange} disabled={uploadingImage} className="text-sm" />}
         {uploadingImage && <p className="text-xs text-brand-slate mt-1">Subiendo...</p>}
-        {imageUrl && <img src={imageUrl} alt="preview" className="w-24 h-24 rounded-lg object-cover mt-2" />}
       </div>
 
       <div><label className="label">Nombre de tu empresa/marca</label><input required className="input text-sm" value={form.companyName} onChange={e => setForm(f => ({ ...f, companyName: e.target.value }))} /></div>
