@@ -9,7 +9,7 @@ const PLAN_PRICES: Record<string, string> = {
   ENTERPRISE: process.env.STRIPE_PRICE_ENTERPRISE!,
 }
 
-const PLAN_AMOUNTS: Record<string, number> = { PROFESSIONAL: 29, PREMIUM: 79, ENTERPRISE: 199 }
+const PLAN_AMOUNTS: Record<string, number> = { PROFESSIONAL: 10, PREMIUM: 25, ENTERPRISE: 50 }
 
 export async function createCheckoutSession({ companyId, plan, successUrl, cancelUrl, customerEmail }: {
   companyId: string; plan: 'PROFESSIONAL' | 'PREMIUM' | 'ENTERPRISE'; successUrl: string; cancelUrl: string; customerEmail: string
@@ -76,7 +76,7 @@ export async function handleStripeWebhook(payload: Buffer, signature: string): P
       const { companyId, plan } = sub.metadata
       if (!companyId || !plan) break
 
-      const amount = PLAN_AMOUNTS[plan] || 29
+      const amount = PLAN_AMOUNTS[plan] || 10
       const status = sub.status === 'active' || sub.status === 'trialing' ? 'ACTIVE' : sub.status === 'past_due' ? 'PAST_DUE' : 'PAUSED'
 
       await prisma.subscription.upsert({

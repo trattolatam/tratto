@@ -9,7 +9,7 @@ const BASE_URL = process.env.NODE_ENV === 'production'
 const API_KEY = process.env.DLOCALGO_API_KEY!
 const API_SECRET = process.env.DLOCALGO_API_SECRET!
 
-const PLAN_AMOUNTS: Record<string, number> = { PROFESSIONAL: 29, PREMIUM: 79 }
+const PLAN_AMOUNTS: Record<string, number> = { PROFESSIONAL: 10, PREMIUM: 25 }
 
 function authHeaders() {
   const token = Buffer.from(`${API_KEY}:${API_SECRET}`).toString('base64')
