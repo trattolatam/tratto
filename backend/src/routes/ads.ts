@@ -4,6 +4,17 @@ import { prisma } from '../lib/prisma'
 import { requireAuth, requireAdmin } from '../middleware/auth'
 import { INTERESTS } from '../constants/targeting'
 
+const LOW_BALANCE_THRESHOLD = 5
+const MAX_IMPRESSIONS_PER_USER_PER_DAY = 3 // tope de repeticiones: no cansar al mismo usuario con el mismo anuncio
+// 1x1 gif transparente — para el pixel de conversión, así funciona como <img src="..."> en cualquier sitio externo
+const TRANSPARENT_PIXEL = Buffer.from('R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==', 'base64')
+
+async function assertIsOwner(id: string, userId: string) {
+  const ad = await prisma.ad.findUnique({ where: { id }, include: { adAccount: true } })
+  if (!ad || ad.adAccount.userId !== userId) return null
+  return ad
+}
+
 export default async function adRoutes(app: FastifyInstance) {
 
   app.get('/feed', async (request, reply) => {
@@ -18,25 +29,31 @@ export default async function adRoutes(app: FastifyInstance) {
     // Sin login, o sin ese dato cargado, solo entran los anuncios sin restricción
     // en esa dimensión — no le mostramos a nadie un anuncio pensado para un
     // público específico si no sabemos si esa persona entra en ese público.
+    let viewerId: string | null = null
     let viewer: { ageRange: string | null; gender: string | null; interests: string[]; incomeLevel: string | null } | null = null
     try {
       await request.jwtVerify()
       const payload = request.user as any
+      viewerId = payload.userId
       viewer = await prisma.user.findUnique({
         where: { id: payload.userId },
         select: { ageRange: true, gender: true, interests: true, incomeLevel: true },
       })
     } catch { /* visitante anónimo — sigue sin datos de segmentación */ }
 
-    const where: any = { status: 'ACTIVE', adAccount: { balance: { gt: 0 } } }
+    const now = new Date()
+    const where: any = {
+      status: 'ACTIVE',
+      adAccount: { balance: { gt: 0 } },
+      OR: [{ startsAt: null }, { startsAt: { lte: now } }],
+      AND: [{ OR: [{ endsAt: null }, { endsAt: { gte: now } }] }],
+    }
     if (query.categoryId) where.targetCategories = { some: { categoryId: query.categoryId } }
     if (query.country) where.targetCountries = { has: query.country }
 
     const limit = parseInt(query.limit)
-    // Traemos un pool más grande del que pide el caller, porque después de
-    // filtrar por perfil puede que varios no califiquen — así igual llegamos al límite pedido.
     const candidates = await prisma.ad.findMany({
-      where, take: Math.min(limit * 5, 20), orderBy: { cpcUsd: 'desc' },
+      where, take: Math.min(limit * 6, 24), orderBy: { cpcUsd: 'desc' },
       select: {
         id: true, title: true, description: true, imageUrls: true, price: true, ctaText: true, ctaUrl: true,
         targetAgeRanges: true, targetGenders: true, targetInterests: true, targetIncomeLevels: true,
@@ -49,18 +66,30 @@ export default async function adRoutes(app: FastifyInstance) {
     const matchesInterests = (adInterests: string[], viewerInterests: string[]) =>
       adInterests.length === 0 || adInterests.some((i) => viewerInterests.includes(i))
 
-    const matched = candidates.filter((ad) =>
+    let demographicMatches = candidates.filter((ad) =>
       matchesDimension(ad.targetAgeRanges, viewer?.ageRange) &&
       matchesDimension(ad.targetGenders, viewer?.gender) &&
       matchesDimension(ad.targetIncomeLevels, viewer?.incomeLevel) &&
       matchesInterests(ad.targetInterests, viewer?.interests || [])
-    ).slice(0, limit)
+    )
 
+    if (viewerId) {
+      const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0)
+      const seenToday = await prisma.adEvent.groupBy({
+        by: ['adId'],
+        where: { userId: viewerId, type: 'impression', createdAt: { gte: todayStart }, adId: { in: demographicMatches.map((a) => a.id) } },
+        _count: { id: true },
+      })
+      const seenCounts = new Map(seenToday.map((s) => [s.adId, s._count.id]))
+      demographicMatches = demographicMatches.filter((ad) => (seenCounts.get(ad.id) || 0) < MAX_IMPRESSIONS_PER_USER_PER_DAY)
+    }
+
+    const matched = demographicMatches.slice(0, limit)
     const ads = matched.map(({ targetAgeRanges, targetGenders, targetInterests, targetIncomeLevels, ...ad }) => ad)
 
     if (ads.length > 0) {
       setImmediate(async () => {
-        await prisma.adEvent.createMany({ data: ads.map(ad => ({ adId: ad.id, type: 'impression', country: query.country })) })
+        await prisma.adEvent.createMany({ data: ads.map(ad => ({ adId: ad.id, type: 'impression', country: query.country, userId: viewerId || undefined })) })
         await prisma.ad.updateMany({ where: { id: { in: ads.map(a => a.id) } }, data: { impressions: { increment: 1 } } })
       })
     }
@@ -70,6 +99,9 @@ export default async function adRoutes(app: FastifyInstance) {
 
   app.post('/:id/click', async (request, reply) => {
     const { id } = request.params as { id: string }
+    let viewerId: string | undefined
+    try { await request.jwtVerify(); viewerId = (request.user as any).userId } catch { /* anónimo */ }
+
     const ad = await prisma.ad.findUnique({ where: { id, status: 'ACTIVE' }, include: { adAccount: true } })
     if (!ad) return reply.status(404).send({ error: true, message: 'Anuncio no encontrado' })
 
@@ -79,11 +111,22 @@ export default async function adRoutes(app: FastifyInstance) {
       return reply.status(410).send({ error: true, message: 'Sin saldo disponible' })
     }
 
+    const newBalance = ad.adAccount.balance - cost
     await Promise.all([
       prisma.adAccount.update({ where: { id: ad.adAccountId }, data: { balance: { decrement: cost } } }),
       prisma.ad.update({ where: { id }, data: { clicks: { increment: 1 }, totalSpent: { increment: cost } } }),
-      prisma.adEvent.create({ data: { adId: id, type: 'click' } }),
+      prisma.adEvent.create({ data: { adId: id, type: 'click', userId: viewerId } }),
     ])
+
+    if (newBalance < LOW_BALANCE_THRESHOLD && !ad.adAccount.lowBalanceNotifiedAt) {
+      await prisma.adAccount.update({ where: { id: ad.adAccountId }, data: { lowBalanceNotifiedAt: new Date() } })
+      const { sendNotification } = await import('../services/notifications')
+      await sendNotification({
+        userId: ad.adAccount.userId, type: 'AD_LOW_BALANCE',
+        title: 'Se te está por acabar el saldo de anuncios',
+        body: `Te quedan USD ${newBalance.toFixed(2)} en tu cuenta de Tratto Ads. Recargá para que tus anuncios no se pausen solos.`,
+      })
+    }
 
     const today = new Date(); today.setHours(0, 0, 0, 0)
     const todaySpend = await prisma.adEvent.count({ where: { adId: id, type: 'click', createdAt: { gte: today } } })
@@ -92,6 +135,14 @@ export default async function adRoutes(app: FastifyInstance) {
     }
 
     return reply.send({ success: true, redirectUrl: ad.ctaUrl })
+  })
+
+  app.get('/:id/convert', async (request, reply) => {
+    const { id } = request.params as { id: string }
+    prisma.ad.update({ where: { id }, data: { conversions: { increment: 1 } } }).catch(() => {})
+    reply.header('Content-Type', 'image/gif')
+    reply.header('Cache-Control', 'no-store')
+    return reply.send(TRANSPARENT_PIXEL)
   })
 
   app.get('/my', { preHandler: requireAuth }, async (request, reply) => {
@@ -103,26 +154,27 @@ export default async function adRoutes(app: FastifyInstance) {
     return reply.send({ account, ads: account.ads })
   })
 
-  app.post('/', { preHandler: requireAuth }, async (request, reply) => {
-    const schema = z.object({
-      title: z.string().min(5).max(80),
-      description: z.string().min(10).max(300),
-      imageUrls: z.array(z.string().url()).min(1).max(3),
-      price: z.number().positive().optional(),
-      ctaText: z.string().default('Consultar precio'),
-      ctaUrl: z.string().url().optional(),
-      model: z.enum(['CPC', 'CPM']).default('CPC'),
-      dailyBudget: z.number().min(3),
-      categoryIds: z.array(z.string().uuid()).min(1),
-      targetCountries: z.array(z.string()).min(1),
-      companyName: z.string().min(2),
-      // Segmentación demográfica — todos opcionales, array vacío/ausente = sin filtro en esa dimensión
-      targetAgeRanges: z.array(z.enum(['R18_24', 'R25_34', 'R35_44', 'R45_54', 'R55_64', 'R65_PLUS'])).default([]),
-      targetGenders: z.array(z.enum(['MALE', 'FEMALE', 'OTHER', 'PREFER_NOT_TO_SAY'])).default([]),
-      targetInterests: z.array(z.string()).default([]),
-      targetIncomeLevels: z.array(z.enum(['LOW', 'MEDIUM', 'HIGH', 'PREFER_NOT_TO_SAY'])).default([]),
-    })
+  const adInputFields = {
+    title: z.string().min(5).max(80),
+    description: z.string().min(10).max(300),
+    imageUrls: z.array(z.string().url()).min(1).max(3),
+    price: z.number().positive().optional(),
+    ctaText: z.string().default('Consultar precio'),
+    ctaUrl: z.string().url().optional(),
+    model: z.enum(['CPC', 'CPM']).default('CPC'),
+    dailyBudget: z.number().min(3),
+    categoryIds: z.array(z.string().uuid()).min(1),
+    targetCountries: z.array(z.string()).min(1),
+    targetAgeRanges: z.array(z.enum(['R18_24', 'R25_34', 'R35_44', 'R45_54', 'R55_64', 'R65_PLUS'])).default([]),
+    targetGenders: z.array(z.enum(['MALE', 'FEMALE', 'OTHER', 'PREFER_NOT_TO_SAY'])).default([]),
+    targetInterests: z.array(z.string()).default([]),
+    targetIncomeLevels: z.array(z.enum(['LOW', 'MEDIUM', 'HIGH', 'PREFER_NOT_TO_SAY'])).default([]),
+    startsAt: z.string().datetime().optional(),
+    endsAt: z.string().datetime().optional(),
+  }
 
+  app.post('/', { preHandler: requireAuth }, async (request, reply) => {
+    const schema = z.object({ ...adInputFields, companyName: z.string().min(2) })
     const body = schema.safeParse(request.body)
     if (!body.success) return reply.status(400).send({ error: true, message: 'Datos inválidos', details: body.error.issues })
 
@@ -134,13 +186,60 @@ export default async function adRoutes(app: FastifyInstance) {
     let account = await prisma.adAccount.findFirst({ where: { userId: request.user.userId } })
     if (!account) account = await prisma.adAccount.create({ data: { userId: request.user.userId, companyName: body.data.companyName } })
 
-    const { categoryIds, companyName, ...adData } = body.data
+    const { categoryIds, companyName, startsAt, endsAt, ...adData } = body.data
     const ad = await prisma.ad.create({
-      data: { ...adData, cpcUsd: 0.35, adAccountId: account.id, status: 'PENDING', targetCategories: { create: categoryIds.map(categoryId => ({ categoryId })) } },
+      data: {
+        ...adData, cpcUsd: 0.35, adAccountId: account.id, status: 'PENDING',
+        startsAt: startsAt ? new Date(startsAt) : null, endsAt: endsAt ? new Date(endsAt) : null,
+        targetCategories: { create: categoryIds.map(categoryId => ({ categoryId })) },
+      },
       include: { targetCategories: { include: { category: true } } },
     })
 
     return reply.status(201).send({ ad, message: 'Anuncio enviado a revisión. Activo en menos de 24hs.' })
+  })
+
+  app.patch('/:id', { preHandler: requireAuth }, async (request, reply) => {
+    const { id } = request.params as { id: string }
+    const existing = await assertIsOwner(id, request.user.userId)
+    if (!existing) return reply.status(404).send({ error: true, message: 'Anuncio no encontrado' })
+
+    const schema = z.object(adInputFields).partial()
+    const body = schema.safeParse(request.body)
+    if (!body.success) return reply.status(400).send({ error: true, message: 'Datos inválidos', details: body.error.issues })
+
+    if (body.data.targetInterests && body.data.targetInterests.length > 0) {
+      const invalid = body.data.targetInterests.filter((i) => !(INTERESTS as readonly string[]).includes(i))
+      if (invalid.length > 0) return reply.status(400).send({ error: true, message: `Interés inválido: ${invalid[0]}` })
+    }
+
+    const { categoryIds, startsAt, endsAt, ...adData } = body.data
+    const ad = await prisma.ad.update({
+      where: { id },
+      data: {
+        ...adData, status: 'PENDING', rejectionNote: null,
+        ...(startsAt !== undefined ? { startsAt: startsAt ? new Date(startsAt) : null } : {}),
+        ...(endsAt !== undefined ? { endsAt: endsAt ? new Date(endsAt) : null } : {}),
+        ...(categoryIds ? { targetCategories: { deleteMany: {}, create: categoryIds.map((categoryId) => ({ categoryId })) } } : {}),
+      },
+      include: { targetCategories: { include: { category: true } } },
+    })
+
+    return reply.send({ ad, message: 'Anuncio actualizado. Vuelve a revisión antes de mostrarse.' })
+  })
+
+  app.patch('/:id/toggle-status', { preHandler: requireAuth }, async (request, reply) => {
+    const { id } = request.params as { id: string }
+    const ad = await assertIsOwner(id, request.user.userId)
+    if (!ad) return reply.status(404).send({ error: true, message: 'Anuncio no encontrado' })
+
+    if (ad.status !== 'ACTIVE' && ad.status !== 'PAUSED') {
+      return reply.status(400).send({ error: true, message: 'Solo se puede pausar o reanudar un anuncio activo' })
+    }
+
+    const newStatus = ad.status === 'ACTIVE' ? 'PAUSED' : 'ACTIVE'
+    const updated = await prisma.ad.update({ where: { id }, data: { status: newStatus } })
+    return reply.send({ ad: updated })
   })
 
   app.post('/:adAccountId/recharge', { preHandler: requireAuth }, async (request, reply) => {
@@ -148,7 +247,10 @@ export default async function adRoutes(app: FastifyInstance) {
     const body = z.object({ amountUsd: z.number().min(20) }).safeParse(request.body)
     if (!body.success) return reply.status(400).send({ error: true, message: 'Monto mínimo: USD 20' })
 
-    const account = await prisma.adAccount.update({ where: { id: adAccountId }, data: { balance: { increment: body.data.amountUsd } } })
+    const account = await prisma.adAccount.update({
+      where: { id: adAccountId },
+      data: { balance: { increment: body.data.amountUsd }, lowBalanceNotifiedAt: null },
+    })
     await prisma.ad.updateMany({ where: { adAccountId, status: 'EXHAUSTED' }, data: { status: 'ACTIVE' } })
 
     return reply.send({ account, message: `Saldo recargado: USD ${body.data.amountUsd}` })

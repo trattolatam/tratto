@@ -76,6 +76,7 @@ enum NotificationType {
   AD_REJECTED
   LEAD_RECEIVED
   TEAM_INVITE
+  AD_LOW_BALANCE
 }
 
 // ─── USUARIOS ─────────────────────────────────────────────────────────────────
@@ -392,6 +393,7 @@ model AdAccount {
   userId      String
   companyName String
   balance     Float     @default(0)
+  lowBalanceNotifiedAt DateTime?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
@@ -461,6 +463,7 @@ model AdEvent {
   id        String    @id @default(uuid())
   adId      String
   type      String
+  userId    String?
   country   String?
   city      String?
   createdAt DateTime  @default(now())
@@ -468,6 +471,7 @@ model AdEvent {
   ad        Ad        @relation(fields: [adId], references: [id])
 
   @@index([adId, type])
+  @@index([adId, userId, createdAt])
   @@map("ad_events")
 }
 

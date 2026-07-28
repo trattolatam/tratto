@@ -6,6 +6,7 @@ import { ads as adsApi, categories as categoriesApi, upload, subscriptions as pa
 import { useAuthStore } from '@/lib/store'
 import { AGE_RANGES, GENDERS, INCOME_LEVELS, INTERESTS } from '@/lib/targeting'
 
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://tratto-api-dk42.onrender.com'
 const COUNTRIES = [{ code: 'UY', name: 'Uruguay' }, { code: 'AR', name: 'Argentina' }, { code: 'CL', name: 'Chile' }, { code: 'MX', name: 'México' }, { code: 'CO', name: 'Colombia' }, { code: 'PE', name: 'Perú' }, { code: 'BR', name: 'Brasil' }]
 
 const STATUS_LABELS: Record<string, { label: string; className: string }> = {
@@ -24,8 +25,11 @@ export default function AdsPage() {
   const [myAds, setMyAds] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [showCreate, setShowCreate] = useState(false)
+  const [editingAd, setEditingAd] = useState<any>(null)
   const [showRecharge, setShowRecharge] = useState(false)
   const [categoryOptions, setCategoryOptions] = useState<any[]>([])
+  const [togglingId, setTogglingId] = useState<string | null>(null)
+  const [expandedPixel, setExpandedPixel] = useState<string | null>(null)
 
   const load = () => {
     adsApi.my().then((data: any) => { setAccount(data.account); setMyAds(data.ads) }).finally(() => setLoading(false))
@@ -36,6 +40,13 @@ export default function AdsPage() {
     load()
     categoriesApi.list().then((data: any) => setCategoryOptions(data.categories)).catch(() => {})
   }, [user])
+
+  const handleToggleStatus = async (id: string) => {
+    setTogglingId(id)
+    try { await adsApi.toggleStatus(id); load() }
+    catch (err: any) { alert(err.message) }
+    finally { setTogglingId(null) }
+  }
 
   if (!user) return null
 
@@ -68,32 +79,50 @@ export default function AdsPage() {
 
           <div className="flex items-center justify-between">
             <p className="text-sm font-semibold text-brand-dark">Mis anuncios</p>
-            <button onClick={() => setShowCreate(!showCreate)} className="btn-primary text-sm py-2 px-4">{showCreate ? 'Cancelar' : '+ Crear anuncio'}</button>
+            <button onClick={() => { setShowCreate(!showCreate); setEditingAd(null) }} className="btn-primary text-sm py-2 px-4">{showCreate ? 'Cancelar' : '+ Crear anuncio'}</button>
           </div>
 
-          {showCreate && <CreateAdForm categoryOptions={categoryOptions} onCreated={() => { setShowCreate(false); load() }} />}
+          {showCreate && !editingAd && <CreateAdForm categoryOptions={categoryOptions} onCreated={() => { setShowCreate(false); load() }} />}
+          {editingAd && <CreateAdForm categoryOptions={categoryOptions} existingAd={editingAd} onCreated={() => { setEditingAd(null); load() }} onCancel={() => setEditingAd(null)} />}
 
           <div className="space-y-3">
             {myAds.length === 0 && !showCreate && <div className="card p-8 text-center text-sm text-brand-slate">Todavía no tenés ningún anuncio. Creá el primero arriba.</div>}
             {myAds.map((ad) => {
               const status = STATUS_LABELS[ad.status] || STATUS_LABELS.PENDING
+              const pixelUrl = `${API_BASE}/api/ads/${ad.id}/convert`
               return (
-                <div key={ad.id} className="card p-4 flex gap-4">
-                  <img src={ad.imageUrls?.[0]} alt={ad.title} className="w-20 h-20 rounded-lg object-cover flex-shrink-0 bg-gray-100" />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <p className="text-sm font-semibold text-brand-dark truncate">{ad.title}</p>
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${status.className}`}>{status.label}</span>
+                <div key={ad.id} className="card p-4">
+                  <div className="flex gap-4">
+                    <img src={ad.imageUrls?.[0]} alt={ad.title} className="w-20 h-20 rounded-lg object-cover flex-shrink-0 bg-gray-100" />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <p className="text-sm font-semibold text-brand-dark truncate">{ad.title}</p>
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${status.className}`}>{status.label}</span>
+                      </div>
+                      <p className="text-xs text-brand-slate truncate mb-2">{ad.description}</p>
+                      <div className="flex gap-4 text-xs text-brand-slate flex-wrap">
+                        <span>{ad.impressions} vistas</span>
+                        <span>{ad.clicks} clics</span>
+                        <span>{ad.conversions} conversiones</span>
+                        <span>USD {ad.totalSpent.toFixed(2)} gastado</span>
+                        <span>{ad.model === 'CPC' ? `USD ${ad.cpcUsd}/clic` : `USD ${ad.cpmUsd || 0}/mil vistas`}</span>
+                      </div>
+                      {ad.rejectionNote && <p className="text-xs text-brand-red mt-2">Motivo del rechazo: {ad.rejectionNote}</p>}
+                      <div className="flex gap-3 mt-3">
+                        {(ad.status === 'ACTIVE' || ad.status === 'PAUSED') && (
+                          <button onClick={() => handleToggleStatus(ad.id)} disabled={togglingId === ad.id} className="text-xs text-brand-green hover:underline disabled:opacity-50">{ad.status === 'ACTIVE' ? 'Pausar' : 'Reanudar'}</button>
+                        )}
+                        <button onClick={() => { setEditingAd(ad); setShowCreate(false); window.scrollTo({ top: 0, behavior: 'smooth' }) }} className="text-xs text-brand-slate hover:underline">Editar</button>
+                        <button onClick={() => setExpandedPixel(expandedPixel === ad.id ? null : ad.id)} className="text-xs text-brand-slate hover:underline">Pixel de conversión</button>
+                      </div>
                     </div>
-                    <p className="text-xs text-brand-slate truncate mb-2">{ad.description}</p>
-                    <div className="flex gap-4 text-xs text-brand-slate">
-                      <span>{ad.impressions} vistas</span>
-                      <span>{ad.clicks} clics</span>
-                      <span>USD {ad.totalSpent.toFixed(2)} gastado</span>
-                      <span>{ad.model === 'CPC' ? `USD ${ad.cpcUsd}/clic` : `USD ${ad.cpmUsd || 0}/mil vistas`}</span>
-                    </div>
-                    {ad.rejectionNote && <p className="text-xs text-brand-red mt-2">Motivo del rechazo: {ad.rejectionNote}</p>}
                   </div>
+                  {expandedPixel === ad.id && (
+                    <div className="mt-3 pt-3 border-t border-gray-100">
+                      <p className="text-xs text-brand-slate mb-2">Pegá esto en la página de "gracias por tu compra" de tu sitio para medir conversiones reales, no solo clics:</p>
+                      <code className="block bg-gray-50 rounded-lg p-3 text-xs break-all">{`<img src="${pixelUrl}" width="1" height="1" style="display:none" alt="" />`}</code>
+                    </div>
+                  )}
                 </div>
               )
             })}
@@ -139,16 +168,29 @@ function RechargeForm({ onClose }: { onClose: () => void }) {
   )
 }
 
-function CreateAdForm({ categoryOptions, onCreated }: { categoryOptions: any[]; onCreated: () => void }) {
-  const [form, setForm] = useState({ title: '', description: '', price: '', ctaText: 'Consultar precio', ctaUrl: '', model: 'CPC' as 'CPC' | 'CPM', dailyBudget: '5', companyName: '' })
-  const [imageUrls, setImageUrls] = useState<string[]>([])
+function toLocalDatetimeInput(iso?: string | null) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+function CreateAdForm({ categoryOptions, onCreated, existingAd, onCancel }: { categoryOptions: any[]; onCreated: () => void; existingAd?: any; onCancel?: () => void }) {
+  const isEditing = !!existingAd
+  const [form, setForm] = useState({
+    title: existingAd?.title || '', description: existingAd?.description || '', price: existingAd?.price ? String(existingAd.price) : '',
+    ctaText: existingAd?.ctaText || 'Consultar precio', ctaUrl: existingAd?.ctaUrl || '', model: (existingAd?.model || 'CPC') as 'CPC' | 'CPM',
+    dailyBudget: existingAd ? String(existingAd.dailyBudget) : '5', companyName: existingAd?.adAccount?.companyName || '',
+    startsAt: toLocalDatetimeInput(existingAd?.startsAt), endsAt: toLocalDatetimeInput(existingAd?.endsAt),
+  })
+  const [imageUrls, setImageUrls] = useState<string[]>(existingAd?.imageUrls || [])
   const [uploadingImage, setUploadingImage] = useState(false)
-  const [categoryIds, setCategoryIds] = useState<string[]>([])
-  const [targetCountries, setTargetCountries] = useState<string[]>(['UY'])
-  const [ageRanges, setAgeRanges] = useState<string[]>([])
-  const [genders, setGenders] = useState<string[]>([])
-  const [interests, setInterests] = useState<string[]>([])
-  const [incomeLevels, setIncomeLevels] = useState<string[]>([])
+  const [categoryIds, setCategoryIds] = useState<string[]>(existingAd?.targetCategories?.map((tc: any) => tc.categoryId) || [])
+  const [targetCountries, setTargetCountries] = useState<string[]>(existingAd?.targetCountries?.length ? existingAd.targetCountries : ['UY'])
+  const [ageRanges, setAgeRanges] = useState<string[]>(existingAd?.targetAgeRanges || [])
+  const [genders, setGenders] = useState<string[]>(existingAd?.targetGenders || [])
+  const [interests, setInterests] = useState<string[]>(existingAd?.targetInterests || [])
+  const [incomeLevels, setIncomeLevels] = useState<string[]>(existingAd?.targetIncomeLevels || [])
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
@@ -177,7 +219,7 @@ function CreateAdForm({ categoryOptions, onCreated }: { categoryOptions: any[]; 
 
     setSubmitting(true)
     try {
-      const result: any = await adsApi.create({
+      const payload: any = {
         ...form,
         imageUrls,
         price: form.price ? Number(form.price) : undefined,
@@ -185,7 +227,12 @@ function CreateAdForm({ categoryOptions, onCreated }: { categoryOptions: any[]; 
         ctaUrl: form.ctaUrl || undefined,
         categoryIds, targetCountries,
         targetAgeRanges: ageRanges, targetGenders: genders, targetInterests: interests, targetIncomeLevels: incomeLevels,
-      })
+        startsAt: form.startsAt ? new Date(form.startsAt).toISOString() : undefined,
+        endsAt: form.endsAt ? new Date(form.endsAt).toISOString() : undefined,
+      }
+      let result: any
+      if (isEditing) { delete payload.companyName; result = await adsApi.update(existingAd.id, payload) }
+      else result = await adsApi.create(payload)
       setSuccess(result.message)
       setTimeout(onCreated, 1500)
     } catch (err: any) { setError(err.message) }
@@ -198,6 +245,7 @@ function CreateAdForm({ categoryOptions, onCreated }: { categoryOptions: any[]; 
 
   return (
     <form onSubmit={handleSubmit} className="card p-5 space-y-4">
+      {isEditing && <p className="text-xs text-brand-amber bg-brand-amber-dim px-3 py-2 rounded-lg">Editando "{existingAd.title}" — al guardar, vuelve a revisión antes de mostrarse de nuevo.</p>}
       {error && <p className="text-xs text-brand-red">{error}</p>}
 
       <div>
@@ -214,7 +262,7 @@ function CreateAdForm({ categoryOptions, onCreated }: { categoryOptions: any[]; 
         {uploadingImage && <p className="text-xs text-brand-slate mt-1">Subiendo...</p>}
       </div>
 
-      <div><label className="label">Nombre de tu empresa/marca</label><input required className="input text-sm" value={form.companyName} onChange={e => setForm(f => ({ ...f, companyName: e.target.value }))} /></div>
+      {!isEditing && <div><label className="label">Nombre de tu empresa/marca</label><input required className="input text-sm" value={form.companyName} onChange={e => setForm(f => ({ ...f, companyName: e.target.value }))} /></div>}
       <div><label className="label">Título del anuncio</label><input required maxLength={80} className="input text-sm" value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} /></div>
       <div><label className="label">Descripción</label><textarea required maxLength={300} rows={2} className="input text-sm" value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} /></div>
 
@@ -232,6 +280,12 @@ function CreateAdForm({ categoryOptions, onCreated }: { categoryOptions: any[]; 
       </div>
 
       <div><label className="label">Presupuesto diario (USD, mínimo 3)</label><input type="number" min={3} required className="input text-sm w-32" value={form.dailyBudget} onChange={e => setForm(f => ({ ...f, dailyBudget: e.target.value }))} /></div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div><label className="label">Empieza (opcional)</label><input type="datetime-local" className="input text-sm" value={form.startsAt} onChange={e => setForm(f => ({ ...f, startsAt: e.target.value }))} /></div>
+        <div><label className="label">Termina (opcional)</label><input type="datetime-local" className="input text-sm" value={form.endsAt} onChange={e => setForm(f => ({ ...f, endsAt: e.target.value }))} /></div>
+      </div>
+      <p className="text-xs text-brand-slate -mt-2">Sin fecha, la campaña corre sin límite de tiempo (hasta que se te acabe el saldo o la pauses).</p>
 
       <div>
         <label className="label">Rubros</label>
@@ -283,7 +337,10 @@ function CreateAdForm({ categoryOptions, onCreated }: { categoryOptions: any[]; 
         </div>
       </div>
 
-      <button type="submit" disabled={submitting || uploadingImage} className="btn-primary w-full py-3 text-sm disabled:opacity-50">{submitting ? 'Enviando...' : 'Enviar a revisión'}</button>
+      <div className="flex gap-2">
+        <button type="submit" disabled={submitting || uploadingImage} className="btn-primary flex-1 py-3 text-sm disabled:opacity-50">{submitting ? 'Enviando...' : isEditing ? 'Guardar cambios' : 'Enviar a revisión'}</button>
+        {isEditing && onCancel && <button type="button" onClick={onCancel} className="text-sm text-brand-slate hover:underline px-4">Cancelar</button>}
+      </div>
     </form>
   )
 }

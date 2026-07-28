@@ -129,6 +129,8 @@ export const ads = {
   click: (adId: string) => apiFetch(`/api/ads/${adId}/click`, { method: 'POST' }),
   my: () => apiFetch<{ account: any; ads: any[] }>('/api/ads/my'),
   create: (body: any) => apiFetch('/api/ads', { method: 'POST', body: JSON.stringify(body) }),
+  update: (id: string, body: any) => apiFetch<{ ad: any; message: string }>(`/api/ads/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  toggleStatus: (id: string) => apiFetch<{ ad: any }>(`/api/ads/${id}/toggle-status`, { method: 'PATCH' }),
 }
 
 export const subscriptions = {
