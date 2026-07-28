@@ -43,6 +43,8 @@ export const branches = {
   list: (companyId: string) => apiFetch<{ branches: any[] }>(`/api/companies/${companyId}/branches`),
   create: (companyId: string, body: { name: string; address: string; city: string; phone?: string }) =>
     apiFetch<{ branch: any }>(`/api/companies/${companyId}/branches`, { method: 'POST', body: JSON.stringify(body) }),
+  update: (companyId: string, branchId: string, body: { name?: string; address?: string; city?: string; phone?: string }) =>
+    apiFetch<{ branch: any }>(`/api/companies/${companyId}/branches/${branchId}`, { method: 'PATCH', body: JSON.stringify(body) }),
   remove: (companyId: string, branchId: string) =>
     apiFetch<{ ok: boolean }>(`/api/companies/${companyId}/branches/${branchId}`, { method: 'DELETE' }),
 }

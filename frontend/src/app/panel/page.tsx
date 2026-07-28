@@ -48,6 +48,9 @@ export default function PanelPage() {
   const [teamError, setTeamError] = useState('')
   const [companyBranches, setCompanyBranches] = useState<any[] | null>(null)
   const [branchForm, setBranchForm] = useState({ name: '', address: '', city: '', phone: '' })
+  const [editingBranchId, setEditingBranchId] = useState<string | null>(null)
+  const [editBranchForm, setEditBranchForm] = useState({ name: '', address: '', city: '', phone: '' })
+  const [savingBranch, setSavingBranch] = useState(false)
   const [addingBranch, setAddingBranch] = useState(false)
   const [webhooksList, setWebhooksList] = useState<any[] | null>(null)
   const [webhookUrl, setWebhookUrl] = useState('')
@@ -270,6 +273,14 @@ export default function PanelPage() {
     } catch (err: any) { setTeamError(err.message) }
   }
 
+  const handleUpdateMemberRole = async (memberId: string, role: 'ADMIN' | 'EDITOR' | 'VIEWER') => {
+    try {
+      await teamApi.updateRole(memberId, role)
+      const teamRes = await teamApi.list()
+      setTeamData(teamRes)
+    } catch (err: any) { setTeamError(err.message) }
+  }
+
   const handleCancelInvite = async (inviteId: string) => {
     if (!confirm('¿Cancelar esta invitación pendiente?')) return
     try {
@@ -290,6 +301,23 @@ export default function PanelPage() {
       setBranchForm({ name: '', address: '', city: '', phone: '' })
     } catch (err: any) { setTeamError(err.message) }
     finally { setAddingBranch(false) }
+  }
+
+  const handleStartEditBranch = (b: any) => {
+    setEditingBranchId(b.id)
+    setEditBranchForm({ name: b.name, address: b.address, city: b.city, phone: b.phone || '' })
+  }
+
+  const handleSaveEditBranch = async (branchId: string) => {
+    setSavingBranch(true)
+    setTeamError('')
+    try {
+      await branchesApi.update(company.id, branchId, editBranchForm)
+      const branchesRes = await branchesApi.list(company.id)
+      setCompanyBranches(branchesRes.branches)
+      setEditingBranchId(null)
+    } catch (err: any) { setTeamError(err.message) }
+    finally { setSavingBranch(false) }
   }
 
   const handleRemoveBranch = async (branchId: string) => {
@@ -872,7 +900,14 @@ export default function PanelPage() {
                   {(teamData?.members || []).map((m) => (
                     <div key={m.id} className="flex items-center justify-between text-sm border border-gray-100 rounded-lg px-3 py-2">
                       <div><p className="text-brand-dark">{m.user.name}</p><p className="text-xs text-brand-slate">{m.user.email}</p></div>
-                      <div className="flex items-center gap-2"><span className="text-xs text-brand-slate">{m.role}</span><button onClick={() => handleRemoveMember(m.id)} className="text-xs text-red-500 hover:underline">Sacar</button></div>
+                      <div className="flex items-center gap-2">
+                        <select className="input text-xs py-1.5 w-28" value={m.role} onChange={e => handleUpdateMemberRole(m.id, e.target.value as any)}>
+                          <option value="ADMIN">Admin</option>
+                          <option value="EDITOR">Editor</option>
+                          <option value="VIEWER">Solo ver</option>
+                        </select>
+                        <button onClick={() => handleRemoveMember(m.id)} className="text-xs text-red-500 hover:underline">Sacar</button>
+                      </div>
                     </div>
                   ))}
                   {(teamData?.pendingInvites || []).map((inv) => (
@@ -898,10 +933,28 @@ export default function PanelPage() {
                 <p className="text-sm font-semibold text-brand-dark mb-3">Sucursales</p>
                 <div className="space-y-2 mb-4">
                   {(companyBranches || []).map((b) => (
-                    <div key={b.id} className="flex items-center justify-between text-sm border border-gray-100 rounded-lg px-3 py-2">
-                      <div><p className="text-brand-dark">{b.name}</p><p className="text-xs text-brand-slate">{b.address}, {b.city} {b.phone ? `· ${b.phone}` : ''}</p></div>
-                      <button onClick={() => handleRemoveBranch(b.id)} className="text-xs text-red-500 hover:underline">Borrar</button>
-                    </div>
+                    editingBranchId === b.id ? (
+                      <div key={b.id} className="border border-brand-green/30 rounded-lg p-3 space-y-2">
+                        <div className="grid grid-cols-2 gap-2">
+                          <input required placeholder="Nombre de la sede" className="input text-sm" value={editBranchForm.name} onChange={e => setEditBranchForm(f => ({ ...f, name: e.target.value }))} />
+                          <input required placeholder="Ciudad" className="input text-sm" value={editBranchForm.city} onChange={e => setEditBranchForm(f => ({ ...f, city: e.target.value }))} />
+                          <input required placeholder="Dirección" className="input text-sm col-span-2" value={editBranchForm.address} onChange={e => setEditBranchForm(f => ({ ...f, address: e.target.value }))} />
+                          <input placeholder="Teléfono (opcional)" className="input text-sm col-span-2" value={editBranchForm.phone} onChange={e => setEditBranchForm(f => ({ ...f, phone: e.target.value }))} />
+                        </div>
+                        <div className="flex gap-2">
+                          <button onClick={() => handleSaveEditBranch(b.id)} disabled={savingBranch} className="btn-secondary text-xs py-1.5 px-3 disabled:opacity-50">{savingBranch ? 'Guardando...' : 'Guardar'}</button>
+                          <button onClick={() => setEditingBranchId(null)} className="text-xs text-brand-slate hover:underline">Cancelar</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div key={b.id} className="flex items-center justify-between text-sm border border-gray-100 rounded-lg px-3 py-2">
+                        <div><p className="text-brand-dark">{b.name}</p><p className="text-xs text-brand-slate">{b.address}, {b.city} {b.phone ? `· ${b.phone}` : ''}</p></div>
+                        <div className="flex items-center gap-2">
+                          <button onClick={() => handleStartEditBranch(b)} className="text-xs text-brand-green hover:underline">Editar</button>
+                          <button onClick={() => handleRemoveBranch(b.id)} className="text-xs text-red-500 hover:underline">Borrar</button>
+                        </div>
+                      </div>
+                    )
                   ))}
                 </div>
                 <form onSubmit={handleAddBranch} className="grid grid-cols-2 gap-2">
