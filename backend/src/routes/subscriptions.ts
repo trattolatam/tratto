@@ -6,14 +6,14 @@ import { leadRateLimit } from '../middleware/rateLimits'
 
 export async function subscriptionRoutes(app: FastifyInstance) {
   app.get('/my', { preHandler: requireBusinessOwner }, async (request, reply) => {
-    const company = await prisma.company.findFirst({ where: { claimedById: request.user.userId } })
+    const company = request.user.companyId ? await prisma.company.findUnique({ where: { id: request.user.companyId } }) : null
     if (!company) return reply.status(404).send({ error: true, message: 'Sin empresa asociada' })
     const sub = await prisma.subscription.findUnique({ where: { companyId: company.id } })
     return reply.send({ subscription: sub })
   })
 
   app.post('/cancel', { preHandler: requireBusinessOwner }, async (request, reply) => {
-    const company = await prisma.company.findFirst({ where: { claimedById: request.user.userId } })
+    const company = request.user.companyId ? await prisma.company.findUnique({ where: { id: request.user.companyId } }) : null
     if (!company) return reply.status(404).send({ error: true, message: 'Sin empresa' })
     const sub = await prisma.subscription.findUnique({ where: { companyId: company.id } })
     if (!sub) return reply.status(404).send({ error: true, message: 'Sin suscripción activa' })
@@ -62,7 +62,7 @@ export async function leadRoutes(app: FastifyInstance) {
   })
 
   app.get('/my', { preHandler: requireBusinessOwner }, async (request, reply) => {
-    const company = await prisma.company.findFirst({ where: { claimedById: request.user.userId } })
+    const company = request.user.companyId ? await prisma.company.findUnique({ where: { id: request.user.companyId } }) : null
     if (!company) return reply.status(404).send({ error: true, message: 'Sin empresa' })
     const leads = await prisma.lead.findMany({ where: { companyId: company.id }, orderBy: { createdAt: 'desc' }, take: 50 })
     return reply.send({ leads })
@@ -73,7 +73,7 @@ export async function leadRoutes(app: FastifyInstance) {
   // Competencia — sin este botón no hay forma de saber cuándo se respondió.
   app.patch('/:id/respond', { preHandler: [requireBusinessOwner, requireCompanyRank('EDITOR')] }, async (request, reply) => {
     const { id } = request.params as { id: string }
-    const company = await prisma.company.findFirst({ where: { claimedById: request.user.userId } })
+    const company = request.user.companyId ? await prisma.company.findUnique({ where: { id: request.user.companyId } }) : null
     if (!company) return reply.status(404).send({ error: true, message: 'Sin empresa' })
 
     const lead = await prisma.lead.findFirst({ where: { id, companyId: company.id } })

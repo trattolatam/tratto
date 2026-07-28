@@ -270,7 +270,7 @@ export default async function companyRoutes(app: FastifyInstance) {
   app.patch('/:id', { preHandler: [requireBusinessOwner, requireCompanyRank('ADMIN')] }, async (request, reply) => {
     const { id } = request.params as { id: string }
     const company = await prisma.company.findUnique({ where: { id } })
-    if (!company || company.claimedById !== request.user.userId) {
+    if (!company || company.id !== request.user.companyId) {
       return reply.status(403).send({ error: true, message: 'Sin permiso para editar esta empresa' })
     }
 
@@ -294,7 +294,7 @@ export default async function companyRoutes(app: FastifyInstance) {
   app.get('/:id/stats', { preHandler: requireBusinessOwner }, async (request, reply) => {
     const { id } = request.params as { id: string }
     const company = await prisma.company.findUnique({ where: { id }, include: { aiSummary: true } })
-    if (!company || company.claimedById !== request.user.userId) {
+    if (!company || company.id !== request.user.companyId) {
       return reply.status(403).send({ error: true, message: 'Sin permiso' })
     }
 
@@ -320,7 +320,7 @@ export default async function companyRoutes(app: FastifyInstance) {
   app.get('/:id/competitive-intel', { preHandler: [requireBusinessOwner, requirePlan('PREMIUM')] }, async (request, reply) => {
     const { id } = request.params as { id: string }
     const company = await prisma.company.findUnique({ where: { id }, include: { category: { select: { name: true } } } })
-    if (!company || company.claimedById !== request.user.userId) {
+    if (!company || company.id !== request.user.companyId) {
       return reply.status(403).send({ error: true, message: 'Sin permiso' })
     }
 
@@ -488,7 +488,7 @@ export default async function companyRoutes(app: FastifyInstance) {
     const { id } = request.params as { id: string }
     const company = await prisma.company.findUnique({ where: { id }, include: { category: { select: { name: true } } } })
 
-    if (!company || company.claimedById !== request.user.userId) {
+    if (!company || company.id !== request.user.companyId) {
       return reply.status(403).send({ error: true, message: 'Sin permiso' })
     }
 
