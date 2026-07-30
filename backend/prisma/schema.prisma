@@ -413,6 +413,19 @@ model Ad {
   price         Float?
   ctaText       String    @default("Consultar precio")
   ctaUrl        String?
+
+  // Datos de contacto — obligatorios al CREAR un anuncio (lo valida el
+  // formulario y el backend), pero opcionales acá a nivel de base para no
+  // romper anuncios viejos que se hayan cargado antes de este cambio.
+  // WhatsApp y teléfono se guardan ya normalizados en formato E.164
+  // (ej: +59897550450), validados contra el país con libphonenumber-js.
+  whatsappCountry String?
+  whatsappNumber  String?
+  phoneCountry    String?
+  phoneNumber     String?
+  contactEmail    String?
+  websiteUrl      String?
+
   model         AdModel   @default(CPC)
   cpcUsd        Float     @default(0.35)
   cpmUsd        Float?

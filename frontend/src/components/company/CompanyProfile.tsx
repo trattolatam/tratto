@@ -371,14 +371,14 @@ function AdCard({ ad }: { ad: Ad }) {
 
   return (
     <>
-      <button type="button" onClick={openDetails} className="card p-4 border border-brand-amber/20 mb-2 text-left w-full block appearance-none cursor-pointer hover:border-brand-amber/40 transition-colors">
+      <button type="button" onClick={openDetails} className="relative card p-4 border border-brand-amber/20 mb-2 text-left w-full block appearance-none cursor-pointer hover:border-brand-amber/40 transition-colors overflow-visible">
+        <span className="absolute -top-2 -right-2 bg-brand-amber text-white text-[10px] font-bold px-2.5 py-1 rounded-md shadow-sm rotate-3 z-10 whitespace-nowrap">Patrocinado</span>
         <div className="flex items-start gap-3">
           <div className="relative flex-shrink-0">
             <img src={images[0]} alt={ad.title} className="w-20 h-20 rounded-lg object-cover bg-gray-100" onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
             {images.length > 1 && <span className="absolute -bottom-1.5 -right-1.5 bg-brand-dark text-white text-[10px] leading-none px-1.5 py-1 rounded-full">+{images.length - 1}</span>}
           </div>
-          <div className="flex-1 min-w-0">
-            <span className="inline-block text-[10px] text-brand-amber bg-brand-amber-dim px-2 py-0.5 rounded mb-1">Patrocinado</span>
+          <div className="flex-1 min-w-0 pr-6">
             <p className="text-sm font-semibold text-brand-dark leading-snug line-clamp-2">{ad.title}</p>
             <p className="text-xs text-brand-slate mt-0.5 line-clamp-1">{ad.description}</p>
             {ad.price && <p className="text-sm font-bold text-brand-green mt-1">USD {ad.price.toFixed(2)}</p>}

@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { prisma } from '../lib/prisma'
 import { requireAuth, requireAdmin } from '../middleware/auth'
 import { INTERESTS } from '../constants/targeting'
+import { validateAndNormalizePhone } from '../utils/phone'
 
 const LOW_BALANCE_THRESHOLD = 5
 const MAX_IMPRESSIONS_PER_USER_PER_DAY = 3 // tope de repeticiones: no cansar al mismo usuario con el mismo anuncio
@@ -56,6 +57,7 @@ export default async function adRoutes(app: FastifyInstance) {
       where, take: Math.min(limit * 6, 24), orderBy: { cpcUsd: 'desc' },
       select: {
         id: true, title: true, description: true, imageUrls: true, price: true, ctaText: true, ctaUrl: true,
+        whatsappNumber: true, phoneNumber: true, contactEmail: true, websiteUrl: true, cpcUsd: true,
         targetAgeRanges: true, targetGenders: true, targetInterests: true, targetIncomeLevels: true,
         adAccount: { select: { companyName: true } },
       },
@@ -84,8 +86,27 @@ export default async function adRoutes(app: FastifyInstance) {
       demographicMatches = demographicMatches.filter((ad) => (seenCounts.get(ad.id) || 0) < MAX_IMPRESSIONS_PER_USER_PER_DAY)
     }
 
+    // Relevancia real: cuánto más específicamente un anuncio apunta a ESTE
+    // usuario (edad/género/ingresos/intereses que coinciden), más arriba queda
+    // — no gana el que más paga, gana el que mejor calza con quien está mirando.
+    // Un anuncio sin ningún filtro (le llega a todos) suma 0 puntos extra acá;
+    // cpcUsd solo desempata entre anuncios igual de relevantes.
+    function relevanceScore(ad: (typeof demographicMatches)[number]): number {
+      let score = 0
+      if (ad.targetAgeRanges.length > 0 && viewer?.ageRange && ad.targetAgeRanges.includes(viewer.ageRange as any)) score += 1
+      if (ad.targetGenders.length > 0 && viewer?.gender && ad.targetGenders.includes(viewer.gender as any)) score += 1
+      if (ad.targetIncomeLevels.length > 0 && viewer?.incomeLevel && ad.targetIncomeLevels.includes(viewer.incomeLevel as any)) score += 1
+      if (ad.targetInterests.length > 0 && (viewer?.interests || []).some((i) => ad.targetInterests.includes(i))) score += 1
+      return score
+    }
+
+    demographicMatches.sort((a, b) => {
+      const scoreDiff = relevanceScore(b) - relevanceScore(a)
+      return scoreDiff !== 0 ? scoreDiff : b.cpcUsd - a.cpcUsd
+    })
+
     const matched = demographicMatches.slice(0, limit)
-    const ads = matched.map(({ targetAgeRanges, targetGenders, targetInterests, targetIncomeLevels, ...ad }) => ad)
+    const ads = matched.map(({ targetAgeRanges, targetGenders, targetInterests, targetIncomeLevels, cpcUsd, ...ad }) => ad)
 
     if (ads.length > 0) {
       setImmediate(async () => {
@@ -99,42 +120,62 @@ export default async function adRoutes(app: FastifyInstance) {
 
   app.post('/:id/click', async (request, reply) => {
     const { id } = request.params as { id: string }
+    const body = z.object({ channel: z.enum(['whatsapp', 'phone', 'email', 'website']).default('whatsapp') }).safeParse(request.body)
+    const channel = body.success ? body.data.channel : 'whatsapp'
+
     let viewerId: string | undefined
     try { await request.jwtVerify(); viewerId = (request.user as any).userId } catch { /* anónimo */ }
 
     const ad = await prisma.ad.findUnique({ where: { id, status: 'ACTIVE' }, include: { adAccount: true } })
     if (!ad) return reply.status(404).send({ error: true, message: 'Anuncio no encontrado' })
 
-    const cost = ad.cpcUsd
-    if (ad.adAccount.balance < cost) {
-      await prisma.ad.update({ where: { id }, data: { status: 'EXHAUSTED' } })
-      return reply.status(410).send({ error: true, message: 'Sin saldo disponible' })
+    // Solo el botón principal (WhatsApp) es lo que se cobra por clic — mirar
+    // el teléfono/mail/web en la ficha ampliada queda como dato gratis para
+    // el usuario, y lo medimos igual para que el anunciante sepa qué canal
+    // le funciona mejor, pero sin cobrarle cada vez que alguien mira su mail.
+    const isBillable = channel === 'whatsapp'
+
+    if (isBillable) {
+      const cost = ad.cpcUsd
+      if (ad.adAccount.balance < cost) {
+        await prisma.ad.update({ where: { id }, data: { status: 'EXHAUSTED' } })
+        return reply.status(410).send({ error: true, message: 'Sin saldo disponible' })
+      }
+
+      const newBalance = ad.adAccount.balance - cost
+      await Promise.all([
+        prisma.adAccount.update({ where: { id: ad.adAccountId }, data: { balance: { decrement: cost } } }),
+        prisma.ad.update({ where: { id }, data: { clicks: { increment: 1 }, totalSpent: { increment: cost } } }),
+        prisma.adEvent.create({ data: { adId: id, type: `click_${channel}`, userId: viewerId } }),
+      ])
+
+      if (newBalance < LOW_BALANCE_THRESHOLD && !ad.adAccount.lowBalanceNotifiedAt) {
+        await prisma.adAccount.update({ where: { id: ad.adAccountId }, data: { lowBalanceNotifiedAt: new Date() } })
+        const { sendNotification } = await import('../services/notifications')
+        await sendNotification({
+          userId: ad.adAccount.userId, type: 'AD_LOW_BALANCE',
+          title: 'Se te está por acabar el saldo de anuncios',
+          body: `Te quedan USD ${newBalance.toFixed(2)} en tu cuenta de Tratto Ads. Recargá para que tus anuncios no se pausen solos.`,
+        })
+      }
+
+      const today = new Date(); today.setHours(0, 0, 0, 0)
+      const todaySpend = await prisma.adEvent.count({ where: { adId: id, type: `click_${channel}`, createdAt: { gte: today } } })
+      if (todaySpend * cost >= ad.dailyBudget) {
+        await prisma.ad.update({ where: { id }, data: { status: 'PAUSED' } })
+      }
+    } else {
+      await prisma.adEvent.create({ data: { adId: id, type: `click_${channel}`, userId: viewerId } })
     }
 
-    const newBalance = ad.adAccount.balance - cost
-    await Promise.all([
-      prisma.adAccount.update({ where: { id: ad.adAccountId }, data: { balance: { decrement: cost } } }),
-      prisma.ad.update({ where: { id }, data: { clicks: { increment: 1 }, totalSpent: { increment: cost } } }),
-      prisma.adEvent.create({ data: { adId: id, type: 'click', userId: viewerId } }),
-    ])
-
-    if (newBalance < LOW_BALANCE_THRESHOLD && !ad.adAccount.lowBalanceNotifiedAt) {
-      await prisma.adAccount.update({ where: { id: ad.adAccountId }, data: { lowBalanceNotifiedAt: new Date() } })
-      const { sendNotification } = await import('../services/notifications')
-      await sendNotification({
-        userId: ad.adAccount.userId, type: 'AD_LOW_BALANCE',
-        title: 'Se te está por acabar el saldo de anuncios',
-        body: `Te quedan USD ${newBalance.toFixed(2)} en tu cuenta de Tratto Ads. Recargá para que tus anuncios no se pausen solos.`,
-      })
+    const redirectUrls: Record<string, string | undefined> = {
+      whatsapp: ad.whatsappNumber ? `https://wa.me/${ad.whatsappNumber.replace('+', '')}?text=${encodeURIComponent(`Hola! Vi tu anuncio "${ad.title}" en Tratto y quería consultar.`)}` : undefined,
+      phone: ad.phoneNumber ? `tel:${ad.phoneNumber}` : undefined,
+      email: ad.contactEmail ? `mailto:${ad.contactEmail}` : undefined,
+      website: ad.websiteUrl || undefined,
     }
 
-    const today = new Date(); today.setHours(0, 0, 0, 0)
-    const todaySpend = await prisma.adEvent.count({ where: { adId: id, type: 'click', createdAt: { gte: today } } })
-    if (todaySpend * cost >= ad.dailyBudget) {
-      await prisma.ad.update({ where: { id }, data: { status: 'PAUSED' } })
-    }
-
-    return reply.send({ success: true, redirectUrl: ad.ctaUrl })
+    return reply.send({ success: true, redirectUrl: redirectUrls[channel] })
   })
 
   app.get('/:id/convert', async (request, reply) => {
@@ -161,6 +202,14 @@ export default async function adRoutes(app: FastifyInstance) {
     price: z.number().positive().optional(),
     ctaText: z.string().default('Consultar precio'),
     ctaUrl: z.string().url().optional(),
+    // Contacto obligatorio — el número "crudo" que escribió el anunciante,
+    // se valida y normaliza a E.164 más abajo antes de guardar.
+    whatsappCountry: z.string().length(2),
+    whatsappNumber: z.string().min(4),
+    phoneCountry: z.string().length(2),
+    phoneNumber: z.string().min(4),
+    contactEmail: z.string().email(),
+    websiteUrl: z.string().url(),
     model: z.enum(['CPC', 'CPM']).default('CPC'),
     dailyBudget: z.number().min(3),
     categoryIds: z.array(z.string().uuid()).min(1),
@@ -173,6 +222,26 @@ export default async function adRoutes(app: FastifyInstance) {
     endsAt: z.string().datetime().optional(),
   }
 
+  // Valida y normaliza WhatsApp/teléfono a E.164 antes de guardar. Se usa
+  // tanto al crear como al editar, así los dos caminos quedan consistentes.
+  function normalizeContactPhones(data: { whatsappCountry?: string; whatsappNumber?: string; phoneCountry?: string; phoneNumber?: string }) {
+    const result: { whatsappNumber?: string; phoneNumber?: string; error?: string } = {}
+
+    if (data.whatsappNumber && data.whatsappCountry) {
+      const check = validateAndNormalizePhone(data.whatsappNumber, data.whatsappCountry)
+      if (!check.valid) { result.error = `WhatsApp: ${check.message}`; return result }
+      result.whatsappNumber = check.e164
+    }
+
+    if (data.phoneNumber && data.phoneCountry) {
+      const check = validateAndNormalizePhone(data.phoneNumber, data.phoneCountry)
+      if (!check.valid) { result.error = `Teléfono: ${check.message}`; return result }
+      result.phoneNumber = check.e164
+    }
+
+    return result
+  }
+
   app.post('/', { preHandler: requireAuth }, async (request, reply) => {
     const schema = z.object({ ...adInputFields, companyName: z.string().min(2) })
     const body = schema.safeParse(request.body)
@@ -183,13 +252,16 @@ export default async function adRoutes(app: FastifyInstance) {
       if (invalid.length > 0) return reply.status(400).send({ error: true, message: `Interés inválido: ${invalid[0]}` })
     }
 
+    const phones = normalizeContactPhones(body.data)
+    if (phones.error) return reply.status(400).send({ error: true, message: phones.error })
+
     let account = await prisma.adAccount.findFirst({ where: { userId: request.user.userId } })
     if (!account) account = await prisma.adAccount.create({ data: { userId: request.user.userId, companyName: body.data.companyName } })
 
     const { categoryIds, companyName, startsAt, endsAt, ...adData } = body.data
     const ad = await prisma.ad.create({
       data: {
-        ...adData, cpcUsd: 0.35, adAccountId: account.id, status: 'PENDING',
+        ...adData, ...phones, cpcUsd: 0.35, adAccountId: account.id, status: 'PENDING',
         startsAt: startsAt ? new Date(startsAt) : null, endsAt: endsAt ? new Date(endsAt) : null,
         targetCategories: { create: categoryIds.map(categoryId => ({ categoryId })) },
       },
@@ -213,11 +285,14 @@ export default async function adRoutes(app: FastifyInstance) {
       if (invalid.length > 0) return reply.status(400).send({ error: true, message: `Interés inválido: ${invalid[0]}` })
     }
 
+    const phones = normalizeContactPhones(body.data)
+    if (phones.error) return reply.status(400).send({ error: true, message: phones.error })
+
     const { categoryIds, startsAt, endsAt, ...adData } = body.data
     const ad = await prisma.ad.update({
       where: { id },
       data: {
-        ...adData, status: 'PENDING', rejectionNote: null,
+        ...adData, ...phones, status: 'PENDING', rejectionNote: null,
         ...(startsAt !== undefined ? { startsAt: startsAt ? new Date(startsAt) : null } : {}),
         ...(endsAt !== undefined ? { endsAt: endsAt ? new Date(endsAt) : null } : {}),
         ...(categoryIds ? { targetCategories: { deleteMany: {}, create: categoryIds.map((categoryId) => ({ categoryId })) } } : {}),
