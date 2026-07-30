@@ -7,6 +7,7 @@ export interface User {
   id: string; email: string; name: string; role: UserRole; country: string; city?: string; phone?: string
   avatarUrl?: string; isVerified: boolean; isPro: boolean; company?: CompanyBasic
   targetingAskedAt?: string | null; companyRole?: 'OWNER' | 'ADMIN' | 'EDITOR' | 'VIEWER'
+  ageRange?: string | null; gender?: string | null; interests?: string[]; incomeLevel?: string | null
 }
 
 export interface CompanyBasic { id: string; name: string; slug: string; plan: CompanyPlan; isVerified: boolean; ratingAvg: number; reviewCount: number; logoUrl?: string }
@@ -42,7 +43,7 @@ export const MEDAL_META: Record<MedalType, { label: string; emoji: string; color
 
 export interface AiSummary { id: string; summaryText: string; insightBars: InsightBar[]; reviewsCount: number; generatedAt: string }
 export interface InsightBar { label: string; percentage: number; isNegative: boolean }
-export interface Ad { id: string; title: string; description: string; imageUrls: string[]; price?: number; ctaText: string; ctaUrl?: string; adAccount: { companyName: string } }
+export interface Ad { id: string; title: string; description: string; imageUrls: string[]; price?: number; ctaText: string; ctaUrl?: string; whatsappNumber: string; phoneNumber: string; contactEmail: string; websiteUrl: string; adAccount: { companyName: string } }
 
 export interface PaginatedResponse<T> { data: T[]; pagination: { page: number; limit: number; total: number; pages: number } }
 export interface ApiError { error: true; message: string; details?: any }

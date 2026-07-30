@@ -3,6 +3,8 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/lib/store'
 import { auth, upload } from '@/lib/api'
+import { AGE_RANGES, GENDERS, INCOME_LEVELS, INTERESTS } from '@/lib/targeting'
+import { COUNTRIES } from '@/lib/countries'
 
 export default function PerfilPage() {
   const { user, fetchMe } = useAuthStore()
@@ -12,6 +14,14 @@ export default function PerfilPage() {
   const [savingProfile, setSavingProfile] = useState(false)
   const [profileMsg, setProfileMsg] = useState('')
   const [profileErr, setProfileErr] = useState('')
+
+  const [ageRange, setAgeRange] = useState('')
+  const [gender, setGender] = useState('')
+  const [incomeLevel, setIncomeLevel] = useState('')
+  const [interests, setInterests] = useState<string[]>([])
+  const [savingTargeting, setSavingTargeting] = useState(false)
+  const [targetingMsg, setTargetingMsg] = useState('')
+  const [targetingErr, setTargetingErr] = useState('')
 
   const [pwForm, setPwForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' })
   const [savingPw, setSavingPw] = useState(false)
@@ -41,6 +51,10 @@ export default function PerfilPage() {
   useEffect(() => {
     if (!user) return
     setForm({ name: user.name || '', phone: user.phone || '', city: user.city || '', country: user.country || '' })
+    setAgeRange(user.ageRange || '')
+    setGender(user.gender || '')
+    setIncomeLevel(user.incomeLevel || '')
+    setInterests(user.interests || [])
   }, [user])
 
   if (!user) return <div className="max-w-2xl mx-auto px-4 py-12 text-center"><i className="ti ti-loader-2 animate-spin text-3xl text-brand-slate block mb-3" /></div>
@@ -54,6 +68,22 @@ export default function PerfilPage() {
       setProfileMsg('Perfil actualizado correctamente.')
     } catch (err: any) { setProfileErr(err.message || 'Error actualizando el perfil') }
     finally { setSavingProfile(false) }
+  }
+
+  const toggleInterest = (i: string) => setInterests((prev) => prev.includes(i) ? prev.filter((x) => x !== i) : [...prev, i])
+
+  const handleTargetingSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setSavingTargeting(true); setTargetingMsg(''); setTargetingErr('')
+    try {
+      await auth.updateTargeting({
+        ageRange: ageRange || undefined, gender: gender || undefined,
+        incomeLevel: incomeLevel || undefined, interests: interests.length > 0 ? interests : [],
+      })
+      await fetchMe()
+      setTargetingMsg('Datos actualizados correctamente.')
+    } catch (err: any) { setTargetingErr(err.message || 'Error actualizando tus datos') }
+    finally { setSavingTargeting(false) }
   }
 
   const handlePwSubmit = async (e: React.FormEvent) => {
@@ -125,7 +155,55 @@ export default function PerfilPage() {
             <div><label className="label">Teléfono</label><input type="text" className="input" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} /></div>
             <div><label className="label">Ciudad</label><input type="text" className="input" value={form.city} onChange={e => setForm(f => ({ ...f, city: e.target.value }))} /></div>
           </div>
+          <div>
+            <label className="label">País</label>
+            <select className="input" value={form.country} onChange={e => setForm(f => ({ ...f, country: e.target.value }))}>
+              {COUNTRIES.map((c) => <option key={c.code} value={c.code}>{c.flag} {c.name}</option>)}
+            </select>
+          </div>
           <button type="submit" disabled={savingProfile || !form.name} className="btn-primary px-6 py-2.5 text-sm disabled:opacity-50">{savingProfile ? 'Guardando...' : 'Guardar cambios'}</button>
+        </form>
+      </div>
+
+      <div className="card p-6">
+        <h2 className="text-sm font-semibold text-brand-dark mb-1">Datos de segmentación</h2>
+        <p className="text-xs text-brand-slate mb-4">Nos ayudan a mostrarte anuncios más relevantes. Es opcional — dejá en blanco lo que prefieras no decir.</p>
+        {targetingErr && <div className="bg-red-50 border border-red-100 rounded-lg p-3 mb-4 text-sm text-brand-red">{targetingErr}</div>}
+        {targetingMsg && <div className="bg-brand-green-dim border border-brand-green/20 rounded-lg p-3 mb-4 text-sm text-brand-green">{targetingMsg}</div>}
+        <form onSubmit={handleTargetingSubmit} className="space-y-4">
+          <div>
+            <label className="label">Rango de edad</label>
+            <div className="grid grid-cols-3 gap-2">
+              {AGE_RANGES.map((r) => (
+                <button key={r.value} type="button" onClick={() => setAgeRange(ageRange === r.value ? '' : r.value)} className={`text-xs py-2 px-2 rounded-lg border transition-all ${ageRange === r.value ? 'bg-brand-green-dim border-brand-green text-brand-green-text font-semibold' : 'border-gray-200 text-brand-slate hover:border-gray-300'}`}>{r.label}</button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label className="label">Género</label>
+            <div className="grid grid-cols-2 gap-2">
+              {GENDERS.map((g) => (
+                <button key={g.value} type="button" onClick={() => setGender(gender === g.value ? '' : g.value)} className={`text-xs py-2 px-2 rounded-lg border transition-all ${gender === g.value ? 'bg-brand-green-dim border-brand-green text-brand-green-text font-semibold' : 'border-gray-200 text-brand-slate hover:border-gray-300'}`}>{g.label}</button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label className="label">Intereses</label>
+            <div className="flex flex-wrap gap-2">
+              {INTERESTS.map((i) => (
+                <button key={i} type="button" onClick={() => toggleInterest(i)} className={`text-xs py-1.5 px-3 rounded-full border transition-all ${interests.includes(i) ? 'bg-brand-green-dim border-brand-green text-brand-green-text font-semibold' : 'border-gray-200 text-brand-slate hover:border-gray-300'}`}>{i}</button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label className="label">Nivel de ingresos</label>
+            <div className="grid grid-cols-2 gap-2">
+              {INCOME_LEVELS.map((l) => (
+                <button key={l.value} type="button" onClick={() => setIncomeLevel(incomeLevel === l.value ? '' : l.value)} className={`text-xs py-2 px-2 rounded-lg border transition-all ${incomeLevel === l.value ? 'bg-brand-green-dim border-brand-green text-brand-green-text font-semibold' : 'border-gray-200 text-brand-slate hover:border-gray-300'}`}>{l.label}</button>
+              ))}
+            </div>
+          </div>
+          <button type="submit" disabled={savingTargeting} className="btn-primary px-6 py-2.5 text-sm disabled:opacity-50">{savingTargeting ? 'Guardando...' : 'Guardar cambios'}</button>
         </form>
       </div>
 
