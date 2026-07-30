@@ -1,6 +1,7 @@
 import crypto from 'crypto'
 import bcrypt from 'bcryptjs'
 import { prisma } from '../lib/prisma'
+import { buildEmailShell, emailButton } from './emailLayout'
 
 /**
  * Genera un token de recuperación y manda el email con el link para elegir
@@ -41,40 +42,12 @@ export async function sendPasswordResetEmail(userId: string, email: string, name
 }
 
 function buildPasswordResetEmailHtml(name: string, resetUrl: string): string {
-  const frontendUrl = process.env.FRONTEND_URL || 'https://tratto.lat'
-  return `
-<!DOCTYPE html>
-<html lang="es">
-<body style="margin:0;padding:0;background-color:#f4f5f7;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f5f7;padding:32px 16px;">
-    <tr>
-      <td align="center">
-        <table role="presentation" width="100%" style="max-width:480px;background-color:#ffffff;border-radius:16px;overflow:hidden;">
-          <tr><td style="background-color:#ffffff;padding:20px 32px;border-bottom:1px solid #f0f0f0;">
-              <table role="presentation" cellpadding="0" cellspacing="0"><tr>
-                <td style="width:32px;height:32px;border-radius:9999px;background-color:#10b981;text-align:center;">
-                  <span style="color:#ffffff;font-size:16px;font-weight:700;line-height:32px;">T</span>
-                </td>
-                <td style="padding-left:10px;"><span style="color:#0f172a;font-size:20px;font-weight:700;">Tratto</span></td>
-              </tr></table>
-            </td></tr>
-          <tr>
-            <td style="padding:32px;">
-              <p style="margin:0 0 16px 0;font-size:16px;line-height:1.5;color:#1f2937;">Hola ${name},</p>
-              <p style="margin:0 0 24px 0;font-size:14px;line-height:1.5;color:#4b5563;">Recibimos una solicitud para restablecer tu contraseña. Hacé click en el botón para elegir una nueva.</p>
-              <table role="presentation" width="100%"><tr><td align="center">
-                <a href="${resetUrl}" style="display:inline-block;background-color:#10b981;color:#ffffff;text-decoration:none;font-size:15px;font-weight:600;padding:14px 32px;border-radius:999px;">Elegir nueva contraseña</a>
-              </td></tr></table>
-              <p style="margin:20px 0 0 0;text-align:center;font-size:12px;color:#9ca3af;">Este link expira en 1 hora. Si no pediste esto, ignorá este email.</p>
-            </td>
-          </tr>
-          <tr><td style="padding:20px 32px;background-color:#f9fafb;text-align:center;"><a href="${frontendUrl}" style="color:#9ca3af;font-size:12px;text-decoration:none;">tratto.lat</a></td></tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>`
+  return buildEmailShell(`
+    <p style="margin:0 0 16px 0;font-size:16px;line-height:1.5;color:#1f2937;">Hola ${name},</p>
+    <p style="margin:0 0 24px 0;font-size:14px;line-height:1.5;color:#4b5563;">Recibimos una solicitud para restablecer tu contraseña. Hacé click en el botón para elegir una nueva.</p>
+    ${emailButton(resetUrl, 'Elegir nueva contraseña')}
+    <p style="margin:20px 0 0 0;text-align:center;font-size:12px;color:#9ca3af;">Este link expira en 1 hora. Si no pediste esto, ignorá este email.</p>
+  `)
 }
 
 /**

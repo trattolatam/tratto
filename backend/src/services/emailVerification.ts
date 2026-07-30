@@ -1,5 +1,6 @@
 import crypto from 'crypto'
 import { prisma } from '../lib/prisma'
+import { buildEmailShell, emailButton } from './emailLayout'
 
 /**
  * Genera un token de verificación y lo envía por email.
@@ -39,6 +40,7 @@ export async function sendVerificationEmail(userId: string, email: string, name:
         to: [email],
         subject: 'Confirmá tu cuenta en Tratto',
         text: `Hola ${name},\n\nConfirmá tu cuenta en Tratto haciendo click en este link:\n${verifyUrl}\n\nEste link expira en 24 horas.\n\nSi no creaste esta cuenta, podés ignorar este email.`,
+        html: buildVerificationEmailHtml(name, verifyUrl),
       }),
     })
 
@@ -48,6 +50,15 @@ export async function sendVerificationEmail(userId: string, email: string, name:
   } catch (err) {
     console.error('Error enviando email de verificación:', err)
   }
+}
+
+function buildVerificationEmailHtml(name: string, verifyUrl: string): string {
+  return buildEmailShell(`
+    <p style="margin:0 0 16px 0;font-size:16px;line-height:1.5;color:#1f2937;">Hola ${name},</p>
+    <p style="margin:0 0 24px 0;font-size:14px;line-height:1.5;color:#4b5563;">Confirmá tu cuenta en Tratto para poder dejar reseñas y usar todas las funciones.</p>
+    ${emailButton(verifyUrl, 'Confirmar mi cuenta')}
+    <p style="margin:20px 0 0 0;text-align:center;font-size:12px;color:#9ca3af;">Este link expira en 24 horas. Si no creaste esta cuenta, podés ignorar este email.</p>
+  `)
 }
 
 /**

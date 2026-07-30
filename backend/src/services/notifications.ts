@@ -1,5 +1,6 @@
 import { prisma } from '../lib/prisma'
 import { NotificationType } from '@prisma/client'
+import { buildEmailShell, emailButton } from './emailLayout'
 
 interface NotificationPayload {
   userId: string
@@ -116,127 +117,43 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
  * No incluye precios a propósito: la idea es que decidan mirando la página, no acá.
  */
 export function buildTeamInviteToRegisterEmailHtml(companyName: string, role: string, registerUrl: string): string {
-  const frontendUrl = process.env.FRONTEND_URL || 'https://tratto.lat'
   const roleLabel = { ADMIN: 'Administrador', EDITOR: 'Editor', VIEWER: 'Solo lectura' }[role] || role
-  return `
-<!DOCTYPE html>
-<html lang="es">
-<body style="margin:0;padding:0;background-color:#f4f5f7;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f5f7;padding:32px 16px;">
-    <tr>
-      <td align="center">
-        <table role="presentation" width="100%" style="max-width:480px;background-color:#ffffff;border-radius:16px;overflow:hidden;">
-          <tr><td style="background-color:#ffffff;padding:20px 32px;border-bottom:1px solid #f0f0f0;">
-              <table role="presentation" cellpadding="0" cellspacing="0"><tr>
-                <td style="width:32px;height:32px;border-radius:9999px;background-color:#10b981;text-align:center;">
-                  <span style="color:#ffffff;font-size:16px;font-weight:700;line-height:32px;">T</span>
-                </td>
-                <td style="padding-left:10px;"><span style="color:#0f172a;font-size:20px;font-weight:700;">Tratto</span></td>
-              </tr></table>
-            </td></tr>
-          <tr>
-            <td style="padding:32px;">
-              <p style="margin:0 0 16px 0;font-size:16px;line-height:1.5;color:#1f2937;">
-                Te invitaron a sumarte al equipo de <strong>${companyName}</strong> en Tratto, como <strong>${roleLabel}</strong>.
-              </p>
-              <p style="margin:0 0 24px 0;font-size:14px;line-height:1.5;color:#4b5563;">
-                Creá tu cuenta gratis con este mismo email y vas a quedar asociado automáticamente al panel de ${companyName}, sin ningún paso extra.
-              </p>
-              <table role="presentation" width="100%"><tr><td align="center">
-                <a href="${registerUrl}" style="display:inline-block;background-color:#10b981;color:#ffffff;text-decoration:none;font-size:15px;font-weight:600;padding:14px 32px;border-radius:999px;">Crear mi cuenta</a>
-              </td></tr></table>
-              <p style="margin:20px 0 0 0;text-align:center;font-size:12px;color:#9ca3af;">Si no esperabas esta invitación, podés ignorar este email.</p>
-            </td>
-          </tr>
-          <tr><td style="padding:20px 32px;background-color:#f9fafb;text-align:center;"><a href="${frontendUrl}" style="color:#9ca3af;font-size:12px;text-decoration:none;">tratto.lat</a></td></tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>`
+  return buildEmailShell(`
+    <p style="margin:0 0 16px 0;font-size:16px;line-height:1.5;color:#1f2937;">
+      Te invitaron a sumarte al equipo de <strong>${companyName}</strong> en Tratto, como <strong>${roleLabel}</strong>.
+    </p>
+    <p style="margin:0 0 24px 0;font-size:14px;line-height:1.5;color:#4b5563;">
+      Creá tu cuenta gratis con este mismo email y vas a quedar asociado automáticamente al panel de ${companyName}, sin ningún paso extra.
+    </p>
+    ${emailButton(registerUrl, 'Crear mi cuenta')}
+    <p style="margin:20px 0 0 0;text-align:center;font-size:12px;color:#9ca3af;">Si no esperabas esta invitación, podés ignorar este email.</p>
+  `)
 }
 
 export function buildTeamInviteRegisterEmailHtml(inviterName: string, companyName: string, role: string, registerUrl: string): string {
-  const frontendUrl = process.env.FRONTEND_URL || 'https://tratto.lat'
   const roleLabel = { ADMIN: 'Administrador', EDITOR: 'Editor', VIEWER: 'Solo lectura' }[role] || role
-  return `
-<!DOCTYPE html>
-<html lang="es">
-<body style="margin:0;padding:0;background-color:#f4f5f7;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f5f7;padding:32px 16px;">
-    <tr>
-      <td align="center">
-        <table role="presentation" width="100%" style="max-width:480px;background-color:#ffffff;border-radius:16px;overflow:hidden;">
-          <tr><td style="background-color:#ffffff;padding:20px 32px;border-bottom:1px solid #f0f0f0;">
-              <table role="presentation" cellpadding="0" cellspacing="0"><tr>
-                <td style="width:32px;height:32px;border-radius:9999px;background-color:#10b981;text-align:center;">
-                  <span style="color:#ffffff;font-size:16px;font-weight:700;line-height:32px;">T</span>
-                </td>
-                <td style="padding-left:10px;"><span style="color:#0f172a;font-size:20px;font-weight:700;">Tratto</span></td>
-              </tr></table>
-            </td></tr>
-          <tr>
-            <td style="padding:32px;">
-              <p style="margin:0 0 16px 0;font-size:16px;line-height:1.5;color:#1f2937;">
-                <strong>${inviterName}</strong> te invitó a sumarte al equipo de <strong>${companyName}</strong> en Tratto.
-              </p>
-              <p style="margin:0 0 24px 0;font-size:14px;line-height:1.5;color:#4b5563;">
-                Creá tu cuenta con este mismo email y vas a quedar asociado automáticamente a la empresa como <strong>${roleLabel}</strong> — no hace falta ningún paso extra.
-              </p>
-              <table role="presentation" width="100%"><tr><td align="center">
-                <a href="${registerUrl}" style="display:inline-block;background-color:#10b981;color:#ffffff;text-decoration:none;font-size:15px;font-weight:600;padding:14px 32px;border-radius:999px;">Crear mi cuenta</a>
-              </td></tr></table>
-            </td>
-          </tr>
-          <tr><td style="padding:20px 32px;background-color:#f9fafb;text-align:center;"><a href="${frontendUrl}" style="color:#9ca3af;font-size:12px;text-decoration:none;">tratto.lat</a></td></tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>`
+  return buildEmailShell(`
+    <p style="margin:0 0 16px 0;font-size:16px;line-height:1.5;color:#1f2937;">
+      <strong>${inviterName}</strong> te invitó a sumarte al equipo de <strong>${companyName}</strong> en Tratto.
+    </p>
+    <p style="margin:0 0 24px 0;font-size:14px;line-height:1.5;color:#4b5563;">
+      Creá tu cuenta con este mismo email y vas a quedar asociado automáticamente a la empresa como <strong>${roleLabel}</strong> — no hace falta ningún paso extra.
+    </p>
+    ${emailButton(registerUrl, 'Crear mi cuenta')}
+  `)
 }
 
 export function buildTeamInviteEmailHtml(inviterName: string, companyName: string, role: string, loginUrl: string): string {
-  const frontendUrl = process.env.FRONTEND_URL || 'https://tratto.lat'
   const roleLabel = { ADMIN: 'Administrador', EDITOR: 'Editor', VIEWER: 'Solo lectura' }[role] || role
-  return `
-<!DOCTYPE html>
-<html lang="es">
-<body style="margin:0;padding:0;background-color:#f4f5f7;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f5f7;padding:32px 16px;">
-    <tr>
-      <td align="center">
-        <table role="presentation" width="100%" style="max-width:480px;background-color:#ffffff;border-radius:16px;overflow:hidden;">
-          <tr><td style="background-color:#ffffff;padding:20px 32px;border-bottom:1px solid #f0f0f0;">
-              <table role="presentation" cellpadding="0" cellspacing="0"><tr>
-                <td style="width:32px;height:32px;border-radius:9999px;background-color:#10b981;text-align:center;">
-                  <span style="color:#ffffff;font-size:16px;font-weight:700;line-height:32px;">T</span>
-                </td>
-                <td style="padding-left:10px;"><span style="color:#0f172a;font-size:20px;font-weight:700;">Tratto</span></td>
-              </tr></table>
-            </td></tr>
-          <tr>
-            <td style="padding:32px;">
-              <p style="margin:0 0 16px 0;font-size:16px;line-height:1.5;color:#1f2937;">
-                <strong>${inviterName}</strong> te sumó al equipo de <strong>${companyName}</strong> en Tratto.
-              </p>
-              <p style="margin:0 0 24px 0;font-size:14px;line-height:1.5;color:#4b5563;">
-                Tu rol es <strong>${roleLabel}</strong>. Entrá con tu cuenta de siempre para acceder al panel de la empresa.
-              </p>
-              <table role="presentation" width="100%"><tr><td align="center">
-                <a href="${loginUrl}" style="display:inline-block;background-color:#10b981;color:#ffffff;text-decoration:none;font-size:15px;font-weight:600;padding:14px 32px;border-radius:999px;">Entrar a Tratto</a>
-              </td></tr></table>
-            </td>
-          </tr>
-          <tr><td style="padding:20px 32px;background-color:#f9fafb;text-align:center;"><a href="${frontendUrl}" style="color:#9ca3af;font-size:12px;text-decoration:none;">tratto.lat</a></td></tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>`
+  return buildEmailShell(`
+    <p style="margin:0 0 16px 0;font-size:16px;line-height:1.5;color:#1f2937;">
+      <strong>${inviterName}</strong> te sumó al equipo de <strong>${companyName}</strong> en Tratto.
+    </p>
+    <p style="margin:0 0 24px 0;font-size:14px;line-height:1.5;color:#4b5563;">
+      Tu rol es <strong>${roleLabel}</strong>. Entrá con tu cuenta de siempre para acceder al panel de la empresa.
+    </p>
+    ${emailButton(loginUrl, 'Entrar a Tratto')}
+  `)
 }
 
 function buildMonthlyReportEmailHtml(contactReveals: number, companyName: string): string {
@@ -257,56 +174,21 @@ function buildMonthlyReportEmailHtml(contactReveals: number, companyName: string
     .map((f) => `<tr><td style="padding:6px 0;font-size:14px;color:#1f2937;"><span style="color:#10b981;font-weight:bold;margin-right:8px;">✓</span>${f}</td></tr>`)
     .join('')
 
-  return `
-<!DOCTYPE html>
-<html lang="es">
-<body style="margin:0;padding:0;background-color:#f4f5f7;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f5f7;padding:32px 16px;">
-    <tr>
-      <td align="center">
-        <table role="presentation" width="100%" style="max-width:480px;background-color:#ffffff;border-radius:16px;overflow:hidden;">
-          <tr><td style="background-color:#ffffff;padding:20px 32px;border-bottom:1px solid #f0f0f0;">
-              <table role="presentation" cellpadding="0" cellspacing="0"><tr>
-                <td style="width:32px;height:32px;border-radius:9999px;background-color:#10b981;text-align:center;">
-                  <span style="color:#ffffff;font-size:16px;font-weight:700;line-height:32px;">T</span>
-                </td>
-                <td style="padding-left:10px;"><span style="color:#0f172a;font-size:20px;font-weight:700;">Tratto</span></td>
-              </tr></table>
-            </td></tr>
-          <tr>
-            <td style="padding:32px;">
-              <p style="margin:0 0 16px 0;font-size:16px;line-height:1.5;color:#1f2937;">
-                <strong>${personas} tu contacto este mes</strong>, pero tu perfil de <strong>${companyName}</strong> todavía no tiene el botón de contacto activado.
-              </p>
-              <p style="margin:0 0 24px 0;font-size:14px;line-height:1.5;color:#4b5563;">
-                Activá el plan Profesional y no dejes pasar más clientes que ya te están buscando.
-              </p>
-              <table role="presentation" width="100%" style="border:1px solid #d1fae5;border-radius:12px;padding:20px;margin-bottom:24px;">
-                <tr><td style="padding:0 4px;"><span style="display:inline-block;background-color:#10b981;color:#ffffff;font-size:11px;font-weight:600;padding:4px 10px;border-radius:999px;margin-bottom:12px;">MÁS ELEGIDO</span></td></tr>
-                <tr><td style="padding:4px;"><span style="font-size:17px;font-weight:700;color:#0f172a;">Plan Profesional</span></td></tr>
-                <tr><td style="padding:8px 4px 4px 4px;"><table role="presentation">${featuresHtml}</table></td></tr>
-              </table>
-              <table role="presentation" width="100%">
-                <tr>
-                  <td align="center">
-                    <a href="${pricingUrl}" style="display:inline-block;background-color:#10b981;color:#ffffff;text-decoration:none;font-size:15px;font-weight:600;padding:14px 32px;border-radius:999px;">Empezar 30 días gratis</a>
-                  </td>
-                </tr>
-              </table>
-              <p style="margin:16px 0 0 0;text-align:center;font-size:12px;color:#9ca3af;">30 días gratis · cancelás cuando quieras</p>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:20px 32px;background-color:#f9fafb;text-align:center;">
-              <a href="${frontendUrl}" style="color:#9ca3af;font-size:12px;text-decoration:none;">tratto.lat</a>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>`
+  return buildEmailShell(`
+    <p style="margin:0 0 16px 0;font-size:16px;line-height:1.5;color:#1f2937;">
+      <strong>${personas} tu contacto este mes</strong>, pero tu perfil de <strong>${companyName}</strong> todavía no tiene el botón de contacto activado.
+    </p>
+    <p style="margin:0 0 24px 0;font-size:14px;line-height:1.5;color:#4b5563;">
+      Activá el plan Profesional y no dejes pasar más clientes que ya te están buscando.
+    </p>
+    <table role="presentation" width="100%" style="border:1px solid #d1fae5;border-radius:12px;padding:20px;margin-bottom:24px;">
+      <tr><td style="padding:0 4px;"><span style="display:inline-block;background-color:#10b981;color:#ffffff;font-size:11px;font-weight:600;padding:4px 10px;border-radius:999px;margin-bottom:12px;">MÁS ELEGIDO</span></td></tr>
+      <tr><td style="padding:4px;"><span style="font-size:17px;font-weight:700;color:#0f172a;">Plan Profesional</span></td></tr>
+      <tr><td style="padding:8px 4px 4px 4px;"><table role="presentation">${featuresHtml}</table></td></tr>
+    </table>
+    ${emailButton(pricingUrl, 'Empezar 30 días gratis')}
+    <p style="margin:16px 0 0 0;text-align:center;font-size:12px;color:#9ca3af;">30 días gratis · cancelás cuando quieras</p>
+  `)
 }
 
 /**
