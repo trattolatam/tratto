@@ -2,8 +2,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/lib/store'
-import { auth, upload } from '@/lib/api'
-import { AGE_RANGES, GENDERS, INCOME_LEVELS, INTERESTS } from '@/lib/targeting'
+import { auth, upload, categories as categoriesApi } from '@/lib/api'
+import { AGE_RANGES, GENDERS, INCOME_LEVELS } from '@/lib/targeting'
 import { COUNTRIES } from '@/lib/countries'
 
 export default function PerfilPage() {
@@ -40,6 +40,11 @@ export default function PerfilPage() {
   }
 
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
+  const [categoryOptions, setCategoryOptions] = useState<any[]>([])
+
+  useEffect(() => {
+    categoriesApi.list().then((data: any) => setCategoryOptions(data.categories)).catch(() => {})
+  }, [])
   const [avatarErr, setAvatarErr] = useState('')
   const avatarInputRef = useRef<HTMLInputElement>(null)
 
@@ -189,10 +194,10 @@ export default function PerfilPage() {
             </div>
           </div>
           <div>
-            <label className="label">Intereses</label>
+            <label className="label">Rubros que te interesan</label>
             <div className="flex flex-wrap gap-2">
-              {INTERESTS.map((i) => (
-                <button key={i} type="button" onClick={() => toggleInterest(i)} className={`text-xs py-1.5 px-3 rounded-full border transition-all ${interests.includes(i) ? 'bg-brand-green-dim border-brand-green text-brand-green-text font-semibold' : 'border-gray-200 text-brand-slate hover:border-gray-300'}`}>{i}</button>
+              {categoryOptions.map((c) => (
+                <button key={c.slug} type="button" onClick={() => toggleInterest(c.slug)} className={`text-xs py-1.5 px-3 rounded-full border transition-all ${interests.includes(c.slug) ? 'bg-brand-green-dim border-brand-green text-brand-green-text font-semibold' : 'border-gray-200 text-brand-slate hover:border-gray-300'}`}>{c.name}</button>
               ))}
             </div>
           </div>

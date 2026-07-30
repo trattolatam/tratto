@@ -1,8 +1,5 @@
-export const INTERESTS = [
-  'Tecnología', 'Hogar y decoración', 'Salud y bienestar', 'Moda y belleza',
-  'Gastronomía', 'Automotor', 'Viajes', 'Finanzas y negocios',
-  'Deportes', 'Educación', 'Familia y niños', 'Mascotas',
-] as const
+// Los "intereses" ahora son los rubros reales del sitio (Category), no una
+// lista fija aparte — se piden vía GET /api/categories donde haga falta.
 
 export const AGE_RANGES = [
   { value: 'R18_24', label: '18 a 24 años' },

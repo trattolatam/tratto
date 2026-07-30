@@ -1,24 +1,6 @@
-/**
- * Lista fija de intereses/rubros para segmentación de publicidad.
- * Se usa tanto en la pantalla post-registro (el usuario elige los suyos)
- * como más adelante en la creación de anuncios (la empresa elige a quién apuntar).
- * Fija a propósito, no editable por admin — así los anuncios siempre pueden
- * cruzar contra una lista conocida, sin tags libres que no calcen entre sí.
- */
-export const INTERESTS = [
-  'Tecnología',
-  'Hogar y decoración',
-  'Salud y bienestar',
-  'Moda y belleza',
-  'Gastronomía',
-  'Automotor',
-  'Viajes',
-  'Finanzas y negocios',
-  'Deportes',
-  'Educación',
-  'Familia y niños',
-  'Mascotas',
-] as const
+// Los "intereses" para segmentación ahora son los rubros reales del sitio
+// (Category) — se validan contra la base con getValidCategorySlugs(), no
+// contra una lista fija acá, para que un rubro nuevo se sume solo.
 
 export const AGE_RANGES = [
   { value: 'R18_24', label: '18 a 24 años' },

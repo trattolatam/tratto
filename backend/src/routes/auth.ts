@@ -6,7 +6,7 @@ import { requireAuth } from '../middleware/auth'
 import { authRateLimit, passwordResetRateLimit } from '../middleware/rateLimits'
 import { sendVerificationEmail, verifyEmailToken, resendVerificationEmail } from '../services/emailVerification'
 import { requestPasswordReset, resetPasswordWithToken } from '../services/passwordReset'
-import { INTERESTS } from '../constants/targeting'
+import { getValidCategorySlugs } from '../services/categories'
 
 const registerSchema = z.object({
   email: z.string().email(),
@@ -233,15 +233,16 @@ export default async function authRoutes(app: FastifyInstance) {
     const body = z.object({
       ageRange: z.enum(['R18_24', 'R25_34', 'R35_44', 'R45_54', 'R55_64', 'R65_PLUS']).optional(),
       gender: z.enum(['MALE', 'FEMALE', 'OTHER', 'PREFER_NOT_TO_SAY']).optional(),
-      interests: z.array(z.string()).max(INTERESTS.length).optional(),
+      interests: z.array(z.string()).max(60).optional(),
       incomeLevel: z.enum(['LOW', 'MEDIUM', 'HIGH', 'PREFER_NOT_TO_SAY']).optional(),
     }).safeParse(request.body)
 
     if (!body.success) return reply.status(400).send({ error: true, message: 'Datos inválidos', details: body.error.issues })
 
-    if (body.data.interests) {
-      const invalid = body.data.interests.filter((i) => !(INTERESTS as readonly string[]).includes(i))
-      if (invalid.length > 0) return reply.status(400).send({ error: true, message: `Interés inválido: ${invalid[0]}` })
+    if (body.data.interests && body.data.interests.length > 0) {
+      const validSlugs = await getValidCategorySlugs()
+      const invalid = body.data.interests.filter((i) => !validSlugs.includes(i))
+      if (invalid.length > 0) return reply.status(400).send({ error: true, message: `Rubro inválido: ${invalid[0]}` })
     }
 
     const updated = await prisma.user.update({

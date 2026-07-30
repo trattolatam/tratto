@@ -1,10 +1,10 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { auth } from '@/lib/api'
+import { auth, categories as categoriesApi } from '@/lib/api'
 import { useAuthStore } from '@/lib/store'
-import { AGE_RANGES, GENDERS, INCOME_LEVELS, INTERESTS } from '@/lib/targeting'
+import { AGE_RANGES, GENDERS, INCOME_LEVELS } from '@/lib/targeting'
 
 export default function CompletarPerfilPage() {
   const router = useRouter()
@@ -14,6 +14,11 @@ export default function CompletarPerfilPage() {
   const [incomeLevel, setIncomeLevel] = useState('')
   const [interests, setInterests] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
+  const [categoryOptions, setCategoryOptions] = useState<any[]>([])
+
+  useEffect(() => {
+    categoriesApi.list().then((data: any) => setCategoryOptions(data.categories)).catch(() => {})
+  }, [])
 
   const toggleInterest = (i: string) => setInterests((prev) => prev.includes(i) ? prev.filter((x) => x !== i) : [...prev, i])
 
@@ -65,10 +70,10 @@ export default function CompletarPerfilPage() {
         </div>
 
         <div>
-          <label className="label">Intereses <span className="font-normal normal-case text-gray-400">(elegí los que quieras)</span></label>
+          <label className="label">Rubros que te interesan <span className="font-normal normal-case text-gray-400">(elegí los que quieras)</span></label>
           <div className="flex flex-wrap gap-2">
-            {INTERESTS.map((i) => (
-              <button key={i} type="button" onClick={() => toggleInterest(i)} className={`text-xs py-1.5 px-3 rounded-full border transition-all ${interests.includes(i) ? 'bg-brand-green-dim border-brand-green text-brand-green-text font-semibold' : 'border-gray-200 text-brand-slate hover:border-gray-300'}`}>{i}</button>
+            {categoryOptions.map((c) => (
+              <button key={c.slug} type="button" onClick={() => toggleInterest(c.slug)} className={`text-xs py-1.5 px-3 rounded-full border transition-all ${interests.includes(c.slug) ? 'bg-brand-green-dim border-brand-green text-brand-green-text font-semibold' : 'border-gray-200 text-brand-slate hover:border-gray-300'}`}>{c.name}</button>
             ))}
           </div>
         </div>

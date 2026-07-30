@@ -4,7 +4,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { ads as adsApi, categories as categoriesApi, upload, subscriptions as paymentsApi } from '@/lib/api'
 import { useAuthStore } from '@/lib/store'
-import { AGE_RANGES, GENDERS, INCOME_LEVELS, INTERESTS } from '@/lib/targeting'
+import { AGE_RANGES, GENDERS, INCOME_LEVELS } from '@/lib/targeting'
 import { CountryPhoneInput } from '@/components/CountryPhoneInput'
 import { isValidPhoneNumber } from 'libphonenumber-js'
 
@@ -352,7 +352,7 @@ function CreateAdForm({ categoryOptions, onCreated, existingAd, onCancel }: { ca
           <div>
             <label className="label">Intereses</label>
             <div className="flex flex-wrap gap-2">
-              {INTERESTS.map((i) => <button key={i} type="button" onClick={() => toggle(interests, setInterests, i)} className={`text-xs py-1.5 px-3 rounded-full border transition-all ${interests.includes(i) ? 'bg-brand-green-dim border-brand-green text-brand-green-text font-semibold' : 'border-gray-200 text-brand-slate'}`}>{i}</button>)}
+              {categoryOptions.map((c) => <button key={c.slug} type="button" onClick={() => toggle(interests, setInterests, c.slug)} className={`text-xs py-1.5 px-3 rounded-full border transition-all ${interests.includes(c.slug) ? 'bg-brand-green-dim border-brand-green text-brand-green-text font-semibold' : 'border-gray-200 text-brand-slate'}`}>{c.name}</button>)}
             </div>
           </div>
           <div>

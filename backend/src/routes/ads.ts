@@ -2,7 +2,7 @@ import { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { prisma } from '../lib/prisma'
 import { requireAuth, requireAdmin } from '../middleware/auth'
-import { INTERESTS } from '../constants/targeting'
+import { getValidCategorySlugs } from '../services/categories'
 import { validateAndNormalizePhone } from '../utils/phone'
 
 const LOW_BALANCE_THRESHOLD = 5
@@ -248,8 +248,9 @@ export default async function adRoutes(app: FastifyInstance) {
     if (!body.success) return reply.status(400).send({ error: true, message: 'Datos inválidos', details: body.error.issues })
 
     if (body.data.targetInterests.length > 0) {
-      const invalid = body.data.targetInterests.filter((i) => !(INTERESTS as readonly string[]).includes(i))
-      if (invalid.length > 0) return reply.status(400).send({ error: true, message: `Interés inválido: ${invalid[0]}` })
+      const validSlugs = await getValidCategorySlugs()
+      const invalid = body.data.targetInterests.filter((i) => !validSlugs.includes(i))
+      if (invalid.length > 0) return reply.status(400).send({ error: true, message: `Rubro inválido: ${invalid[0]}` })
     }
 
     const phones = normalizeContactPhones(body.data)
@@ -281,8 +282,9 @@ export default async function adRoutes(app: FastifyInstance) {
     if (!body.success) return reply.status(400).send({ error: true, message: 'Datos inválidos', details: body.error.issues })
 
     if (body.data.targetInterests && body.data.targetInterests.length > 0) {
-      const invalid = body.data.targetInterests.filter((i) => !(INTERESTS as readonly string[]).includes(i))
-      if (invalid.length > 0) return reply.status(400).send({ error: true, message: `Interés inválido: ${invalid[0]}` })
+      const validSlugs = await getValidCategorySlugs()
+      const invalid = body.data.targetInterests.filter((i) => !validSlugs.includes(i))
+      if (invalid.length > 0) return reply.status(400).send({ error: true, message: `Rubro inválido: ${invalid[0]}` })
     }
 
     const phones = normalizeContactPhones(body.data)
