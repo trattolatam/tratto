@@ -357,17 +357,13 @@ function ReviewItem({ review, canRespond, onResponded }: { review: Review; canRe
 function AdCard({ ad }: { ad: Ad }) {
   const [showDetails, setShowDetails] = useState(false)
   const [galleryIndex, setGalleryIndex] = useState(0)
-  const [ctaFeedback, setCtaFeedback] = useState('')
   const images = ad.imageUrls && ad.imageUrls.length > 0 ? ad.imageUrls : []
 
-  const handleCta = async () => {
+  const handleChannelClick = async (channel: 'whatsapp' | 'phone' | 'email' | 'website') => {
     try {
       const { ads: adsApi } = await import('@/lib/api')
-      const result = await adsApi.click(ad.id) as any
-      if (result.redirectUrl) { window.open(result.redirectUrl, '_blank'); return }
-      // Sin link de destino: igual le avisamos a la empresa que hubo interés,
-      // y se lo confirmamos al usuario para que el botón no se sienta "roto".
-      setCtaFeedback('¡Listo! Le avisamos a la empresa que estás interesado.')
+      const result = await adsApi.click(ad.id, channel)
+      if (result.redirectUrl) window.open(result.redirectUrl, channel === 'website' ? '_blank' : '_self')
     } catch (e) { console.error(e) }
   }
 
@@ -375,19 +371,20 @@ function AdCard({ ad }: { ad: Ad }) {
 
   return (
     <>
-      <button type="button" onClick={openDetails} className="card p-5 border border-brand-amber/20 mb-2 text-left w-full hover:border-brand-amber/40 transition-colors">
-        <div className="flex items-start gap-4">
+      <button type="button" onClick={openDetails} className="card p-4 border border-brand-amber/20 mb-2 text-left w-full block appearance-none cursor-pointer hover:border-brand-amber/40 transition-colors">
+        <div className="flex items-start gap-3">
           <div className="relative flex-shrink-0">
-            <img src={images[0]} alt={ad.title} className="w-24 h-24 rounded-lg object-cover bg-gray-100" onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+            <img src={images[0]} alt={ad.title} className="w-20 h-20 rounded-lg object-cover bg-gray-100" onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
             {images.length > 1 && <span className="absolute -bottom-1.5 -right-1.5 bg-brand-dark text-white text-[10px] leading-none px-1.5 py-1 rounded-full">+{images.length - 1}</span>}
           </div>
           <div className="flex-1 min-w-0">
-            <div className="flex items-start justify-between gap-2"><p className="text-base font-semibold text-brand-dark leading-tight">{ad.title}</p><span className="text-xs text-brand-amber bg-brand-amber-dim px-2 py-1 rounded flex-shrink-0">Patrocinado</span></div>
-            <p className="text-sm text-brand-slate mt-1 line-clamp-2">{ad.description}</p>
-            {ad.price && <p className="text-lg font-bold text-brand-green mt-1.5">USD {ad.price.toFixed(2)}</p>}
-            <span className="inline-block mt-3 text-sm btn-dark py-2 px-4">{ad.ctaText}</span>
+            <span className="inline-block text-[10px] text-brand-amber bg-brand-amber-dim px-2 py-0.5 rounded mb-1">Patrocinado</span>
+            <p className="text-sm font-semibold text-brand-dark leading-snug line-clamp-2">{ad.title}</p>
+            <p className="text-xs text-brand-slate mt-0.5 line-clamp-1">{ad.description}</p>
+            {ad.price && <p className="text-sm font-bold text-brand-green mt-1">USD {ad.price.toFixed(2)}</p>}
           </div>
         </div>
+        <span className="inline-block mt-3 w-full text-center text-sm font-semibold bg-brand-dark text-white rounded-lg py-2 px-4">{ad.ctaText}</span>
       </button>
 
       {showDetails && (
@@ -413,11 +410,22 @@ function AdCard({ ad }: { ad: Ad }) {
               <p className="text-xs text-brand-slate mb-3">Por {ad.adAccount.companyName}</p>
               <p className="text-sm text-brand-dark leading-relaxed mb-3">{ad.description}</p>
               {ad.price && <p className="text-2xl font-bold text-brand-green mb-4">USD {ad.price.toFixed(2)}</p>}
-              {ctaFeedback ? (
-                <p className="text-sm text-brand-green font-medium py-3 text-center">{ctaFeedback}</p>
-              ) : (
-                <button onClick={handleCta} className="btn-primary w-full py-3 text-sm">{ad.ctaText}</button>
-              )}
+
+              <button onClick={() => handleChannelClick('whatsapp')} className="btn-primary w-full py-3 text-sm flex items-center justify-center gap-2 mb-3">
+                <i className="ti ti-brand-whatsapp text-base" />{ad.ctaText}
+              </button>
+
+              <div className="grid grid-cols-3 gap-2">
+                <button onClick={() => handleChannelClick('phone')} className="flex flex-col items-center gap-1 py-2.5 rounded-lg border border-gray-100 hover:bg-gray-50 text-brand-slate">
+                  <i className="ti ti-phone text-lg" /><span className="text-xs">Llamar</span>
+                </button>
+                <button onClick={() => handleChannelClick('email')} className="flex flex-col items-center gap-1 py-2.5 rounded-lg border border-gray-100 hover:bg-gray-50 text-brand-slate">
+                  <i className="ti ti-mail text-lg" /><span className="text-xs">Email</span>
+                </button>
+                <button onClick={() => handleChannelClick('website')} className="flex flex-col items-center gap-1 py-2.5 rounded-lg border border-gray-100 hover:bg-gray-50 text-brand-slate">
+                  <i className="ti ti-world text-lg" /><span className="text-xs">Sitio web</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>

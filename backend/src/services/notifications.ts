@@ -126,7 +126,14 @@ export function buildTeamInviteToRegisterEmailHtml(companyName: string, role: st
     <tr>
       <td align="center">
         <table role="presentation" width="100%" style="max-width:480px;background-color:#ffffff;border-radius:16px;overflow:hidden;">
-          <tr><td style="background-color:#0f172a;padding:24px 32px;"><span style="color:#ffffff;font-size:20px;font-weight:700;">Tratto</span></td></tr>
+          <tr><td style="background-color:#ffffff;padding:20px 32px;border-bottom:1px solid #f0f0f0;">
+              <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+                <td style="width:32px;height:32px;border-radius:9999px;background-color:#10b981;text-align:center;">
+                  <span style="color:#ffffff;font-size:16px;font-weight:700;line-height:32px;">T</span>
+                </td>
+                <td style="padding-left:10px;"><span style="color:#0f172a;font-size:20px;font-weight:700;">Tratto</span></td>
+              </tr></table>
+            </td></tr>
           <tr>
             <td style="padding:32px;">
               <p style="margin:0 0 16px 0;font-size:16px;line-height:1.5;color:#1f2937;">
@@ -161,7 +168,14 @@ export function buildTeamInviteRegisterEmailHtml(inviterName: string, companyNam
     <tr>
       <td align="center">
         <table role="presentation" width="100%" style="max-width:480px;background-color:#ffffff;border-radius:16px;overflow:hidden;">
-          <tr><td style="background-color:#0f172a;padding:24px 32px;"><span style="color:#ffffff;font-size:20px;font-weight:700;">Tratto</span></td></tr>
+          <tr><td style="background-color:#ffffff;padding:20px 32px;border-bottom:1px solid #f0f0f0;">
+              <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+                <td style="width:32px;height:32px;border-radius:9999px;background-color:#10b981;text-align:center;">
+                  <span style="color:#ffffff;font-size:16px;font-weight:700;line-height:32px;">T</span>
+                </td>
+                <td style="padding-left:10px;"><span style="color:#0f172a;font-size:20px;font-weight:700;">Tratto</span></td>
+              </tr></table>
+            </td></tr>
           <tr>
             <td style="padding:32px;">
               <p style="margin:0 0 16px 0;font-size:16px;line-height:1.5;color:#1f2937;">
@@ -195,7 +209,14 @@ export function buildTeamInviteEmailHtml(inviterName: string, companyName: strin
     <tr>
       <td align="center">
         <table role="presentation" width="100%" style="max-width:480px;background-color:#ffffff;border-radius:16px;overflow:hidden;">
-          <tr><td style="background-color:#0f172a;padding:24px 32px;"><span style="color:#ffffff;font-size:20px;font-weight:700;">Tratto</span></td></tr>
+          <tr><td style="background-color:#ffffff;padding:20px 32px;border-bottom:1px solid #f0f0f0;">
+              <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+                <td style="width:32px;height:32px;border-radius:9999px;background-color:#10b981;text-align:center;">
+                  <span style="color:#ffffff;font-size:16px;font-weight:700;line-height:32px;">T</span>
+                </td>
+                <td style="padding-left:10px;"><span style="color:#0f172a;font-size:20px;font-weight:700;">Tratto</span></td>
+              </tr></table>
+            </td></tr>
           <tr>
             <td style="padding:32px;">
               <p style="margin:0 0 16px 0;font-size:16px;line-height:1.5;color:#1f2937;">
@@ -244,11 +265,14 @@ function buildMonthlyReportEmailHtml(contactReveals: number, companyName: string
     <tr>
       <td align="center">
         <table role="presentation" width="100%" style="max-width:480px;background-color:#ffffff;border-radius:16px;overflow:hidden;">
-          <tr>
-            <td style="background-color:#0f172a;padding:24px 32px;">
-              <span style="color:#ffffff;font-size:20px;font-weight:700;">Tratto</span>
-            </td>
-          </tr>
+          <tr><td style="background-color:#ffffff;padding:20px 32px;border-bottom:1px solid #f0f0f0;">
+              <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+                <td style="width:32px;height:32px;border-radius:9999px;background-color:#10b981;text-align:center;">
+                  <span style="color:#ffffff;font-size:16px;font-weight:700;line-height:32px;">T</span>
+                </td>
+                <td style="padding-left:10px;"><span style="color:#0f172a;font-size:20px;font-weight:700;">Tratto</span></td>
+              </tr></table>
+            </td></tr>
           <tr>
             <td style="padding:32px;">
               <p style="margin:0 0 16px 0;font-size:16px;line-height:1.5;color:#1f2937;">
