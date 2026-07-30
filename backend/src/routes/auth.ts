@@ -42,7 +42,7 @@ export default async function authRoutes(app: FastifyInstance) {
 
     const user = await prisma.user.create({
       data: { email, passwordHash, name, country, city, phone, role },
-      select: { id: true, email: true, name: true, role: true, country: true, createdAt: true, targetingAskedAt: true },
+      select: { id: true, email: true, name: true, role: true, country: true, createdAt: true, targetingAskedAt: true, ageRange: true, gender: true, interests: true, incomeLevel: true },
     })
 
     sendVerificationEmail(user.id, user.email, user.name).catch(err =>
@@ -132,6 +132,7 @@ export default async function authRoutes(app: FastifyInstance) {
         id: user.id, email: user.email, name: user.name, role: user.role,
         country: user.country, city: user.city, phone: user.phone, avatarUrl: user.avatarUrl,
         isVerified: user.isVerified, isPro: user.isPro, company: effectiveCompany, companyRole, targetingAskedAt: user.targetingAskedAt,
+        ageRange: user.ageRange, gender: user.gender, interests: user.interests, incomeLevel: user.incomeLevel,
       },
       token,
     })
@@ -144,6 +145,7 @@ export default async function authRoutes(app: FastifyInstance) {
         id: true, email: true, name: true, role: true,
         country: true, city: true, phone: true, avatarUrl: true,
         isVerified: true, isPro: true, createdAt: true, targetingAskedAt: true,
+        ageRange: true, gender: true, interests: true, incomeLevel: true,
         company: {
           select: { id: true, name: true, slug: true, plan: true, isVerified: true, ratingAvg: true, reviewCount: true, logoUrl: true },
         },
