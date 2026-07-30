@@ -7,7 +7,7 @@ import { AGE_RANGES, GENDERS, INCOME_LEVELS, INTERESTS } from '@/lib/targeting'
 import { COUNTRIES } from '@/lib/countries'
 
 export default function PerfilPage() {
-  const { user, fetchMe } = useAuthStore()
+  const { user, fetchMe, authChecked } = useAuthStore()
   const router = useRouter()
 
   const [form, setForm] = useState({ name: '', phone: '', city: '', country: '' })
@@ -44,9 +44,10 @@ export default function PerfilPage() {
   const avatarInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
+    if (!authChecked) return
     if (!user) { router.push('/login'); return }
     fetchMe().catch(() => {})
-  }, [])
+  }, [authChecked])
 
   useEffect(() => {
     if (!user) return

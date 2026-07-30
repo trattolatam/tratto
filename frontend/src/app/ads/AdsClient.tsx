@@ -5,6 +5,8 @@ import Link from 'next/link'
 import { ads as adsApi, categories as categoriesApi, upload, subscriptions as paymentsApi } from '@/lib/api'
 import { useAuthStore } from '@/lib/store'
 import { AGE_RANGES, GENDERS, INCOME_LEVELS, INTERESTS } from '@/lib/targeting'
+import { CountryPhoneInput } from '@/components/CountryPhoneInput'
+import { isValidPhoneNumber } from 'libphonenumber-js'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://tratto-api-dk42.onrender.com'
 const COUNTRIES = [{ code: 'UY', name: 'Uruguay' }, { code: 'AR', name: 'Argentina' }, { code: 'CL', name: 'Chile' }, { code: 'MX', name: 'México' }, { code: 'CO', name: 'Colombia' }, { code: 'PE', name: 'Perú' }, { code: 'BR', name: 'Brasil' }]
@@ -18,7 +20,7 @@ const STATUS_LABELS: Record<string, { label: string; className: string }> = {
 }
 
 export default function AdsClient() {
-  const { user } = useAuthStore()
+  const { user, authChecked } = useAuthStore()
   const router = useRouter()
   const searchParams = useSearchParams()
   const [account, setAccount] = useState<any>(null)
@@ -36,10 +38,11 @@ export default function AdsClient() {
   }
 
   useEffect(() => {
+    if (!authChecked) return
     if (!user) { router.push('/login'); return }
     load()
     categoriesApi.list().then((data: any) => setCategoryOptions(data.categories)).catch(() => {})
-  }, [user])
+  }, [authChecked])
 
   const handleToggleStatus = async (id: string) => {
     setTogglingId(id)
@@ -183,6 +186,12 @@ function CreateAdForm({ categoryOptions, onCreated, existingAd, onCancel }: { ca
     dailyBudget: existingAd ? String(existingAd.dailyBudget) : '5', companyName: existingAd?.adAccount?.companyName || '',
     startsAt: toLocalDatetimeInput(existingAd?.startsAt), endsAt: toLocalDatetimeInput(existingAd?.endsAt),
   })
+  const [whatsappCountry, setWhatsappCountry] = useState(existingAd?.whatsappCountry || 'UY')
+  const [whatsappNumber, setWhatsappNumber] = useState(existingAd?.whatsappNumber || '')
+  const [phoneCountry, setPhoneCountry] = useState(existingAd?.phoneCountry || 'UY')
+  const [phoneNumber, setPhoneNumber] = useState(existingAd?.phoneNumber || '')
+  const [contactEmail, setContactEmail] = useState(existingAd?.contactEmail || '')
+  const [websiteUrl, setWebsiteUrl] = useState(existingAd?.websiteUrl || '')
   const [imageUrls, setImageUrls] = useState<string[]>(existingAd?.imageUrls || [])
   const [uploadingImage, setUploadingImage] = useState(false)
   const [categoryIds, setCategoryIds] = useState<string[]>(existingAd?.targetCategories?.map((tc: any) => tc.categoryId) || [])
@@ -216,6 +225,12 @@ function CreateAdForm({ categoryOptions, onCreated, existingAd, onCancel }: { ca
     if (imageUrls.length === 0) { setError('Subí al menos una imagen para el anuncio'); return }
     if (categoryIds.length === 0) { setError('Elegí al menos un rubro'); return }
     if (targetCountries.length === 0) { setError('Elegí al menos un país'); return }
+    if (!whatsappNumber) { setError('El WhatsApp es obligatorio'); return }
+    if (!isValidPhoneNumber(whatsappNumber, whatsappCountry as any)) { setError(`Ingresá un WhatsApp válido para ${whatsappCountry}.`); return }
+    if (!phoneNumber) { setError('El teléfono es obligatorio'); return }
+    if (!isValidPhoneNumber(phoneNumber, phoneCountry as any)) { setError(`Ingresá un teléfono válido para ${phoneCountry}.`); return }
+    if (!contactEmail) { setError('El email de contacto es obligatorio'); return }
+    if (!websiteUrl) { setError('El sitio web es obligatorio'); return }
 
     setSubmitting(true)
     try {
@@ -225,6 +240,7 @@ function CreateAdForm({ categoryOptions, onCreated, existingAd, onCancel }: { ca
         price: form.price ? Number(form.price) : undefined,
         dailyBudget: Number(form.dailyBudget),
         ctaUrl: form.ctaUrl || undefined,
+        whatsappCountry, whatsappNumber, phoneCountry, phoneNumber, contactEmail, websiteUrl,
         categoryIds, targetCountries,
         targetAgeRanges: ageRanges, targetGenders: genders, targetInterests: interests, targetIncomeLevels: incomeLevels,
         startsAt: form.startsAt ? new Date(form.startsAt).toISOString() : undefined,
@@ -280,6 +296,17 @@ function CreateAdForm({ categoryOptions, onCreated, existingAd, onCancel }: { ca
       </div>
 
       <div><label className="label">Presupuesto diario (USD, mínimo 3)</label><input type="number" min={3} required className="input text-sm w-32" value={form.dailyBudget} onChange={e => setForm(f => ({ ...f, dailyBudget: e.target.value }))} /></div>
+
+      <div className="pt-2 border-t border-gray-100">
+        <p className="text-sm font-semibold text-brand-dark mb-1">Datos de contacto <span className="font-normal text-xs text-brand-red">(obligatorios)</span></p>
+        <p className="text-xs text-brand-slate mb-3">El botón principal del anuncio abre WhatsApp directo. Los otros tres datos aparecen en la ficha ampliada para quien quiera contactarte por otro medio.</p>
+        <div className="space-y-3">
+          <CountryPhoneInput label="WhatsApp" countryCode={whatsappCountry} number={whatsappNumber} onCountryChange={setWhatsappCountry} onNumberChange={setWhatsappNumber} />
+          <CountryPhoneInput label="Teléfono" countryCode={phoneCountry} number={phoneNumber} onCountryChange={setPhoneCountry} onNumberChange={setPhoneNumber} />
+          <div><label className="label">Email de contacto</label><input type="email" required className="input text-sm" value={contactEmail} onChange={e => setContactEmail(e.target.value)} /></div>
+          <div><label className="label">Sitio web</label><input type="url" required placeholder="https://..." className="input text-sm" value={websiteUrl} onChange={e => setWebsiteUrl(e.target.value)} /></div>
+        </div>
+      </div>
 
       <div className="grid grid-cols-2 gap-3">
         <div><label className="label">Empieza (opcional)</label><input type="datetime-local" className="input text-sm" value={form.startsAt} onChange={e => setForm(f => ({ ...f, startsAt: e.target.value }))} /></div>
