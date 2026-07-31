@@ -363,7 +363,7 @@ function AdCard({ ad }: { ad: Ad }) {
     try {
       const { ads: adsApi } = await import('@/lib/api')
       const result = await adsApi.click(ad.id, channel)
-      if (result.redirectUrl) window.open(result.redirectUrl, channel === 'website' ? '_blank' : '_self')
+      if (result.redirectUrl) window.open(result.redirectUrl, '_blank')
     } catch (e) { console.error(e) }
   }
 
