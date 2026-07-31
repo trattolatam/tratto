@@ -481,6 +481,8 @@ model AdEvent {
   userId    String?
   country   String?
   city      String?
+  costUsd   Float?    // solo en eventos que realmente cobraron algo — permite
+                       // calcular gasto real por período, no solo el total acumulado
   createdAt DateTime  @default(now())
 
   ad        Ad        @relation(fields: [adId], references: [id])

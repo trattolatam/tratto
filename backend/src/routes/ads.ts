@@ -112,7 +112,23 @@ export default async function adRoutes(app: FastifyInstance) {
 
     if (matched.length > 0) {
       setImmediate(async () => {
-        await prisma.adEvent.createMany({ data: matched.map(ad => ({ adId: ad.id, type: 'impression', country: query.country, userId: viewerId || undefined })) })
+        // Para los CPM, decidimos ACÁ (antes de crear el evento) si hay saldo
+        // para cobrar esta vista — así el costo queda grabado en el mismo
+        // evento desde el principio, y las estadísticas por período después
+        // pueden sumar el gasto real sin tener que adivinar.
+        const costByAdId = new Map<string, number>()
+        for (const ad of matched) {
+          if (ad.model !== 'CPM') continue
+          const cost = (ad.cpmUsd || 0) / 1000
+          if (cost > 0 && ad.adAccount.balance >= cost) costByAdId.set(ad.id, cost)
+        }
+
+        await prisma.adEvent.createMany({
+          data: matched.map(ad => ({
+            adId: ad.id, type: 'impression', country: query.country, userId: viewerId || undefined,
+            costUsd: costByAdId.get(ad.id) || null,
+          })),
+        })
         await prisma.ad.updateMany({ where: { id: { in: matched.map(a => a.id) } }, data: { impressions: { increment: 1 } } })
 
         // Los anuncios CPM se cobran acá, por cada vista — no en /click.
@@ -122,7 +138,8 @@ export default async function adRoutes(app: FastifyInstance) {
           const cost = (ad.cpmUsd || 0) / 1000
           if (cost <= 0) continue
 
-          if (ad.adAccount.balance < cost) {
+          if (!costByAdId.has(ad.id)) {
+            // No tenía saldo cuando chequeamos arriba — se queda sin cobrar esta vista.
             await prisma.ad.update({ where: { id: ad.id }, data: { status: 'EXHAUSTED' } })
             continue
           }
@@ -187,7 +204,7 @@ export default async function adRoutes(app: FastifyInstance) {
       await Promise.all([
         prisma.adAccount.update({ where: { id: ad.adAccountId }, data: { balance: { decrement: cost } } }),
         prisma.ad.update({ where: { id }, data: { clicks: { increment: 1 }, totalSpent: { increment: cost } } }),
-        prisma.adEvent.create({ data: { adId: id, type: `click_${channel}`, userId: viewerId } }),
+        prisma.adEvent.create({ data: { adId: id, type: `click_${channel}`, userId: viewerId, costUsd: cost } }),
       ])
 
       if (newBalance < LOW_BALANCE_THRESHOLD && !ad.adAccount.lowBalanceNotifiedAt) {
@@ -224,6 +241,7 @@ export default async function adRoutes(app: FastifyInstance) {
   app.get('/:id/convert', async (request, reply) => {
     const { id } = request.params as { id: string }
     prisma.ad.update({ where: { id }, data: { conversions: { increment: 1 } } }).catch(() => {})
+    prisma.adEvent.create({ data: { adId: id, type: 'conversion' } }).catch(() => {})
     reply.header('Content-Type', 'image/gif')
     reply.header('Cache-Control', 'no-store')
     return reply.send(TRANSPARENT_PIXEL)
@@ -264,6 +282,81 @@ export default async function adRoutes(app: FastifyInstance) {
     })
 
     return reply.send({ account, ads })
+  })
+
+  // ─── Panel de estadísticas del anunciante, por período ──────────────────────
+  app.get('/my/stats', { preHandler: requireAuth }, async (request, reply) => {
+    const query = z.object({
+      period: z.enum(['7d', '30d', 'all', 'custom']).default('30d'),
+      from: z.string().optional(),
+      to: z.string().optional(),
+    }).safeParse(request.query)
+    if (!query.success) return reply.status(400).send({ error: true, message: 'Parámetros inválidos' })
+
+    const account = await prisma.adAccount.findFirst({ where: { userId: request.user.userId }, include: { ads: true } })
+    if (!account) return reply.send({ from: null, to: null, totals: null, byAd: [] })
+
+    let from: Date | undefined
+    let to: Date | undefined
+    const now = new Date()
+    if (query.data.period === '7d') { from = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000) }
+    else if (query.data.period === '30d') { from = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000) }
+    else if (query.data.period === 'custom') {
+      if (query.data.from) from = new Date(query.data.from)
+      if (query.data.to) to = new Date(query.data.to)
+    }
+    // 'all' deja from/to sin definir — trae toda la campaña, desde siempre.
+
+    const adIds = account.ads.map((a) => a.id)
+    if (adIds.length === 0) return reply.send({ from: from || null, to: to || null, totals: { impressions: 0, clicks: 0, detailViews: 0, spend: 0, conversions: 0, ctr: 0 }, byAd: [] })
+
+    const dateFilter: any = {}
+    if (from) dateFilter.gte = from
+    if (to) dateFilter.lte = to
+
+    const events = await prisma.adEvent.findMany({
+      where: { adId: { in: adIds }, ...(from || to ? { createdAt: dateFilter } : {}) },
+      select: { adId: true, type: true, costUsd: true },
+    })
+
+    const perAd = new Map<string, { impressions: number; clicksByChannel: Record<string, number>; clicks: number; detailViews: number; spend: number; conversions: number }>()
+    for (const id of adIds) perAd.set(id, { impressions: 0, clicksByChannel: {}, clicks: 0, detailViews: 0, spend: 0, conversions: 0 })
+
+    for (const e of events) {
+      const bucket = perAd.get(e.adId)
+      if (!bucket) continue
+      if (e.type === 'impression') bucket.impressions++
+      else if (e.type === 'detail_view') bucket.detailViews++
+      else if (e.type === 'conversion') bucket.conversions++
+      else if (e.type.startsWith('click_')) {
+        const channel = e.type.replace('click_', '')
+        bucket.clicksByChannel[channel] = (bucket.clicksByChannel[channel] || 0) + 1
+        bucket.clicks++
+      }
+      if (e.costUsd) bucket.spend += e.costUsd
+    }
+
+    const byAd = account.ads.map((ad) => {
+      const bucket = perAd.get(ad.id)!
+      const ctr = bucket.impressions > 0 ? Math.round((bucket.clicks / bucket.impressions) * 1000) / 10 : 0
+      return {
+        adId: ad.id, title: ad.title, status: ad.status, model: ad.model,
+        impressions: bucket.impressions, clicks: bucket.clicks, clicksByChannel: bucket.clicksByChannel,
+        detailViews: bucket.detailViews, spend: Math.round(bucket.spend * 100) / 100,
+        conversions: bucket.conversions, ctr,
+      }
+    })
+
+    const totals = byAd.reduce((acc, a) => ({
+      impressions: acc.impressions + a.impressions,
+      clicks: acc.clicks + a.clicks,
+      detailViews: acc.detailViews + a.detailViews,
+      spend: Math.round((acc.spend + a.spend) * 100) / 100,
+      conversions: acc.conversions + a.conversions,
+    }), { impressions: 0, clicks: 0, detailViews: 0, spend: 0, conversions: 0 })
+    const totalsCtr = totals.impressions > 0 ? Math.round((totals.clicks / totals.impressions) * 1000) / 10 : 0
+
+    return reply.send({ from: from || null, to: to || null, totals: { ...totals, ctr: totalsCtr }, byAd })
   })
 
   const adInputFields = {

@@ -84,6 +84,8 @@ export default function AdsClient() {
 
           {showRecharge && <RechargeForm onClose={() => setShowRecharge(false)} />}
 
+          {myAds.length > 0 && <StatsPanel />}
+
           <div className="flex items-center justify-between">
             <p className="text-sm font-semibold text-brand-dark">Mis anuncios</p>
             <button onClick={() => { setShowCreate(!showCreate); setEditingAd(null) }} className="btn-primary text-sm py-2 px-4">{showCreate ? 'Cancelar' : '+ Crear anuncio'}</button>
@@ -144,6 +146,81 @@ export default function AdsClient() {
             })}
           </div>
         </div>
+      )}
+    </div>
+  )
+}
+
+function StatsPanel() {
+  const [period, setPeriod] = useState<'7d' | '30d' | 'all' | 'custom'>('30d')
+  const [customFrom, setCustomFrom] = useState('')
+  const [customTo, setCustomTo] = useState('')
+  const [stats, setStats] = useState<{ totals: any; byAd: any[] } | null>(null)
+  const [loading, setLoading] = useState(false)
+
+  const load = (p: typeof period, from?: string, to?: string) => {
+    setLoading(true)
+    adsApi.myStats(p, from, to).then((data: any) => setStats(data)).finally(() => setLoading(false))
+  }
+
+  useEffect(() => { if (period !== 'custom') load(period) }, [period])
+
+  const handleCustomApply = () => {
+    if (!customFrom || !customTo) return
+    load('custom', new Date(customFrom).toISOString(), new Date(customTo + 'T23:59:59').toISOString())
+  }
+
+  const PERIODS: { value: typeof period; label: string }[] = [
+    { value: '7d', label: 'Últimos 7 días' },
+    { value: '30d', label: 'Últimos 30 días' },
+    { value: 'all', label: 'Campaña completa' },
+    { value: 'custom', label: 'Rango personalizado' },
+  ]
+
+  return (
+    <div className="card p-5">
+      <p className="text-sm font-semibold text-brand-dark mb-3">Estadísticas</p>
+
+      <div className="flex gap-2 flex-wrap mb-4">
+        {PERIODS.map((p) => (
+          <button key={p.value} onClick={() => setPeriod(p.value)} className={`text-xs py-1.5 px-3 rounded-full border transition-all ${period === p.value ? 'bg-brand-green-dim border-brand-green text-brand-green-text font-semibold' : 'border-gray-200 text-brand-slate'}`}>{p.label}</button>
+        ))}
+      </div>
+
+      {period === 'custom' && (
+        <div className="flex items-end gap-2 mb-4">
+          <div><label className="label">Desde</label><input type="date" className="input text-sm" value={customFrom} onChange={e => setCustomFrom(e.target.value)} /></div>
+          <div><label className="label">Hasta</label><input type="date" className="input text-sm" value={customTo} onChange={e => setCustomTo(e.target.value)} /></div>
+          <button onClick={handleCustomApply} className="btn-secondary text-xs py-2 px-4">Aplicar</button>
+        </div>
+      )}
+
+      {loading ? (
+        <div className="text-center py-6"><i className="ti ti-loader-2 animate-spin text-xl text-brand-slate" /></div>
+      ) : stats && stats.totals ? (
+        <>
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-4">
+            <div className="bg-gray-50 rounded-lg p-3"><p className="text-xs text-brand-slate">Vistas</p><p className="text-xl font-bold text-brand-dark">{stats.totals.impressions}</p></div>
+            <div className="bg-gray-50 rounded-lg p-3"><p className="text-xs text-brand-slate">Clics</p><p className="text-xl font-bold text-brand-dark">{stats.totals.clicks}</p></div>
+            <div className="bg-gray-50 rounded-lg p-3"><p className="text-xs text-brand-slate">CTR</p><p className="text-xl font-bold text-brand-dark">{stats.totals.ctr}%</p></div>
+            <div className="bg-gray-50 rounded-lg p-3"><p className="text-xs text-brand-slate">Conversiones</p><p className="text-xl font-bold text-brand-dark">{stats.totals.conversions}</p></div>
+            <div className="bg-brand-green-dim rounded-lg p-3"><p className="text-xs text-brand-slate">Gastado</p><p className="text-xl font-bold text-brand-green">USD {stats.totals.spend.toFixed(2)}</p></div>
+          </div>
+
+          {stats.byAd.length > 1 && (
+            <div className="space-y-2">
+              <p className="text-xs font-semibold text-brand-slate uppercase tracking-wide">Por anuncio</p>
+              {stats.byAd.map((a) => (
+                <div key={a.adId} className="flex items-center justify-between text-xs border-t border-gray-50 pt-2">
+                  <span className="text-brand-dark font-medium truncate">{a.title}</span>
+                  <span className="text-brand-slate flex-shrink-0 ml-2">{a.impressions} vistas · {a.clicks} clics · {a.ctr}% CTR · USD {a.spend.toFixed(2)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      ) : (
+        <p className="text-xs text-brand-slate text-center py-4">Elegí un rango de fechas para ver los datos.</p>
       )}
     </div>
   )

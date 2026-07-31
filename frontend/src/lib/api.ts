@@ -129,6 +129,12 @@ export const ads = {
   click: (adId: string, channel: 'whatsapp' | 'phone' | 'email' | 'website' | 'instagram' | 'facebook' = 'whatsapp') =>
     apiFetch<{ success: boolean; redirectUrl?: string }>(`/api/ads/${adId}/click`, { method: 'POST', body: JSON.stringify({ channel }) }),
   trackDetailView: (adId: string) => apiFetch(`/api/ads/${adId}/detail-view`, { method: 'POST' }).catch(() => {}),
+  myStats: (period: '7d' | '30d' | 'all' | 'custom', from?: string, to?: string) => {
+    const params = new URLSearchParams({ period })
+    if (from) params.set('from', from)
+    if (to) params.set('to', to)
+    return apiFetch<{ from: string | null; to: string | null; totals: any; byAd: any[] }>(`/api/ads/my/stats?${params.toString()}`)
+  },
   my: () => apiFetch<{ account: any; ads: any[] }>('/api/ads/my'),
   create: (body: any) => apiFetch('/api/ads', { method: 'POST', body: JSON.stringify(body) }),
   update: (id: string, body: any) => apiFetch<{ ad: any; message: string }>(`/api/ads/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
