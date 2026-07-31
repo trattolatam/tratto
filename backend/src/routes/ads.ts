@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { prisma } from '../lib/prisma'
 import { requireAuth, requireAdmin } from '../middleware/auth'
 import { getValidCategorySlugs } from '../services/categories'
+import { DEFAULT_CPC_USD, DEFAULT_CPM_USD } from '../constants/adPricing'
 import { validateAndNormalizePhone } from '../utils/phone'
 
 const LOW_BALANCE_THRESHOLD = 5
@@ -58,8 +59,9 @@ export default async function adRoutes(app: FastifyInstance) {
       select: {
         id: true, title: true, description: true, imageUrls: true, price: true, ctaText: true, ctaUrl: true,
         whatsappNumber: true, phoneNumber: true, contactEmail: true, websiteUrl: true, cpcUsd: true,
+        model: true, cpmUsd: true, adAccountId: true, dailyBudget: true,
         targetAgeRanges: true, targetGenders: true, targetInterests: true, targetIncomeLevels: true,
-        adAccount: { select: { companyName: true } },
+        adAccount: { select: { companyName: true, balance: true } },
       },
     })
 
@@ -106,12 +108,50 @@ export default async function adRoutes(app: FastifyInstance) {
     })
 
     const matched = demographicMatches.slice(0, limit)
-    const ads = matched.map(({ targetAgeRanges, targetGenders, targetInterests, targetIncomeLevels, cpcUsd, ...ad }) => ad)
+    const ads = matched.map(({ targetAgeRanges, targetGenders, targetInterests, targetIncomeLevels, cpcUsd, model, cpmUsd, adAccountId, dailyBudget, adAccount, ...ad }) => ({ ...ad, adAccount: { companyName: adAccount.companyName } }))
 
-    if (ads.length > 0) {
+    if (matched.length > 0) {
       setImmediate(async () => {
-        await prisma.adEvent.createMany({ data: ads.map(ad => ({ adId: ad.id, type: 'impression', country: query.country, userId: viewerId || undefined })) })
-        await prisma.ad.updateMany({ where: { id: { in: ads.map(a => a.id) } }, data: { impressions: { increment: 1 } } })
+        await prisma.adEvent.createMany({ data: matched.map(ad => ({ adId: ad.id, type: 'impression', country: query.country, userId: viewerId || undefined })) })
+        await prisma.ad.updateMany({ where: { id: { in: matched.map(a => a.id) } }, data: { impressions: { increment: 1 } } })
+
+        // Los anuncios CPM se cobran acá, por cada vista — no en /click.
+        // Los CPC no pagan nada por esto, ya se cobran cuando les tocan WhatsApp.
+        for (const ad of matched) {
+          if (ad.model !== 'CPM') continue
+          const cost = (ad.cpmUsd || 0) / 1000
+          if (cost <= 0) continue
+
+          if (ad.adAccount.balance < cost) {
+            await prisma.ad.update({ where: { id: ad.id }, data: { status: 'EXHAUSTED' } })
+            continue
+          }
+
+          const newBalance = ad.adAccount.balance - cost
+          await Promise.all([
+            prisma.adAccount.update({ where: { id: ad.adAccountId }, data: { balance: { decrement: cost } } }),
+            prisma.ad.update({ where: { id: ad.id }, data: { totalSpent: { increment: cost } } }),
+          ])
+
+          const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0)
+          const todayImpressions = await prisma.adEvent.count({ where: { adId: ad.id, type: 'impression', createdAt: { gte: todayStart } } })
+          if (todayImpressions * cost >= ad.dailyBudget) {
+            await prisma.ad.update({ where: { id: ad.id }, data: { status: 'PAUSED' } })
+          }
+
+          if (newBalance < LOW_BALANCE_THRESHOLD) {
+            const account = await prisma.adAccount.findUnique({ where: { id: ad.adAccountId } })
+            if (account && !account.lowBalanceNotifiedAt) {
+              await prisma.adAccount.update({ where: { id: ad.adAccountId }, data: { lowBalanceNotifiedAt: new Date() } })
+              const { sendNotification } = await import('../services/notifications')
+              await sendNotification({
+                userId: account.userId, type: 'AD_LOW_BALANCE',
+                title: 'Se te está por acabar el saldo de anuncios',
+                body: `Te quedan USD ${newBalance.toFixed(2)} en tu cuenta de Tratto Ads. Recargá para que tus anuncios no se pausen solos.`,
+              })
+            }
+          }
+        }
       })
     }
 
@@ -129,11 +169,10 @@ export default async function adRoutes(app: FastifyInstance) {
     const ad = await prisma.ad.findUnique({ where: { id, status: 'ACTIVE' }, include: { adAccount: true } })
     if (!ad) return reply.status(404).send({ error: true, message: 'Anuncio no encontrado' })
 
-    // Solo el botón principal (WhatsApp) es lo que se cobra por clic — mirar
-    // el teléfono/mail/web en la ficha ampliada queda como dato gratis para
-    // el usuario, y lo medimos igual para que el anunciante sepa qué canal
-    // le funciona mejor, pero sin cobrarle cada vez que alguien mira su mail.
-    const isBillable = channel === 'whatsapp'
+    // Solo el botón principal (WhatsApp) es lo que se cobra por clic, y solo
+    // en anuncios con modelo CPC — los CPM ya se cobran por cada vista en
+    // /feed, así que cobrarles también el clic sería cobrar dos veces.
+    const isBillable = channel === 'whatsapp' && ad.model === 'CPC'
 
     if (isBillable) {
       const cost = ad.cpcUsd
@@ -265,7 +304,7 @@ export default async function adRoutes(app: FastifyInstance) {
     const { categoryIds, companyName, startsAt, endsAt, ...adData } = body.data
     const ad = await prisma.ad.create({
       data: {
-        ...adData, ...phones, cpcUsd: 0.35, adAccountId: account.id, status: 'PENDING',
+        ...adData, ...phones, cpcUsd: DEFAULT_CPC_USD, cpmUsd: DEFAULT_CPM_USD, adAccountId: account.id, status: 'PENDING',
         startsAt: startsAt ? new Date(startsAt) : null, endsAt: endsAt ? new Date(endsAt) : null,
         targetCategories: { create: categoryIds.map(categoryId => ({ categoryId })) },
       },
