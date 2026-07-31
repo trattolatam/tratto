@@ -299,7 +299,7 @@ function CreateAdForm({ categoryOptions, onCreated, existingAd, onCancel }: { ca
           </select>
           <p className="text-xs text-brand-slate mt-1">
             {form.model === 'CPC'
-              ? 'Se te cobra USD 0,50 cada vez que alguien te escribe por WhatsApp desde el anuncio. Mirar el resto de tus datos de contacto es gratis.'
+              ? 'Se te cobra USD 0,50 cada vez que alguien te contacta por WhatsApp, Instagram o Facebook desde el anuncio. Que miren tu teléfono, email o sitio web es gratis.'
               : 'Se te cobra USD 3,00 cada mil veces que se muestra tu anuncio, sin importar si alguien hace clic o no.'}
           </p>
         </div>

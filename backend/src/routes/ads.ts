@@ -169,10 +169,13 @@ export default async function adRoutes(app: FastifyInstance) {
     const ad = await prisma.ad.findUnique({ where: { id, status: 'ACTIVE' }, include: { adAccount: true } })
     if (!ad) return reply.status(404).send({ error: true, message: 'Anuncio no encontrado' })
 
-    // Solo el botón principal (WhatsApp) es lo que se cobra por clic, y solo
-    // en anuncios con modelo CPC — los CPM ya se cobran por cada vista en
-    // /feed, así que cobrarles también el clic sería cobrar dos veces.
-    const isBillable = channel === 'whatsapp' && ad.model === 'CPC'
+    // Canales de contacto directo (WhatsApp, Instagram, Facebook) cobran por
+    // clic, solo en anuncios CPM — teléfono/email/sitio web quedan gratis, son
+    // más "mirar el dato" que un contacto directo iniciado. En anuncios CPM
+    // ningún clic cobra nada, porque ya se cobra por cada vista en /feed —
+    // cobrar también el clic ahí sería cobrarle dos veces al anunciante.
+    const DIRECT_CONTACT_CHANNELS = ['whatsapp', 'instagram', 'facebook']
+    const isBillable = DIRECT_CONTACT_CHANNELS.includes(channel) && ad.model === 'CPC'
 
     if (isBillable) {
       const cost = ad.cpcUsd
