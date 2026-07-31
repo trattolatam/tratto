@@ -126,7 +126,7 @@ export const ai = { generateSummary: (companyId: string) => apiFetch<{ message: 
 
 export const ads = {
   feed: (params: { categoryId?: string; country?: string } = {}) => apiFetch<{ ads: any[] }>(`/api/ads/feed?${new URLSearchParams(params as any).toString()}`),
-  click: (adId: string, channel: 'whatsapp' | 'phone' | 'email' | 'website' = 'whatsapp') =>
+  click: (adId: string, channel: 'whatsapp' | 'phone' | 'email' | 'website' | 'instagram' | 'facebook' = 'whatsapp') =>
     apiFetch<{ success: boolean; redirectUrl?: string }>(`/api/ads/${adId}/click`, { method: 'POST', body: JSON.stringify({ channel }) }),
   my: () => apiFetch<{ account: any; ads: any[] }>('/api/ads/my'),
   create: (body: any) => apiFetch('/api/ads', { method: 'POST', body: JSON.stringify(body) }),

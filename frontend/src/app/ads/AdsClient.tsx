@@ -192,6 +192,8 @@ function CreateAdForm({ categoryOptions, onCreated, existingAd, onCancel }: { ca
   const [phoneNumber, setPhoneNumber] = useState(existingAd?.phoneNumber || '')
   const [contactEmail, setContactEmail] = useState(existingAd?.contactEmail || '')
   const [websiteUrl, setWebsiteUrl] = useState(existingAd?.websiteUrl || '')
+  const [instagramUrl, setInstagramUrl] = useState(existingAd?.instagramUrl || '')
+  const [facebookUrl, setFacebookUrl] = useState(existingAd?.facebookUrl || '')
   const [imageUrls, setImageUrls] = useState<string[]>(existingAd?.imageUrls || [])
   const [uploadingImage, setUploadingImage] = useState(false)
   const [categoryIds, setCategoryIds] = useState<string[]>(existingAd?.targetCategories?.map((tc: any) => tc.categoryId) || [])
@@ -242,6 +244,8 @@ function CreateAdForm({ categoryOptions, onCreated, existingAd, onCancel }: { ca
         phoneNumber: phoneNumber || undefined,
         contactEmail: contactEmail || undefined,
         websiteUrl: websiteUrl || undefined,
+        instagramUrl: instagramUrl || undefined,
+        facebookUrl: facebookUrl || undefined,
         categoryIds, targetCountries,
         targetAgeRanges: ageRanges, targetGenders: genders, targetInterests: interests, targetIncomeLevels: incomeLevels,
         startsAt: form.startsAt ? new Date(form.startsAt).toISOString() : undefined,
@@ -317,6 +321,10 @@ function CreateAdForm({ categoryOptions, onCreated, existingAd, onCancel }: { ca
           </div>
           <div><label className="label">Email de contacto (opcional)</label><input type="email" className="input text-sm" value={contactEmail} onChange={e => setContactEmail(e.target.value)} /></div>
           <div><label className="label">Sitio web (opcional)</label><input type="url" placeholder="https://..." className="input text-sm" value={websiteUrl} onChange={e => setWebsiteUrl(e.target.value)} /></div>
+          <div className="grid grid-cols-2 gap-3">
+            <div><label className="label">Instagram (opcional)</label><input type="url" placeholder="https://instagram.com/..." className="input text-sm" value={instagramUrl} onChange={e => setInstagramUrl(e.target.value)} /></div>
+            <div><label className="label">Facebook (opcional)</label><input type="url" placeholder="https://facebook.com/..." className="input text-sm" value={facebookUrl} onChange={e => setFacebookUrl(e.target.value)} /></div>
+          </div>
         </div>
       </div>
 

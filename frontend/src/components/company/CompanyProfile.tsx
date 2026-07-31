@@ -359,7 +359,7 @@ function AdCard({ ad }: { ad: Ad }) {
   const [galleryIndex, setGalleryIndex] = useState(0)
   const images = ad.imageUrls && ad.imageUrls.length > 0 ? ad.imageUrls : []
 
-  const handleChannelClick = async (channel: 'whatsapp' | 'phone' | 'email' | 'website') => {
+  const handleChannelClick = async (channel: 'whatsapp' | 'phone' | 'email' | 'website' | 'instagram' | 'facebook') => {
     try {
       const { ads: adsApi } = await import('@/lib/api')
       const result = await adsApi.click(ad.id, channel)
@@ -416,25 +416,27 @@ function AdCard({ ad }: { ad: Ad }) {
                 <i className="ti ti-brand-whatsapp text-base" />{ad.ctaText}
               </button>
 
-              {(ad.phoneNumber || ad.contactEmail || ad.websiteUrl) && (
-                <div className={`grid gap-2 ${[ad.phoneNumber, ad.contactEmail, ad.websiteUrl].filter(Boolean).length === 1 ? 'grid-cols-1' : [ad.phoneNumber, ad.contactEmail, ad.websiteUrl].filter(Boolean).length === 2 ? 'grid-cols-2' : 'grid-cols-3'}`}>
-                  {ad.phoneNumber && (
-                    <button onClick={() => handleChannelClick('phone')} className="flex flex-col items-center gap-1 py-2.5 rounded-lg border border-gray-100 hover:bg-gray-50 text-brand-slate">
-                      <i className="ti ti-phone text-lg" /><span className="text-xs">Llamar</span>
-                    </button>
-                  )}
-                  {ad.contactEmail && (
-                    <button onClick={() => handleChannelClick('email')} className="flex flex-col items-center gap-1 py-2.5 rounded-lg border border-gray-100 hover:bg-gray-50 text-brand-slate">
-                      <i className="ti ti-mail text-lg" /><span className="text-xs">Email</span>
-                    </button>
-                  )}
-                  {ad.websiteUrl && (
-                    <button onClick={() => handleChannelClick('website')} className="flex flex-col items-center gap-1 py-2.5 rounded-lg border border-gray-100 hover:bg-gray-50 text-brand-slate">
-                      <i className="ti ti-world text-lg" /><span className="text-xs">Sitio web</span>
-                    </button>
-                  )}
-                </div>
-              )}
+              {(() => {
+                const extraChannels = [
+                  ad.phoneNumber && { key: 'phone', icon: 'ti-phone', label: 'Llamar' },
+                  ad.contactEmail && { key: 'email', icon: 'ti-mail', label: 'Email' },
+                  ad.websiteUrl && { key: 'website', icon: 'ti-world', label: 'Sitio web' },
+                  ad.instagramUrl && { key: 'instagram', icon: 'ti-brand-instagram', label: 'Instagram' },
+                  ad.facebookUrl && { key: 'facebook', icon: 'ti-brand-facebook', label: 'Facebook' },
+                ].filter(Boolean) as { key: 'phone' | 'email' | 'website' | 'instagram' | 'facebook'; icon: string; label: string }[]
+
+                if (extraChannels.length === 0) return null
+                const colsClass = extraChannels.length === 1 ? 'grid-cols-1' : extraChannels.length === 2 ? 'grid-cols-2' : 'grid-cols-3'
+                return (
+                  <div className={`grid gap-2 ${colsClass}`}>
+                    {extraChannels.map((c) => (
+                      <button key={c.key} onClick={() => handleChannelClick(c.key)} className="flex flex-col items-center gap-1 py-2.5 rounded-lg border border-gray-100 hover:bg-gray-50 text-brand-slate">
+                        <i className={`ti ${c.icon} text-lg`} /><span className="text-xs">{c.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                )
+              })()}
             </div>
           </div>
         </div>

@@ -43,7 +43,7 @@ export const MEDAL_META: Record<MedalType, { label: string; emoji: string; color
 
 export interface AiSummary { id: string; summaryText: string; insightBars: InsightBar[]; reviewsCount: number; generatedAt: string }
 export interface InsightBar { label: string; percentage: number; isNegative: boolean }
-export interface Ad { id: string; title: string; description: string; imageUrls: string[]; price?: number; ctaText: string; ctaUrl?: string; whatsappNumber: string; phoneNumber?: string | null; contactEmail?: string | null; websiteUrl?: string | null; adAccount: { companyName: string } }
+export interface Ad { id: string; title: string; description: string; imageUrls: string[]; price?: number; ctaText: string; ctaUrl?: string; whatsappNumber: string; phoneNumber?: string | null; contactEmail?: string | null; websiteUrl?: string | null; instagramUrl?: string | null; facebookUrl?: string | null; adAccount: { companyName: string } }
 
 export interface PaginatedResponse<T> { data: T[]; pagination: { page: number; limit: number; total: number; pages: number } }
 export interface ApiError { error: true; message: string; details?: any }

@@ -58,7 +58,7 @@ export default async function adRoutes(app: FastifyInstance) {
       where, take: Math.min(limit * 6, 24), orderBy: { cpcUsd: 'desc' },
       select: {
         id: true, title: true, description: true, imageUrls: true, price: true, ctaText: true, ctaUrl: true,
-        whatsappNumber: true, phoneNumber: true, contactEmail: true, websiteUrl: true, cpcUsd: true,
+        whatsappNumber: true, phoneNumber: true, contactEmail: true, websiteUrl: true, instagramUrl: true, facebookUrl: true, cpcUsd: true,
         model: true, cpmUsd: true, adAccountId: true, dailyBudget: true,
         targetAgeRanges: true, targetGenders: true, targetInterests: true, targetIncomeLevels: true,
         adAccount: { select: { companyName: true, balance: true } },
@@ -160,7 +160,7 @@ export default async function adRoutes(app: FastifyInstance) {
 
   app.post('/:id/click', async (request, reply) => {
     const { id } = request.params as { id: string }
-    const body = z.object({ channel: z.enum(['whatsapp', 'phone', 'email', 'website']).default('whatsapp') }).safeParse(request.body)
+    const body = z.object({ channel: z.enum(['whatsapp', 'phone', 'email', 'website', 'instagram', 'facebook']).default('whatsapp') }).safeParse(request.body)
     const channel = body.success ? body.data.channel : 'whatsapp'
 
     let viewerId: string | undefined
@@ -212,6 +212,8 @@ export default async function adRoutes(app: FastifyInstance) {
       phone: ad.phoneNumber ? `tel:${ad.phoneNumber}` : undefined,
       email: ad.contactEmail ? `mailto:${ad.contactEmail}` : undefined,
       website: ad.websiteUrl || undefined,
+      instagram: ad.instagramUrl || undefined,
+      facebook: ad.facebookUrl || undefined,
     }
 
     return reply.send({ success: true, redirectUrl: redirectUrls[channel] })
@@ -252,6 +254,8 @@ export default async function adRoutes(app: FastifyInstance) {
     phoneNumber: z.string().min(4).optional(),
     contactEmail: z.string().email().optional(),
     websiteUrl: z.string().url().optional(),
+    instagramUrl: z.string().url().optional(),
+    facebookUrl: z.string().url().optional(),
     model: z.enum(['CPC', 'CPM']).default('CPC'),
     dailyBudget: z.number().min(3),
     categoryIds: z.array(z.string().uuid()).min(1),

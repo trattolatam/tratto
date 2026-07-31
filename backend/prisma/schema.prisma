@@ -425,6 +425,8 @@ model Ad {
   phoneNumber     String?
   contactEmail    String?
   websiteUrl      String?
+  instagramUrl    String?
+  facebookUrl     String?
 
   model         AdModel   @default(CPC)
   cpcUsd        Float     @default(0.35)
