@@ -204,12 +204,15 @@ export default async function adRoutes(app: FastifyInstance) {
     ctaUrl: z.string().url().optional(),
     // Contacto obligatorio — el número "crudo" que escribió el anunciante,
     // se valida y normaliza a E.164 más abajo antes de guardar.
+    // Solo WhatsApp es obligatorio — es el único canal que garantiza una
+    // acción real (el botón principal del anuncio abre WhatsApp). El resto
+    // son canales alternativos, opcionales, para quien quiera dar más datos.
     whatsappCountry: z.string().length(2),
     whatsappNumber: z.string().min(4),
-    phoneCountry: z.string().length(2),
-    phoneNumber: z.string().min(4),
-    contactEmail: z.string().email(),
-    websiteUrl: z.string().url(),
+    phoneCountry: z.string().length(2).optional(),
+    phoneNumber: z.string().min(4).optional(),
+    contactEmail: z.string().email().optional(),
+    websiteUrl: z.string().url().optional(),
     model: z.enum(['CPC', 'CPM']).default('CPC'),
     dailyBudget: z.number().min(3),
     categoryIds: z.array(z.string().uuid()).min(1),

@@ -415,17 +415,25 @@ function AdCard({ ad }: { ad: Ad }) {
                 <i className="ti ti-brand-whatsapp text-base" />{ad.ctaText}
               </button>
 
-              <div className="grid grid-cols-3 gap-2">
-                <button onClick={() => handleChannelClick('phone')} className="flex flex-col items-center gap-1 py-2.5 rounded-lg border border-gray-100 hover:bg-gray-50 text-brand-slate">
-                  <i className="ti ti-phone text-lg" /><span className="text-xs">Llamar</span>
-                </button>
-                <button onClick={() => handleChannelClick('email')} className="flex flex-col items-center gap-1 py-2.5 rounded-lg border border-gray-100 hover:bg-gray-50 text-brand-slate">
-                  <i className="ti ti-mail text-lg" /><span className="text-xs">Email</span>
-                </button>
-                <button onClick={() => handleChannelClick('website')} className="flex flex-col items-center gap-1 py-2.5 rounded-lg border border-gray-100 hover:bg-gray-50 text-brand-slate">
-                  <i className="ti ti-world text-lg" /><span className="text-xs">Sitio web</span>
-                </button>
-              </div>
+              {(ad.phoneNumber || ad.contactEmail || ad.websiteUrl) && (
+                <div className={`grid gap-2 ${[ad.phoneNumber, ad.contactEmail, ad.websiteUrl].filter(Boolean).length === 1 ? 'grid-cols-1' : [ad.phoneNumber, ad.contactEmail, ad.websiteUrl].filter(Boolean).length === 2 ? 'grid-cols-2' : 'grid-cols-3'}`}>
+                  {ad.phoneNumber && (
+                    <button onClick={() => handleChannelClick('phone')} className="flex flex-col items-center gap-1 py-2.5 rounded-lg border border-gray-100 hover:bg-gray-50 text-brand-slate">
+                      <i className="ti ti-phone text-lg" /><span className="text-xs">Llamar</span>
+                    </button>
+                  )}
+                  {ad.contactEmail && (
+                    <button onClick={() => handleChannelClick('email')} className="flex flex-col items-center gap-1 py-2.5 rounded-lg border border-gray-100 hover:bg-gray-50 text-brand-slate">
+                      <i className="ti ti-mail text-lg" /><span className="text-xs">Email</span>
+                    </button>
+                  )}
+                  {ad.websiteUrl && (
+                    <button onClick={() => handleChannelClick('website')} className="flex flex-col items-center gap-1 py-2.5 rounded-lg border border-gray-100 hover:bg-gray-50 text-brand-slate">
+                      <i className="ti ti-world text-lg" /><span className="text-xs">Sitio web</span>
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>

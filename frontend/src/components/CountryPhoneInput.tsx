@@ -28,7 +28,7 @@ export function CountryPhoneInput({
 
   return (
     <div>
-      <label className="label">{label}</label>
+      {label && <label className="label">{label}</label>}
       <div className="flex gap-2">
         <div className="relative" ref={wrapperRef}>
           <button type="button" onClick={() => setOpen(!open)} className="input text-sm flex items-center gap-1.5 w-28">

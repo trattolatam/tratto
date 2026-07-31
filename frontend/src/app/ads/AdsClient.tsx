@@ -227,10 +227,7 @@ function CreateAdForm({ categoryOptions, onCreated, existingAd, onCancel }: { ca
     if (targetCountries.length === 0) { setError('Elegí al menos un país'); return }
     if (!whatsappNumber) { setError('El WhatsApp es obligatorio'); return }
     if (!isValidPhoneNumber(whatsappNumber, whatsappCountry as any)) { setError(`Ingresá un WhatsApp válido para ${whatsappCountry}.`); return }
-    if (!phoneNumber) { setError('El teléfono es obligatorio'); return }
-    if (!isValidPhoneNumber(phoneNumber, phoneCountry as any)) { setError(`Ingresá un teléfono válido para ${phoneCountry}.`); return }
-    if (!contactEmail) { setError('El email de contacto es obligatorio'); return }
-    if (!websiteUrl) { setError('El sitio web es obligatorio'); return }
+    if (phoneNumber && !isValidPhoneNumber(phoneNumber, phoneCountry as any)) { setError(`Ingresá un teléfono válido para ${phoneCountry}.`); return }
 
     setSubmitting(true)
     try {
@@ -240,7 +237,11 @@ function CreateAdForm({ categoryOptions, onCreated, existingAd, onCancel }: { ca
         price: form.price ? Number(form.price) : undefined,
         dailyBudget: Number(form.dailyBudget),
         ctaUrl: form.ctaUrl || undefined,
-        whatsappCountry, whatsappNumber, phoneCountry, phoneNumber, contactEmail, websiteUrl,
+        whatsappCountry, whatsappNumber,
+        phoneCountry: phoneNumber ? phoneCountry : undefined,
+        phoneNumber: phoneNumber || undefined,
+        contactEmail: contactEmail || undefined,
+        websiteUrl: websiteUrl || undefined,
         categoryIds, targetCountries,
         targetAgeRanges: ageRanges, targetGenders: genders, targetInterests: interests, targetIncomeLevels: incomeLevels,
         startsAt: form.startsAt ? new Date(form.startsAt).toISOString() : undefined,
@@ -298,13 +299,19 @@ function CreateAdForm({ categoryOptions, onCreated, existingAd, onCancel }: { ca
       <div><label className="label">Presupuesto diario (USD, mínimo 3)</label><input type="number" min={3} required className="input text-sm w-32" value={form.dailyBudget} onChange={e => setForm(f => ({ ...f, dailyBudget: e.target.value }))} /></div>
 
       <div className="pt-2 border-t border-gray-100">
-        <p className="text-sm font-semibold text-brand-dark mb-1">Datos de contacto <span className="font-normal text-xs text-brand-red">(obligatorios)</span></p>
-        <p className="text-xs text-brand-slate mb-3">El botón principal del anuncio abre WhatsApp directo. Los otros tres datos aparecen en la ficha ampliada para quien quiera contactarte por otro medio.</p>
+        <p className="text-sm font-semibold text-brand-dark mb-1">Datos de contacto</p>
+        <p className="text-xs text-brand-slate mb-3">El botón principal del anuncio abre WhatsApp directo (<span className="text-brand-red">obligatorio</span>). Teléfono, email y sitio web son opcionales — si los cargás, aparecen como canales extra en la ficha ampliada.</p>
         <div className="space-y-3">
-          <CountryPhoneInput label="WhatsApp" countryCode={whatsappCountry} number={whatsappNumber} onCountryChange={setWhatsappCountry} onNumberChange={setWhatsappNumber} />
-          <CountryPhoneInput label="Teléfono" countryCode={phoneCountry} number={phoneNumber} onCountryChange={setPhoneCountry} onNumberChange={setPhoneNumber} />
-          <div><label className="label">Email de contacto</label><input type="email" required className="input text-sm" value={contactEmail} onChange={e => setContactEmail(e.target.value)} /></div>
-          <div><label className="label">Sitio web</label><input type="url" required placeholder="https://..." className="input text-sm" value={websiteUrl} onChange={e => setWebsiteUrl(e.target.value)} /></div>
+          <CountryPhoneInput label="WhatsApp *" countryCode={whatsappCountry} number={whatsappNumber} onCountryChange={setWhatsappCountry} onNumberChange={setWhatsappNumber} />
+          <div>
+            <div className="flex items-center justify-between">
+              <label className="label mb-0">Teléfono (opcional)</label>
+              {whatsappNumber && <button type="button" onClick={() => { setPhoneCountry(whatsappCountry); setPhoneNumber(whatsappNumber) }} className="text-xs text-brand-green hover:underline">Usar el mismo que WhatsApp</button>}
+            </div>
+            <div className="mt-1"><CountryPhoneInput label="" countryCode={phoneCountry} number={phoneNumber} onCountryChange={setPhoneCountry} onNumberChange={setPhoneNumber} /></div>
+          </div>
+          <div><label className="label">Email de contacto (opcional)</label><input type="email" className="input text-sm" value={contactEmail} onChange={e => setContactEmail(e.target.value)} /></div>
+          <div><label className="label">Sitio web (opcional)</label><input type="url" placeholder="https://..." className="input text-sm" value={websiteUrl} onChange={e => setWebsiteUrl(e.target.value)} /></div>
         </div>
       </div>
 
