@@ -379,6 +379,7 @@ function AdCard({ ad }: { ad: Ad }) {
             {images.length > 1 && <span className="absolute -bottom-1.5 -right-1.5 bg-brand-dark text-white text-[10px] leading-none px-1.5 py-1 rounded-full">+{images.length - 1}</span>}
           </div>
           <div className="flex-1 min-w-0 pr-6">
+            <p className="text-[11px] font-medium text-brand-slate uppercase tracking-wide truncate">{ad.adAccount.companyName}</p>
             <p className="text-sm font-semibold text-brand-dark leading-snug line-clamp-2">{ad.title}</p>
             <p className="text-xs text-brand-slate mt-0.5 line-clamp-1">{ad.description}</p>
             {ad.price && <p className="text-sm font-bold text-brand-green mt-1">USD {ad.price.toFixed(2)}</p>}
