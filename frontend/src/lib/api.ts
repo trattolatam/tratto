@@ -128,6 +128,7 @@ export const ads = {
   feed: (params: { categoryId?: string; country?: string } = {}) => apiFetch<{ ads: any[] }>(`/api/ads/feed?${new URLSearchParams(params as any).toString()}`),
   click: (adId: string, channel: 'whatsapp' | 'phone' | 'email' | 'website' | 'instagram' | 'facebook' = 'whatsapp') =>
     apiFetch<{ success: boolean; redirectUrl?: string }>(`/api/ads/${adId}/click`, { method: 'POST', body: JSON.stringify({ channel }) }),
+  trackDetailView: (adId: string) => apiFetch(`/api/ads/${adId}/detail-view`, { method: 'POST' }).catch(() => {}),
   my: () => apiFetch<{ account: any; ads: any[] }>('/api/ads/my'),
   create: (body: any) => apiFetch('/api/ads', { method: 'POST', body: JSON.stringify(body) }),
   update: (id: string, body: any) => apiFetch<{ ad: any; message: string }>(`/api/ads/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),

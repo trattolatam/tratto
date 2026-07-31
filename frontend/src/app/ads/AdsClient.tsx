@@ -11,6 +11,10 @@ import { isValidPhoneNumber } from 'libphonenumber-js'
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://tratto-api-dk42.onrender.com'
 const COUNTRIES = [{ code: 'UY', name: 'Uruguay' }, { code: 'AR', name: 'Argentina' }, { code: 'CL', name: 'Chile' }, { code: 'MX', name: 'México' }, { code: 'CO', name: 'Colombia' }, { code: 'PE', name: 'Perú' }, { code: 'BR', name: 'Brasil' }]
 
+const CHANNEL_LABELS: Record<string, string> = {
+  whatsapp: 'WhatsApp', phone: 'Teléfono', email: 'Email', website: 'Sitio web', instagram: 'Instagram', facebook: 'Facebook',
+}
+
 const STATUS_LABELS: Record<string, { label: string; className: string }> = {
   PENDING: { label: 'En revisión', className: 'bg-brand-amber-dim text-brand-amber' },
   ACTIVE: { label: 'Activo', className: 'bg-brand-green-dim text-brand-green' },
@@ -106,10 +110,19 @@ export default function AdsClient() {
                       <div className="flex gap-4 text-xs text-brand-slate flex-wrap">
                         <span>{ad.impressions} vistas</span>
                         <span>{ad.clicks} clics</span>
+                        <span>{ad.ctr ?? 0}% CTR</span>
+                        <span>{ad.detailViews ?? 0} aperturas de ficha</span>
                         <span>{ad.conversions} conversiones</span>
                         <span>USD {ad.totalSpent.toFixed(2)} gastado</span>
                         <span>{ad.model === 'CPC' ? `USD ${ad.cpcUsd}/clic` : `USD ${ad.cpmUsd || 0}/mil vistas`}</span>
                       </div>
+                      {ad.clicksByChannel && Object.keys(ad.clicksByChannel).length > 0 && (
+                        <div className="flex gap-3 text-xs text-brand-slate flex-wrap mt-1.5">
+                          {Object.entries(ad.clicksByChannel).map(([channel, count]) => (
+                            <span key={channel} className="bg-gray-50 rounded px-2 py-0.5">{CHANNEL_LABELS[channel] || channel}: <strong className="text-brand-dark">{count as number}</strong></span>
+                          ))}
+                        </div>
+                      )}
                       {ad.rejectionNote && <p className="text-xs text-brand-red mt-2">Motivo del rechazo: {ad.rejectionNote}</p>}
                       <div className="flex gap-3 mt-3">
                         {(ad.status === 'ACTIVE' || ad.status === 'PAUSED') && (
@@ -299,7 +312,7 @@ function CreateAdForm({ categoryOptions, onCreated, existingAd, onCancel }: { ca
           </select>
           <p className="text-xs text-brand-slate mt-1">
             {form.model === 'CPC'
-              ? 'Se te cobra USD 0,50 cada vez que alguien te contacta por WhatsApp, Instagram o Facebook desde el anuncio. Que miren tu teléfono, email o sitio web es gratis.'
+              ? 'Se te cobra USD 0,50 cada vez que alguien te contacta desde el anuncio, por cualquier canal (WhatsApp, teléfono, email, sitio web, Instagram o Facebook).'
               : 'Se te cobra USD 3,00 cada mil veces que se muestra tu anuncio, sin importar si alguien hace clic o no.'}
           </p>
         </div>

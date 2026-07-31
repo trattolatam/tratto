@@ -367,7 +367,11 @@ function AdCard({ ad }: { ad: Ad }) {
     } catch (e) { console.error(e) }
   }
 
-  const openDetails = () => { setGalleryIndex(0); setShowDetails(true) }
+  const openDetails = async () => {
+    setGalleryIndex(0)
+    setShowDetails(true)
+    try { const { ads: adsApi } = await import('@/lib/api'); adsApi.trackDetailView(ad.id) } catch (e) { console.error(e) }
+  }
 
   return (
     <>

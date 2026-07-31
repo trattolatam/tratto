@@ -169,13 +169,12 @@ export default async function adRoutes(app: FastifyInstance) {
     const ad = await prisma.ad.findUnique({ where: { id, status: 'ACTIVE' }, include: { adAccount: true } })
     if (!ad) return reply.status(404).send({ error: true, message: 'Anuncio no encontrado' })
 
-    // Canales de contacto directo (WhatsApp, Instagram, Facebook) cobran por
-    // clic, solo en anuncios CPM — teléfono/email/sitio web quedan gratis, son
-    // más "mirar el dato" que un contacto directo iniciado. En anuncios CPM
-    // ningún clic cobra nada, porque ya se cobra por cada vista en /feed —
-    // cobrar también el clic ahí sería cobrarle dos veces al anunciante.
-    const DIRECT_CONTACT_CHANNELS = ['whatsapp', 'instagram', 'facebook']
-    const isBillable = DIRECT_CONTACT_CHANNELS.includes(channel) && ad.model === 'CPC'
+    // Cualquier clic (WhatsApp, teléfono, email, sitio web, Instagram,
+    // Facebook) cobra en anuncios CPC — todos son, al final, un contacto real
+    // iniciado. En anuncios CPM ningún clic cobra nada, porque ya se cobra
+    // por cada vista en /feed — cobrar también el clic ahí sería cobrarle
+    // dos veces al anunciante por lo mismo.
+    const isBillable = ad.model === 'CPC'
 
     if (isBillable) {
       const cost = ad.cpcUsd
@@ -202,7 +201,7 @@ export default async function adRoutes(app: FastifyInstance) {
       }
 
       const today = new Date(); today.setHours(0, 0, 0, 0)
-      const todaySpend = await prisma.adEvent.count({ where: { adId: id, type: `click_${channel}`, createdAt: { gte: today } } })
+      const todaySpend = await prisma.adEvent.count({ where: { adId: id, type: { startsWith: 'click_' }, createdAt: { gte: today } } })
       if (todaySpend * cost >= ad.dailyBudget) {
         await prisma.ad.update({ where: { id }, data: { status: 'PAUSED' } })
       }
@@ -230,13 +229,41 @@ export default async function adRoutes(app: FastifyInstance) {
     return reply.send(TRANSPARENT_PIXEL)
   })
 
+  // ─── Alguien abrió la ficha ampliada del anuncio (no cobra nada, solo mide) ──
+  app.post('/:id/detail-view', async (request, reply) => {
+    const { id } = request.params as { id: string }
+    let viewerId: string | undefined
+    try { await request.jwtVerify(); viewerId = (request.user as any).userId } catch { /* anónimo */ }
+    prisma.adEvent.create({ data: { adId: id, type: 'detail_view', userId: viewerId } }).catch(() => {})
+    return reply.send({ ok: true })
+  })
+
   app.get('/my', { preHandler: requireAuth }, async (request, reply) => {
     const account = await prisma.adAccount.findFirst({
       where: { userId: request.user.userId },
       include: { ads: { orderBy: { createdAt: 'desc' }, include: { targetCategories: { include: { category: true } } } } },
     })
     if (!account) return reply.send({ account: null, ads: [] })
-    return reply.send({ account, ads: account.ads })
+
+    // Desglose de clics por canal + aperturas de ficha ampliada, para cada anuncio.
+    const adIds = account.ads.map((a) => a.id)
+    const events = adIds.length > 0
+      ? await prisma.adEvent.groupBy({ by: ['adId', 'type'], where: { adId: { in: adIds } }, _count: true })
+      : []
+
+    const ads = account.ads.map((ad) => {
+      const adEvents = events.filter((e) => e.adId === ad.id)
+      const clicksByChannel: Record<string, number> = {}
+      let detailViews = 0
+      for (const e of adEvents) {
+        if (e.type === 'detail_view') detailViews = e._count
+        else if (e.type.startsWith('click_')) clicksByChannel[e.type.replace('click_', '')] = e._count
+      }
+      const ctr = ad.impressions > 0 ? Math.round((ad.clicks / ad.impressions) * 1000) / 10 : 0
+      return { ...ad, clicksByChannel, detailViews, ctr }
+    })
+
+    return reply.send({ account, ads })
   })
 
   const adInputFields = {
