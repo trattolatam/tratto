@@ -8,6 +8,7 @@ import { admin as adminApi } from '@/lib/api'
 export function Navbar() {
   const { user, logout } = useAuthStore()
   const [menuOpen, setMenuOpen] = useState(false)
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const userMenuRef = useRef<HTMLDivElement>(null)
   const [searchQuery, setSearchQuery] = useState('')
@@ -111,18 +112,26 @@ export function Navbar() {
               <Link href="/registro" className="btn-primary py-1.5 text-xs"><i className="ti ti-pencil text-sm" />Escribir reseña</Link>
             </>
           )}
-          <button className="md:hidden w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100" onClick={() => setMenuOpen(!menuOpen)}>
+          <button className="md:hidden w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100" onClick={() => { setMobileSearchOpen(!mobileSearchOpen); setMenuOpen(false) }}>
+            <i className={`ti ${mobileSearchOpen ? 'ti-x' : 'ti-search'} text-lg`} />
+          </button>
+          <button className="md:hidden w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100" onClick={() => { setMenuOpen(!menuOpen); setMobileSearchOpen(false) }}>
             <i className={`ti ${menuOpen ? 'ti-x' : 'ti-menu-2'} text-lg`} />
           </button>
         </div>
       </div>
 
+      {mobileSearchOpen && (
+        <div className="md:hidden border-t border-gray-100 bg-white px-4 py-3">
+          <form onSubmit={(e) => { handleSearch(e); setMobileSearchOpen(false) }} className="relative">
+            <input type="text" autoFocus placeholder="Buscar electricistas, peluquerías, psicólogos..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="input text-sm w-full pl-9" />
+            <button type="submit" className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-brand-green transition-colors"><i className="ti ti-search text-base" /></button>
+          </form>
+        </div>
+      )}
+
       {menuOpen && (
         <div className="md:hidden border-t border-gray-100 bg-white px-4 py-3 space-y-1">
-          <form onSubmit={(e) => { handleSearch(e); setMenuOpen(false) }} className="relative mb-2">
-            <input type="text" placeholder="Buscar electricistas, peluquerías, psicólogos..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="input text-sm w-full pl-9" />
-            <i className="ti ti-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-base" />
-          </form>
           <Link href="/categorias" className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 rounded-lg hover:bg-gray-50" onClick={() => setMenuOpen(false)}><i className="ti ti-category text-base" /> Categorías</Link>
           <Link href="/como-funciona" className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 rounded-lg hover:bg-gray-50" onClick={() => setMenuOpen(false)}><i className="ti ti-help text-base" /> Cómo funciona</Link>
           <Link href="/precios" className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 rounded-lg hover:bg-gray-50" onClick={() => setMenuOpen(false)}><i className="ti ti-building-store text-base" /> Para empresas</Link>
