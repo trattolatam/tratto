@@ -1,7 +1,7 @@
 import { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { prisma } from '../lib/prisma'
-import { requireAuth, requireVerifiedEmail, requireBusinessOwner, requireAdmin, requirePlan, requireCompanyRank } from '../middleware/auth'
+import { requireAuth, requireVerifiedEmail, requireBusinessOwner, requireStaff, requirePlan, requireCompanyRank } from '../middleware/auth'
 import { createReviewRateLimit } from '../middleware/rateLimits'
 import { recalcCompanyRating } from '../services/rating'
 import { checkAndAwardMedals } from '../services/medals'
@@ -145,7 +145,7 @@ export default async function reviewRoutes(app: FastifyInstance) {
     return reply.send({ helpful: true })
   })
 
-  app.patch('/:id/moderate', { preHandler: requireAdmin }, async (request, reply) => {
+  app.patch('/:id/moderate', { preHandler: requireStaff }, async (request, reply) => {
     const { id } = request.params as { id: string }
     const body = z.object({ status: z.enum(['APPROVED', 'REJECTED']), note: z.string().optional() }).safeParse(request.body)
     if (!body.success) return reply.status(400).send({ error: true, message: 'Datos inválidos' })

@@ -1,7 +1,7 @@
 import { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { prisma } from '../lib/prisma'
-import { requireAuth, requireAdmin } from '../middleware/auth'
+import { requireAuth, requireStaff } from '../middleware/auth'
 import { getValidCategorySlugs } from '../services/categories'
 import { DEFAULT_CPC_USD, DEFAULT_CPM_USD } from '../constants/adPricing'
 import { validateAndNormalizePhone } from '../utils/phone'
@@ -502,7 +502,7 @@ export default async function adRoutes(app: FastifyInstance) {
     return reply.send({ account, message: `Saldo recargado: USD ${body.data.amountUsd}` })
   })
 
-  app.get('/pending', { preHandler: requireAdmin }, async (_request, reply) => {
+  app.get('/pending', { preHandler: requireStaff }, async (_request, reply) => {
     const ads = await prisma.ad.findMany({
       where: { status: 'PENDING' },
       orderBy: { createdAt: 'asc' },
@@ -511,7 +511,7 @@ export default async function adRoutes(app: FastifyInstance) {
     return reply.send({ ads })
   })
 
-  app.patch('/:id/moderate', { preHandler: requireAdmin }, async (request, reply) => {
+  app.patch('/:id/moderate', { preHandler: requireStaff }, async (request, reply) => {
     const { id } = request.params as { id: string }
     const body = z.object({ status: z.enum(['ACTIVE', 'REJECTED']), note: z.string().optional() }).safeParse(request.body)
     if (!body.success) return reply.status(400).send({ error: true, message: 'Datos inválidos' })

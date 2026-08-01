@@ -70,6 +70,22 @@ function normalizePhone(phone: string, country: string | null): string {
   return `+${code}${withoutLeadingZero}`
 }
 
+// Avisos operativos del panel (nuevo reclamo, etc.) — le llegan a TODOS los
+// administradores y colaboradores registrados, no a una casilla fija. Usa el
+// mismo shell/estilo que el resto de los emails de Tratto para que se vean
+// consistentes. `onlyEmails` sirve para notificar a una sola persona puntual
+// (ej. cuando se la agrega como staff) reusando el mismo formato.
+export async function notifyStaff(subject: string, bodyHtml: string, opts?: { onlyEmails?: string[] }): Promise<void> {
+  const recipients = opts?.onlyEmails
+    ? opts.onlyEmails
+    : (await prisma.user.findMany({ where: { role: { in: ['ADMIN', 'COLLABORATOR'] } }, select: { email: true } })).map((u) => u.email)
+
+  if (recipients.length === 0) return
+
+  const html = buildEmailShell(bodyHtml)
+  await Promise.allSettled(recipients.map((email) => sendEmail(email, subject, subject, html)))
+}
+
 export async function sendEmail(to: string, subject: string, body: string, html?: string): Promise<void> {
   if (!process.env.RESEND_API_KEY) return
   try {

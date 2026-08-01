@@ -5,8 +5,8 @@ import { requireAuth, requireVerifiedEmail, requireBusinessOwner, requirePlan, r
 import { generateCertificatePdf } from '../services/certificate'
 import { validateTaxId, validatePersonalId } from '../services/taxIdValidation'
 import { contactRevealRateLimit } from '../middleware/rateLimits'
-import { sendEmail } from '../services/notifications'
-import { buildEmailShell, emailButton } from '../services/emailLayout'
+import { notifyStaff } from '../services/notifications'
+import { emailButton } from '../services/emailLayout'
 
 export default async function companyRoutes(app: FastifyInstance) {
 
@@ -231,16 +231,16 @@ export default async function companyRoutes(app: FastifyInstance) {
 
     await prisma.user.update({ where: { id: request.user.userId }, data: { role: 'BUSINESS' } })
 
-    if (process.env.ADMIN_NOTIFICATION_EMAIL) {
+    {
       const claimant = await prisma.user.findUnique({ where: { id: request.user.userId }, select: { name: true, email: true } })
       const frontendUrl = process.env.FRONTEND_URL || 'https://tratto.lat'
-      const html = buildEmailShell(`
-        <p style="font-size:16px;color:#0f172a;margin:0 0 12px;">Nuevo reclamo de empresa</p>
-        <p style="font-size:14px;color:#475569;margin:0 0 4px;"><strong>${updated.name}</strong> fue reclamada por ${claimant?.name || 'un usuario'} (${claimant?.email || 'sin email'}).</p>
-        <p style="font-size:14px;color:#475569;margin:0 0 20px;">Revisá la verificación (RUT/documento) en el panel de administrador.</p>
-        ${emailButton(`${frontendUrl}/admin`, 'Ver en el panel')}
-      `)
-      sendEmail(process.env.ADMIN_NOTIFICATION_EMAIL, `Nuevo reclamo: ${updated.name}`, `${updated.name} fue reclamada por ${claimant?.name || 'un usuario'} (${claimant?.email || 'sin email'}).`, html).catch(() => {})
+      notifyStaff(
+        `Nuevo reclamo: ${updated.name}`,
+        `<p style="font-size:16px;color:#0f172a;margin:0 0 12px;">Nuevo reclamo de empresa</p>
+         <p style="font-size:14px;color:#475569;margin:0 0 4px;"><strong>${updated.name}</strong> fue reclamada por ${claimant?.name || 'un usuario'} (${claimant?.email || 'sin email'}).</p>
+         <p style="font-size:14px;color:#475569;margin:0 0 20px;">Revisá la verificación (RUT/documento) en el panel de administrador.</p>
+         ${emailButton(`${frontendUrl}/admin`, 'Ver en el panel')}`
+      ).catch(() => {})
     }
 
     const token = app.jwt.sign(

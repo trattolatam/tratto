@@ -45,6 +45,21 @@ export async function requireAdmin(request: FastifyRequest, reply: FastifyReply)
   }
 }
 
+// Admin o colaborador — para moderación y tareas del día a día del panel.
+// Las acciones más sensibles (gestionar colaboradores, ingresos, suspender
+// empresas) siguen exigiendo requireAdmin además de este middleware.
+export async function requireStaff(request: FastifyRequest, reply: FastifyReply) {
+  try {
+    await request.jwtVerify()
+    const payload = request.user as JwtPayload
+    if (payload.role !== 'ADMIN' && payload.role !== 'COLLABORATOR') {
+      return reply.status(403).send({ error: true, message: 'Acceso denegado' })
+    }
+  } catch {
+    reply.status(401).send({ error: true, message: 'Token inválido o expirado' })
+  }
+}
+
 export async function requireBusinessOwner(request: FastifyRequest, reply: FastifyReply) {
   try {
     await request.jwtVerify()

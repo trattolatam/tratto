@@ -222,4 +222,8 @@ export const admin = {
   resolveClaimDispute: (id: string, action: 'approve' | 'reject', note?: string) => apiFetch(`/api/admin/claim-disputes/${id}/resolve`, { method: 'POST', body: JSON.stringify({ action, note }) }),
   categorySuggestions: (status?: string) => apiFetch<{ suggestions: any[] }>(`/api/admin/category-suggestions${status ? `?status=${status}` : ''}`),
   resolveCategorySuggestion: (id: string, action: 'approve' | 'reject', categoryId?: string) => apiFetch(`/api/admin/category-suggestions/${id}/resolve`, { method: 'POST', body: JSON.stringify({ action, categoryId }) }),
+  staff: () => apiFetch<{ staff: any[] }>('/api/admin/staff'),
+  addStaff: (email: string, role: 'ADMIN' | 'COLLABORATOR') => apiFetch(`/api/admin/staff`, { method: 'POST', body: JSON.stringify({ email, role }) }),
+  updateStaffRole: (id: string, role: 'ADMIN' | 'COLLABORATOR') => apiFetch(`/api/admin/staff/${id}`, { method: 'PATCH', body: JSON.stringify({ role }) }),
+  removeStaff: (id: string) => apiFetch(`/api/admin/staff/${id}`, { method: 'DELETE' }),
 }

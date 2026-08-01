@@ -1,13 +1,15 @@
 import { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { prisma } from '../lib/prisma'
-import { requireAdmin } from '../middleware/auth'
+import { requireAdmin, requireStaff } from '../middleware/auth'
 import { cancelSubscriptionImmediately } from '../services/payments/stripe'
+import { notifyStaff } from '../services/notifications'
 
 export default async function adminRoutes(app: FastifyInstance) {
-  app.addHook('preHandler', requireAdmin)
+  app.addHook('preHandler', requireStaff)
 
-  app.get('/dashboard', async (_request, reply) => {
+  app.get('/dashboard', async (request, reply) => {
+    const isFullAdmin = request.user.role === 'ADMIN'
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
 
     const [totalCompanies, newCompaniesMonth, totalUsers, newUsersMonth, pendingReviews, reportedReviews, pendingAds, activeSubscriptions, totalReviews, verifiedReviews, pendingDisputes, pendingCategorySuggestions] = await Promise.all([
@@ -47,9 +49,12 @@ export default async function adminRoutes(app: FastifyInstance) {
 
     return reply.send({
       stats: {
-        totalCompanies, newCompaniesMonth, totalUsers, newUsersMonth, pendingReviews, reportedReviews, pendingAds, activeSubscriptions,
-        totalReviews, verifiedReviews, verifiedPct: totalReviews > 0 ? Math.round((verifiedReviews / totalReviews) * 100) : 0, mrr: Math.round(mrr),
-        pendingDisputes, pendingCategorySuggestions,
+        pendingReviews, reportedReviews, pendingAds, totalReviews, verifiedReviews,
+        verifiedPct: totalReviews > 0 ? Math.round((verifiedReviews / totalReviews) * 100) : 0,
+        pendingDisputes, pendingCategorySuggestions, newUsersMonth,
+        // MRR, suscripciones y datos de empresas son solo para administradores plenos —
+        // los colaboradores tienen acceso de moderación, sin ver ingresos ni gestionar empresas.
+        ...(isFullAdmin ? { totalCompanies, newCompaniesMonth, totalUsers, activeSubscriptions, mrr: Math.round(mrr) } : {}),
       },
       recentActivity,
     })
@@ -86,7 +91,7 @@ export default async function adminRoutes(app: FastifyInstance) {
     return reply.send({ reviews, pagination: { page, limit, total } })
   })
 
-  app.get('/companies', async (request, reply) => {
+  app.get('/companies', { preHandler: requireAdmin }, async (request, reply) => {
     const query = z.object({
       plan: z.enum(['FREE', 'PROFESSIONAL', 'PREMIUM', 'ENTERPRISE']).optional(),
       verified: z.string().optional(), country: z.string().optional(), search: z.string().optional(), page: z.string().default('1'),
@@ -114,7 +119,7 @@ export default async function adminRoutes(app: FastifyInstance) {
     return reply.send({ companies, pagination: { page, limit, total } })
   })
 
-  app.patch('/companies/:id/verify', async (request, reply) => {
+  app.patch('/companies/:id/verify', { preHandler: requireAdmin }, async (request, reply) => {
     const { id } = request.params as { id: string }
     const body = z.object({ verified: z.boolean() }).parse(request.body)
     const existing = await prisma.company.findUnique({ where: { id }, select: { claimedById: true } })
@@ -129,7 +134,7 @@ export default async function adminRoutes(app: FastifyInstance) {
     return reply.send({ company, message: body.verified ? 'Empresa verificada' : 'Verificación removida' })
   })
 
-  app.patch('/companies/:id/suspend', async (request, reply) => {
+  app.patch('/companies/:id/suspend', { preHandler: requireAdmin }, async (request, reply) => {
     const { id } = request.params as { id: string }
     await prisma.review.updateMany({ where: { companyId: id, status: 'APPROVED' }, data: { status: 'REJECTED' } })
 
@@ -239,7 +244,7 @@ export default async function adminRoutes(app: FastifyInstance) {
     return reply.send({ suggestion: updated })
   })
 
-  app.get('/revenue', async (_request, reply) => {
+  app.get('/revenue', { preHandler: requireAdmin }, async (_request, reply) => {
     const now = new Date()
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
 
@@ -258,5 +263,72 @@ export default async function adminRoutes(app: FastifyInstance) {
       leadsRevenue: leadsRevenue._sum.amountUsd || 0, leadsCount: leadsRevenue._count, boostsCount: boostsRevenue,
       totalMonthRevenue: Math.round(mrr + adsMonthRevenue + (leadsRevenue._sum.amountUsd || 0)),
     })
+  })
+
+  // ─── Administradores y colaboradores del panel (solo un ADMIN puede tocar esto) ───
+  app.get('/staff', { preHandler: requireAdmin }, async (_request, reply) => {
+    const staff = await prisma.user.findMany({
+      where: { role: { in: ['ADMIN', 'COLLABORATOR'] } },
+      select: { id: true, name: true, email: true, role: true, createdAt: true },
+      orderBy: [{ role: 'asc' }, { createdAt: 'asc' }],
+    })
+    return reply.send({ staff })
+  })
+
+  app.post('/staff', { preHandler: requireAdmin }, async (request, reply) => {
+    const body = z.object({ email: z.string().email(), role: z.enum(['ADMIN', 'COLLABORATOR']) }).parse(request.body)
+
+    const user = await prisma.user.findUnique({ where: { email: body.email } })
+    if (!user) {
+      return reply.status(404).send({ error: true, message: 'No existe ninguna cuenta con ese email. La persona tiene que registrarse en Tratto primero, y después la agregás desde acá.' })
+    }
+    if (user.role === 'ADMIN' || user.role === 'COLLABORATOR') {
+      return reply.status(409).send({ error: true, message: 'Esa persona ya es administrador o colaborador' })
+    }
+
+    const updated = await prisma.user.update({ where: { id: user.id }, data: { role: body.role } })
+
+    const roleLabel = body.role === 'ADMIN' ? 'administrador' : 'colaborador'
+    notifyStaff(
+      `Te agregaron como ${roleLabel} en Tratto`,
+      `<p style="font-size:16px;color:#0f172a;margin:0 0 12px;">Ahora sos ${roleLabel} de Tratto</p>
+       <p style="font-size:14px;color:#475569;margin:0 0 20px;">Ya podés entrar al panel de administrador con tu cuenta (${user.email}) y empezar a moderar.</p>`,
+      { onlyEmails: [user.email] }
+    ).catch(() => {})
+
+    return reply.send({ user: { id: updated.id, name: updated.name, email: updated.email, role: updated.role } })
+  })
+
+  app.patch('/staff/:id', { preHandler: requireAdmin }, async (request, reply) => {
+    const { id } = request.params as { id: string }
+    const body = z.object({ role: z.enum(['ADMIN', 'COLLABORATOR']) }).parse(request.body)
+
+    const target = await prisma.user.findUnique({ where: { id } })
+    if (!target || (target.role !== 'ADMIN' && target.role !== 'COLLABORATOR')) {
+      return reply.status(404).send({ error: true, message: 'No encontrado' })
+    }
+    if (target.role === 'ADMIN' && body.role === 'COLLABORATOR') {
+      const adminCount = await prisma.user.count({ where: { role: 'ADMIN' } })
+      if (adminCount <= 1) return reply.status(400).send({ error: true, message: 'No podés dejar a Tratto sin ningún administrador' })
+    }
+
+    const updated = await prisma.user.update({ where: { id }, data: { role: body.role } })
+    return reply.send({ user: { id: updated.id, name: updated.name, email: updated.email, role: updated.role } })
+  })
+
+  app.delete('/staff/:id', { preHandler: requireAdmin }, async (request, reply) => {
+    const { id } = request.params as { id: string }
+
+    const target = await prisma.user.findUnique({ where: { id } })
+    if (!target || (target.role !== 'ADMIN' && target.role !== 'COLLABORATOR')) {
+      return reply.status(404).send({ error: true, message: 'No encontrado' })
+    }
+    if (target.role === 'ADMIN') {
+      const adminCount = await prisma.user.count({ where: { role: 'ADMIN' } })
+      if (adminCount <= 1) return reply.status(400).send({ error: true, message: 'No podés dejar a Tratto sin ningún administrador' })
+    }
+
+    await prisma.user.update({ where: { id }, data: { role: 'USER' } })
+    return reply.send({ message: 'Acceso removido' })
   })
 }

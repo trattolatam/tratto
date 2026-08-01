@@ -1,4 +1,4 @@
-export type UserRole = 'USER' | 'BUSINESS' | 'ADMIN'
+export type UserRole = 'USER' | 'BUSINESS' | 'ADMIN' | 'COLLABORATOR'
 export type CompanyPlan = 'FREE' | 'PROFESSIONAL' | 'PREMIUM' | 'ENTERPRISE'
 export type ReviewStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'REPORTED'
 export type MedalType = 'TOP_CATEGORY' | 'FIFTY_REVIEWS' | 'CONSISTENT_12M' | 'TRENDING_UP' | 'HIGHLY_RECOMMENDED' | 'CHOICE_OF_YEAR'

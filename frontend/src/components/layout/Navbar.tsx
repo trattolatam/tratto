@@ -17,7 +17,7 @@ export function Navbar() {
   useEffect(() => {
     // Aviso de "pendientes" para el admin en el menú, sin que tenga que entrar
     // al panel a revisar reseñas/anuncios/denuncias/rubros a mano.
-    if (user?.role !== 'ADMIN') return
+    if (user?.role !== 'ADMIN' && user?.role !== 'COLLABORATOR') return
     const load = () => adminApi.pendingCounts().then((d) => setAdminPending(d.total)).catch(() => {})
     load()
     const interval = setInterval(load, 60000)
@@ -78,7 +78,7 @@ export function Navbar() {
               <div className="relative" ref={userMenuRef}>
                 <button onClick={() => setUserMenuOpen(!userMenuOpen)} className="relative w-8 h-8 rounded-full bg-brand-green/20 flex items-center justify-center text-brand-green font-semibold text-sm">
                   {user.name.charAt(0).toUpperCase()}
-                  {user.role === 'ADMIN' && adminPending > 0 && (
+                  {(user.role === 'ADMIN' || user.role === 'COLLABORATOR') && adminPending > 0 && (
                     <span className="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full bg-brand-red border-2 border-white" />
                   )}
                 </button>
@@ -93,9 +93,9 @@ export function Navbar() {
                       {user.role === 'BUSINESS' && (
                         <Link href="/panel" onClick={() => setUserMenuOpen(false)} className="md:hidden w-full flex items-center gap-2 px-3 py-2 text-xs text-brand-dark hover:bg-gray-50 text-left"><i className="ti ti-layout-dashboard text-sm" /> Mi panel</Link>
                       )}
-                      {user.role === 'ADMIN' && (
+                      {(user.role === 'ADMIN' || user.role === 'COLLABORATOR') && (
                         <Link href="/admin" onClick={() => setUserMenuOpen(false)} className="w-full flex items-center justify-between gap-2 px-3 py-2 text-xs text-brand-dark hover:bg-gray-50 text-left">
-                          <span className="flex items-center gap-2"><i className="ti ti-shield-lock text-sm" /> Panel de admin</span>
+                          <span className="flex items-center gap-2"><i className="ti ti-shield-lock text-sm" /> {user.role === 'ADMIN' ? 'Panel de admin' : 'Panel de moderación'}</span>
                           {adminPending > 0 && <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-brand-red text-white text-[10px] font-bold">{adminPending > 99 ? '99+' : adminPending}</span>}
                         </Link>
                       )}

@@ -7,11 +7,12 @@ import { useAuthStore } from '@/lib/store'
 const TABS = [
   { id: 'resumen', label: 'Resumen' },
   { id: 'reseñas', label: 'Reseñas' },
-  { id: 'empresas', label: 'Empresas' },
+  { id: 'empresas', label: 'Empresas', adminOnly: true },
   { id: 'anuncios', label: 'Anuncios' },
   { id: 'denuncias', label: 'Denuncias' },
   { id: 'rubros', label: 'Rubros sugeridos' },
-  { id: 'ingresos', label: 'Ingresos' },
+  { id: 'ingresos', label: 'Ingresos', adminOnly: true },
+  { id: 'colaboradores', label: 'Colaboradores', adminOnly: true },
 ] as const
 type Tab = typeof TABS[number]['id']
 
@@ -20,21 +21,25 @@ export default function AdminPage() {
   const router = useRouter()
   const [tab, setTab] = useState<Tab>('resumen')
   const [counts, setCounts] = useState<{ pendingReviews: number; reportedReviews: number; pendingAds: number; pendingDisputes: number; pendingCategorySuggestions: number } | null>(null)
+  const isStaff = !!user && (user.role === 'ADMIN' || user.role === 'COLLABORATOR')
+  const isAdmin = !!user && user.role === 'ADMIN'
 
   const loadCounts = () => adminApi.pendingCounts().then(setCounts).catch(() => {})
   useEffect(() => {
-    if (!authChecked || !user || user.role !== 'ADMIN') return
+    if (!authChecked || !isStaff) return
     loadCounts()
-    const interval = setInterval(loadCounts, 60000) // refresca solo, sin que el admin tenga que recargar la página
+    const interval = setInterval(loadCounts, 60000) // refresca solo, sin que tengan que recargar la página
     return () => clearInterval(interval)
-  }, [authChecked, user])
+  }, [authChecked, isStaff])
 
   useEffect(() => {
     if (!authChecked) return
-    if (!user || user.role !== 'ADMIN') { router.push('/'); return }
-  }, [authChecked, user])
+    if (!isStaff) { router.push('/'); return }
+  }, [authChecked, isStaff])
 
-  if (!user || user.role !== 'ADMIN') return null
+  if (!isStaff) return null
+
+  const visibleTabs = TABS.filter((t) => !('adminOnly' in t && t.adminOnly) || isAdmin)
 
   const badgeFor: Partial<Record<Tab, number>> = counts ? {
     reseñas: counts.pendingReviews + counts.reportedReviews,
@@ -46,10 +51,10 @@ export default function AdminPage() {
   return (
     <div className="max-w-5xl mx-auto px-4 py-8">
       <h1 className="text-2xl font-bold text-brand-dark mb-1">Panel de administrador</h1>
-      <p className="text-sm text-brand-slate mb-6">Moderación, empresas, anuncios e ingresos de Tratto.</p>
+      <p className="text-sm text-brand-slate mb-6">{isAdmin ? 'Moderación, empresas, anuncios e ingresos de Tratto.' : 'Moderación de reseñas, anuncios, denuncias y rubros sugeridos.'}</p>
 
       <div className="flex gap-1 border-b border-gray-100 mb-6 overflow-x-auto">
-        {TABS.map((t) => {
+        {visibleTabs.map((t) => {
           const count = badgeFor[t.id]
           return (
             <button key={t.id} onClick={() => setTab(t.id)} className={`relative text-sm px-4 py-2.5 border-b-2 whitespace-nowrap transition-colors ${tab === t.id ? 'border-brand-green text-brand-dark font-semibold' : 'border-transparent text-brand-slate hover:text-brand-dark'}`}>
@@ -60,33 +65,35 @@ export default function AdminPage() {
         })}
       </div>
 
-      {tab === 'resumen' && <ResumenTab onNavigate={setTab} />}
+      {tab === 'resumen' && <ResumenTab onNavigate={setTab} isAdmin={isAdmin} />}
       {tab === 'reseñas' && <ReseñasTab onChanged={loadCounts} />}
-      {tab === 'empresas' && <EmpresasTab />}
+      {tab === 'empresas' && <EmpresasTab isAdmin={isAdmin} />}
       {tab === 'anuncios' && <AnunciosTab onChanged={loadCounts} />}
       {tab === 'denuncias' && <DenunciasTab onChanged={loadCounts} />}
       {tab === 'rubros' && <RubrosTab onChanged={loadCounts} />}
-      {tab === 'ingresos' && <IngresosTab />}
+      {tab === 'ingresos' && isAdmin && <IngresosTab />}
+      {tab === 'colaboradores' && isAdmin && <ColaboradoresTab currentUserId={user!.id} />}
     </div>
   )
 }
 
-function ResumenTab({ onNavigate }: { onNavigate: (t: Tab) => void }) {
+function ResumenTab({ onNavigate, isAdmin }: { onNavigate: (t: Tab) => void; isAdmin: boolean }) {
   const [data, setData] = useState<any>(null)
   useEffect(() => { adminApi.dashboard().then(setData).catch(() => {}) }, [])
   if (!data) return <Loading />
 
-  const cards: { label: string; value: any; sub?: string; warn?: boolean; tab?: Tab }[] = [
-    { label: 'Empresas totales', value: data.stats.totalCompanies, sub: `+${data.stats.newCompaniesMonth} este mes`, tab: 'empresas' },
-    { label: 'Usuarios totales', value: data.stats.totalUsers, sub: `+${data.stats.newUsersMonth} este mes` },
-    { label: 'Reseñas pendientes', value: data.stats.pendingReviews, sub: `${data.stats.reportedReviews} reportadas`, warn: data.stats.pendingReviews > 0, tab: 'reseñas' },
-    { label: 'Anuncios pendientes', value: data.stats.pendingAds, warn: data.stats.pendingAds > 0, tab: 'anuncios' },
-    { label: 'Suscripciones activas', value: data.stats.activeSubscriptions, tab: 'ingresos' },
-    { label: 'MRR', value: `USD ${data.stats.mrr}`, tab: 'ingresos' },
-    { label: 'Reseñas verificadas', value: `${data.stats.verifiedPct}%`, sub: `${data.stats.verifiedReviews} de ${data.stats.totalReviews}`, tab: 'reseñas' },
-    { label: 'Denuncias pendientes', value: data.stats.pendingDisputes, warn: data.stats.pendingDisputes > 0, tab: 'denuncias' },
-    { label: 'Rubros por revisar', value: data.stats.pendingCategorySuggestions, warn: data.stats.pendingCategorySuggestions > 0, tab: 'rubros' },
-  ]
+  type Card = { label: string; value: any; sub?: string; warn?: boolean; tab?: Tab; adminOnly?: boolean }
+  const cards: Card[] = [
+    { label: 'Empresas totales', value: data.stats.totalCompanies, sub: `+${data.stats.newCompaniesMonth} este mes`, tab: 'empresas', adminOnly: true } satisfies Card,
+    { label: 'Usuarios totales', value: data.stats.totalUsers, sub: `+${data.stats.newUsersMonth} este mes`, adminOnly: true } satisfies Card,
+    { label: 'Reseñas pendientes', value: data.stats.pendingReviews, sub: `${data.stats.reportedReviews} reportadas`, warn: data.stats.pendingReviews > 0, tab: 'reseñas' } satisfies Card,
+    { label: 'Anuncios pendientes', value: data.stats.pendingAds, warn: data.stats.pendingAds > 0, tab: 'anuncios' } satisfies Card,
+    { label: 'Suscripciones activas', value: data.stats.activeSubscriptions, tab: 'ingresos', adminOnly: true } satisfies Card,
+    { label: 'MRR', value: `USD ${data.stats.mrr}`, tab: 'ingresos', adminOnly: true } satisfies Card,
+    { label: 'Reseñas verificadas', value: `${data.stats.verifiedPct}%`, sub: `${data.stats.verifiedReviews} de ${data.stats.totalReviews}`, tab: 'reseñas' } satisfies Card,
+    { label: 'Denuncias pendientes', value: data.stats.pendingDisputes, warn: data.stats.pendingDisputes > 0, tab: 'denuncias' } satisfies Card,
+    { label: 'Rubros por revisar', value: data.stats.pendingCategorySuggestions, warn: data.stats.pendingCategorySuggestions > 0, tab: 'rubros' } satisfies Card,
+  ].filter((c) => !c.adminOnly || isAdmin)
 
   return (
     <div className="space-y-6">
@@ -116,8 +123,8 @@ function ResumenTab({ onNavigate }: { onNavigate: (t: Tab) => void }) {
             {data.recentActivity.map((r: any) => (
               <div
                 key={`${r.type}-${r.id}`}
-                onClick={r.type === 'claim' ? () => onNavigate('empresas') : undefined}
-                className={`flex items-center justify-between text-xs border-t border-gray-50 pt-2 first:border-0 first:pt-0 ${r.type === 'claim' ? 'cursor-pointer hover:text-brand-dark' : ''}`}
+                onClick={r.type === 'claim' && isAdmin ? () => onNavigate('empresas') : undefined}
+                className={`flex items-center justify-between text-xs border-t border-gray-50 pt-2 first:border-0 first:pt-0 ${r.type === 'claim' && isAdmin ? 'cursor-pointer hover:text-brand-dark' : ''}`}
               >
                 <span className="text-brand-dark">
                   {r.type === 'claim'
@@ -185,7 +192,7 @@ function ReseñasTab({ onChanged }: { onChanged: () => void }) {
   )
 }
 
-function EmpresasTab() {
+function EmpresasTab({ isAdmin }: { isAdmin: boolean }) {
   const [search, setSearch] = useState('')
   const [sort, setSort] = useState<'recent' | 'claimed'>('recent')
   const [data, setData] = useState<{ companies: any[]; pagination: any } | null>(null)
@@ -241,7 +248,7 @@ function EmpresasTab() {
               </div>
               <div className="flex gap-2 flex-shrink-0">
                 <button onClick={() => handleVerify(c.id, !c.isVerified)} disabled={busyId === c.id} className="text-xs text-brand-green hover:underline disabled:opacity-50">{c.isVerified ? 'Quitar verificación' : 'Verificar'}</button>
-                <button onClick={() => handleSuspend(c.id, c.name)} disabled={busyId === c.id} className="text-xs text-brand-red hover:underline disabled:opacity-50">Suspender</button>
+                {isAdmin && <button onClick={() => handleSuspend(c.id, c.name)} disabled={busyId === c.id} className="text-xs text-brand-red hover:underline disabled:opacity-50">Suspender</button>}
               </div>
             </div>
           ))}
@@ -405,6 +412,85 @@ function IngresosTab() {
         <div className="card p-4"><p className="text-xs text-brand-slate">Consultas cobradas este mes</p><p className="text-lg font-bold text-brand-dark">{data.leadsCount} · USD {data.leadsRevenue}</p></div>
         <div className="card p-4"><p className="text-xs text-brand-slate">Perfiles destacados activos</p><p className="text-lg font-bold text-brand-dark">{data.boostsCount}</p></div>
       </div>
+    </div>
+  )
+}
+
+function ColaboradoresTab({ currentUserId }: { currentUserId: string }) {
+  const [staff, setStaff] = useState<any[] | null>(null)
+  const [email, setEmail] = useState('')
+  const [newRole, setNewRole] = useState<'ADMIN' | 'COLLABORATOR'>('COLLABORATOR')
+  const [adding, setAdding] = useState(false)
+  const [error, setError] = useState('')
+  const [busyId, setBusyId] = useState<string | null>(null)
+
+  const load = () => adminApi.staff().then((d: any) => setStaff(d.staff)).catch(() => setStaff([]))
+  useEffect(() => { load() }, [])
+
+  const handleAdd = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError('')
+    setAdding(true)
+    try { await adminApi.addStaff(email.trim(), newRole); setEmail(''); load() }
+    catch (e: any) { setError(e.message || 'No se pudo agregar') }
+    finally { setAdding(false) }
+  }
+
+  const handleRoleChange = async (id: string, role: 'ADMIN' | 'COLLABORATOR') => {
+    setBusyId(id)
+    try { await adminApi.updateStaffRole(id, role); load() }
+    catch (e: any) { alert(e.message) }
+    finally { setBusyId(null) }
+  }
+
+  const handleRemove = async (id: string, name: string) => {
+    if (!confirm(`¿Quitarle el acceso al panel a "${name}"?`)) return
+    setBusyId(id)
+    try { await adminApi.removeStaff(id); load() }
+    catch (e: any) { alert(e.message) }
+    finally { setBusyId(null) }
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="card p-5">
+        <p className="text-sm font-semibold text-brand-dark mb-1">Agregar administrador o colaborador</p>
+        <p className="text-xs text-brand-slate mb-4">La persona tiene que tener una cuenta creada en Tratto con ese email — buscala primero si no estás segura de que ya se registró.</p>
+        <form onSubmit={handleAdd} className="flex gap-2 flex-wrap">
+          <input type="email" required placeholder="email@ejemplo.com" className="input text-sm flex-1 min-w-[200px]" value={email} onChange={(e) => setEmail(e.target.value)} />
+          <select className="input text-sm w-auto" value={newRole} onChange={(e) => setNewRole(e.target.value as 'ADMIN' | 'COLLABORATOR')}>
+            <option value="COLLABORATOR">Colaborador</option>
+            <option value="ADMIN">Administrador</option>
+          </select>
+          <button type="submit" disabled={adding} className="btn-secondary text-sm py-2 px-4 disabled:opacity-50">Agregar</button>
+        </form>
+        {error && <p className="text-xs text-brand-red mt-2">{error}</p>}
+      </div>
+
+      {!staff ? <Loading /> : (
+        <div className="space-y-2">
+          {staff.map((s) => (
+            <div key={s.id} className="card p-4 flex items-center justify-between gap-3 flex-wrap">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-brand-dark truncate">{s.name} {s.id === currentUserId && <span className="text-brand-slate font-normal">(vos)</span>}</p>
+                <p className="text-xs text-brand-slate truncate">{s.email}</p>
+              </div>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <select
+                  value={s.role}
+                  disabled={busyId === s.id}
+                  onChange={(e) => handleRoleChange(s.id, e.target.value as 'ADMIN' | 'COLLABORATOR')}
+                  className="text-xs border border-gray-200 rounded-full py-1.5 px-3 text-brand-slate disabled:opacity-50"
+                >
+                  <option value="COLLABORATOR">Colaborador</option>
+                  <option value="ADMIN">Administrador</option>
+                </select>
+                <button onClick={() => handleRemove(s.id, s.name)} disabled={busyId === s.id} className="text-xs text-brand-red hover:underline disabled:opacity-50">Quitar acceso</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
