@@ -77,6 +77,8 @@ enum NotificationType {
   LEAD_RECEIVED
   TEAM_INVITE
   AD_LOW_BALANCE
+  AD_MONTHLY_REPORT
+  AD_CAMPAIGN_ENDED
 }
 
 // ─── USUARIOS ─────────────────────────────────────────────────────────────────
@@ -445,6 +447,11 @@ model Ad {
 
   startsAt      DateTime?
   endsAt        DateTime?
+  // Para saber cuándo toca mandar el próximo reporte mensual, y si ya se
+  // mandó el informe final de cierre cuando termina la campaña (para no
+  // mandarlo dos veces).
+  lastMonthlyReportAt DateTime?
+  finalReportSentAt   DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
