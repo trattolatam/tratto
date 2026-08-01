@@ -1000,7 +1000,7 @@ export default function PanelPage() {
                   {(companyDetails?.photos || []).map((url: string) => (
                     <div key={url} className="relative group aspect-square">
                       <img src={url} alt="" className="w-full h-full rounded-lg object-cover" />
-                      <button onClick={() => handleDeletePhoto(url)} className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-brand-dark text-white text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"><i className="ti ti-x" /></button>
+                      <button onClick={() => handleDeletePhoto(url)} className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-brand-dark text-white text-xs flex items-center justify-center shadow-sm"><i className="ti ti-x" /></button>
                     </div>
                   ))}
                   {(companyDetails?.photos || []).length < 10 && (
