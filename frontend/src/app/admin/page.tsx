@@ -38,7 +38,7 @@ export default function AdminPage() {
         ))}
       </div>
 
-      {tab === 'resumen' && <ResumenTab />}
+      {tab === 'resumen' && <ResumenTab onNavigate={setTab} />}
       {tab === 'reseñas' && <ReseñasTab />}
       {tab === 'empresas' && <EmpresasTab />}
       {tab === 'anuncios' && <AnunciosTab />}
@@ -49,26 +49,33 @@ export default function AdminPage() {
   )
 }
 
-function ResumenTab() {
+function ResumenTab({ onNavigate }: { onNavigate: (t: Tab) => void }) {
   const [data, setData] = useState<any>(null)
   useEffect(() => { adminApi.dashboard().then(setData).catch(() => {}) }, [])
   if (!data) return <Loading />
 
-  const cards = [
-    { label: 'Empresas totales', value: data.stats.totalCompanies, sub: `+${data.stats.newCompaniesMonth} este mes` },
+  const cards: { label: string; value: any; sub?: string; warn?: boolean; tab?: Tab }[] = [
+    { label: 'Empresas totales', value: data.stats.totalCompanies, sub: `+${data.stats.newCompaniesMonth} este mes`, tab: 'empresas' },
     { label: 'Usuarios totales', value: data.stats.totalUsers, sub: `+${data.stats.newUsersMonth} este mes` },
-    { label: 'Reseñas pendientes', value: data.stats.pendingReviews, sub: `${data.stats.reportedReviews} reportadas`, warn: data.stats.pendingReviews > 0 },
-    { label: 'Anuncios pendientes', value: data.stats.pendingAds, warn: data.stats.pendingAds > 0 },
-    { label: 'Suscripciones activas', value: data.stats.activeSubscriptions },
-    { label: 'MRR', value: `USD ${data.stats.mrr}` },
-    { label: 'Reseñas verificadas', value: `${data.stats.verifiedPct}%`, sub: `${data.stats.verifiedReviews} de ${data.stats.totalReviews}` },
+    { label: 'Reseñas pendientes', value: data.stats.pendingReviews, sub: `${data.stats.reportedReviews} reportadas`, warn: data.stats.pendingReviews > 0, tab: 'reseñas' },
+    { label: 'Anuncios pendientes', value: data.stats.pendingAds, warn: data.stats.pendingAds > 0, tab: 'anuncios' },
+    { label: 'Suscripciones activas', value: data.stats.activeSubscriptions, tab: 'ingresos' },
+    { label: 'MRR', value: `USD ${data.stats.mrr}`, tab: 'ingresos' },
+    { label: 'Reseñas verificadas', value: `${data.stats.verifiedPct}%`, sub: `${data.stats.verifiedReviews} de ${data.stats.totalReviews}`, tab: 'reseñas' },
   ]
 
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
         {cards.map((c) => (
-          <div key={c.label} className={`card p-4 ${c.warn ? 'border border-brand-amber/30 bg-brand-amber-dim/20' : ''}`}>
+          <div
+            key={c.label}
+            onClick={c.tab ? () => onNavigate(c.tab as Tab) : undefined}
+            role={c.tab ? 'button' : undefined}
+            tabIndex={c.tab ? 0 : undefined}
+            onKeyDown={c.tab ? (e) => { if (e.key === 'Enter') onNavigate(c.tab as Tab) } : undefined}
+            className={`card p-4 ${c.warn ? 'border border-brand-amber/30 bg-brand-amber-dim/20' : ''} ${c.tab ? 'cursor-pointer transition-shadow hover:shadow-md' : ''}`}
+          >
             <p className="text-xs text-brand-slate">{c.label}</p>
             <p className="text-xl font-bold text-brand-dark mt-1">{c.value}</p>
             {c.sub && <p className="text-xs text-brand-slate mt-0.5">{c.sub}</p>}
