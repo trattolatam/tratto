@@ -16,11 +16,13 @@ const TABS = [
   { id: 'colaboradores', label: 'Colaboradores', adminOnly: true },
 ] as const
 type Tab = typeof TABS[number]['id']
+type EmpresasFilter = { plan?: 'FREE' | 'PROFESSIONAL' | 'PREMIUM' | 'ENTERPRISE'; boosted?: boolean; leadsMonth?: boolean }
 
 export default function AdminPage() {
   const { user, authChecked } = useAuthStore()
   const router = useRouter()
   const [tab, setTab] = useState<Tab>('resumen')
+  const [empresasFilter, setEmpresasFilter] = useState<EmpresasFilter | null>(null)
   const [counts, setCounts] = useState<{ pendingReviews: number; reportedReviews: number; pendingAds: number; pendingDisputes: number; pendingCategorySuggestions: number } | null>(null)
   const isStaff = !!user && (user.role === 'ADMIN' || user.role === 'COLLABORATOR')
   const isAdmin = !!user && user.role === 'ADMIN'
@@ -49,6 +51,11 @@ export default function AdminPage() {
     rubros: counts.pendingCategorySuggestions,
   } : {}
 
+  // Navega a una pestaña y, si es Empresas, la deja pre-filtrada (ej: por plan,
+  // o por "con perfil destacado activo") — así las tarjetas de otras pestañas
+  // llevan directo al contenido relacionado en vez de a la lista completa.
+  const goToEmpresas = (filter?: EmpresasFilter) => { setEmpresasFilter(filter || null); setTab('empresas') }
+
   return (
     <div className="max-w-5xl mx-auto px-4 py-8">
       <h1 className="text-2xl font-bold text-brand-dark mb-1">Panel de administrador</h1>
@@ -58,7 +65,7 @@ export default function AdminPage() {
         {visibleTabs.map((t) => {
           const count = badgeFor[t.id]
           return (
-            <button key={t.id} onClick={() => setTab(t.id)} className={`relative text-sm px-4 py-2.5 border-b-2 whitespace-nowrap transition-colors ${tab === t.id ? 'border-brand-green text-brand-dark font-semibold' : 'border-transparent text-brand-slate hover:text-brand-dark'}`}>
+            <button key={t.id} onClick={() => { if (t.id === 'empresas') setEmpresasFilter(null); setTab(t.id) }} className={`relative text-sm px-4 py-2.5 border-b-2 whitespace-nowrap transition-colors ${tab === t.id ? 'border-brand-green text-brand-dark font-semibold' : 'border-transparent text-brand-slate hover:text-brand-dark'}`}>
               {t.label}
               {!!count && <span className="ml-1.5 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-brand-red text-white text-[10px] font-bold align-middle">{count > 99 ? '99+' : count}</span>}
             </button>
@@ -68,11 +75,11 @@ export default function AdminPage() {
 
       {tab === 'resumen' && <ResumenTab onNavigate={setTab} isAdmin={isAdmin} />}
       {tab === 'reseñas' && <ReseñasTab onChanged={loadCounts} />}
-      {tab === 'empresas' && <EmpresasTab isAdmin={isAdmin} />}
+      {tab === 'empresas' && <EmpresasTab isAdmin={isAdmin} initialFilter={empresasFilter} />}
       {tab === 'anuncios' && <AnunciosTab onChanged={loadCounts} />}
       {tab === 'denuncias' && <DenunciasTab onChanged={loadCounts} />}
       {tab === 'rubros' && <RubrosTab onChanged={loadCounts} />}
-      {tab === 'ingresos' && isAdmin && <IngresosTab />}
+      {tab === 'ingresos' && isAdmin && <IngresosTab onNavigateToEmpresas={goToEmpresas} />}
       {tab === 'colaboradores' && isAdmin && <ColaboradoresTab currentUserId={user!.id} />}
     </div>
   )
@@ -193,15 +200,28 @@ function ReseñasTab({ onChanged }: { onChanged: () => void }) {
   )
 }
 
-function EmpresasTab({ isAdmin }: { isAdmin: boolean }) {
+function EmpresasTab({ isAdmin, initialFilter }: { isAdmin: boolean; initialFilter: EmpresasFilter | null }) {
   const [search, setSearch] = useState('')
   const [sort, setSort] = useState<'recent' | 'claimed'>('recent')
+  const [filter, setFilter] = useState<EmpresasFilter>(initialFilter || {})
   const [data, setData] = useState<{ companies: any[]; pagination: any } | null>(null)
   const [loading, setLoading] = useState(false)
   const [busyId, setBusyId] = useState<string | null>(null)
 
-  const load = () => { setLoading(true); adminApi.companies({ ...(search ? { search } : {}), sort }).then(setData).finally(() => setLoading(false)) }
-  useEffect(() => { load() }, [sort])
+  // Si llegamos con un filtro nuevo desde otra pestaña (ej: clickeando "Perfiles
+  // destacados activos" en Ingresos), lo tomamos como punto de partida.
+  useEffect(() => { if (initialFilter) setFilter(initialFilter) }, [initialFilter])
+
+  const load = () => {
+    setLoading(true)
+    const params: Record<string, string> = { sort }
+    if (search) params.search = search
+    if (filter.plan) params.plan = filter.plan
+    if (filter.boosted) params.boosted = 'true'
+    if (filter.leadsMonth) params.leadsMonth = 'true'
+    adminApi.companies(params).then(setData).finally(() => setLoading(false))
+  }
+  useEffect(() => { load() }, [sort, filter])
 
   const handleSearch = (e: React.FormEvent) => { e.preventDefault(); load() }
 
@@ -220,6 +240,8 @@ function EmpresasTab({ isAdmin }: { isAdmin: boolean }) {
     finally { setBusyId(null) }
   }
 
+  const activeFilterLabel = filter.plan ? `Plan ${filter.plan}` : filter.boosted ? 'Con perfil destacado activo' : filter.leadsMonth ? 'Con consultas cobradas este mes' : null
+
   return (
     <div className="space-y-4">
       <form onSubmit={handleSearch} className="flex gap-2">
@@ -227,14 +249,20 @@ function EmpresasTab({ isAdmin }: { isAdmin: boolean }) {
         <button type="submit" className="btn-secondary text-sm py-2 px-4">Buscar</button>
       </form>
 
-      <div className="flex gap-2">
+      <div className="flex gap-2 flex-wrap items-center">
         {([{ id: 'recent', label: 'Más recientes' }, { id: 'claimed', label: 'Reclamadas recientemente' }] as const).map((s) => (
           <button key={s.id} onClick={() => setSort(s.id)} className={`text-xs py-1.5 px-3 rounded-full border transition-all ${sort === s.id ? 'bg-brand-green-dim border-brand-green text-brand-green-text font-semibold' : 'border-gray-200 text-brand-slate'}`}>{s.label}</button>
         ))}
+        {activeFilterLabel && (
+          <span className="text-xs py-1.5 px-3 rounded-full bg-brand-blue-dim text-brand-blue font-semibold flex items-center gap-1.5">
+            {activeFilterLabel}
+            <button onClick={() => setFilter({})} className="hover:opacity-70"><i className="ti ti-x text-xs" /></button>
+          </span>
+        )}
       </div>
 
       {loading ? <Loading /> : !data || data.companies.length === 0 ? (
-        <div className="card p-8 text-center text-sm text-brand-slate">No se encontraron empresas.</div>
+        <div className="card p-8 text-center text-sm text-brand-slate">No se encontraron empresas{activeFilterLabel ? ' con ese filtro' : ''}.</div>
       ) : (
         <div className="space-y-2">
           {data.companies.map((c: any) => (
@@ -245,7 +273,12 @@ function EmpresasTab({ isAdmin }: { isAdmin: boolean }) {
                   <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-brand-slate flex-shrink-0">{c.plan}</span>
                   {c.isVerified && <span className="text-xs px-2 py-0.5 rounded-full bg-brand-green-dim text-brand-green flex-shrink-0">Verificada</span>}
                 </div>
-                <p className="text-xs text-brand-slate truncate">{c.category?.name} · {c.owner?.email || 'sin reclamar'} · {c._count.reviews} reseñas{sort === 'claimed' && c.claimedAt ? ` · reclamada el ${new Date(c.claimedAt).toLocaleDateString('es-AR')}` : ''}</p>
+                <p className="text-xs text-brand-slate truncate">
+                  {c.category?.name} · {c.owner?.email || 'sin reclamar'} · {c._count.reviews} reseñas
+                  {sort === 'claimed' && c.claimedAt ? ` · reclamada el ${new Date(c.claimedAt).toLocaleDateString('es-AR')}` : ''}
+                  {filter.leadsMonth ? ` · ${c._count.leads} consultas este mes` : ''}
+                  {filter.boosted ? ` · ${c._count.boosts} boost activo` : ''}
+                </p>
               </div>
               <div className="flex gap-2 flex-shrink-0">
                 <button onClick={() => handleVerify(c.id, !c.isVerified)} disabled={busyId === c.id} className="text-xs text-brand-green hover:underline disabled:opacity-50">{c.isVerified ? 'Quitar verificación' : 'Verificar'}</button>
@@ -383,7 +416,7 @@ function RubrosTab({ onChanged }: { onChanged: () => void }) {
   )
 }
 
-function IngresosTab() {
+function IngresosTab({ onNavigateToEmpresas }: { onNavigateToEmpresas: (filter?: EmpresasFilter) => void }) {
   const [data, setData] = useState<any>(null)
   useEffect(() => { adminApi.revenue().then(setData).catch(() => {}) }, [])
   if (!data) return <Loading />
@@ -401,17 +434,27 @@ function IngresosTab() {
         <p className="text-sm font-semibold text-brand-dark mb-3">Suscripciones activas por plan</p>
         <div className="space-y-2">
           {data.subscriptions.map((s: any) => (
-            <div key={s.plan} className="flex items-center justify-between text-sm border-t border-gray-50 pt-2 first:border-0 first:pt-0">
+            <button
+              key={s.plan}
+              onClick={() => onNavigateToEmpresas({ plan: s.plan })}
+              className="w-full flex items-center justify-between text-sm border-t border-gray-50 pt-2 first:border-0 first:pt-0 text-left hover:bg-gray-50 rounded-lg -mx-2 px-2 transition-colors"
+            >
               <span className="text-brand-dark">{s.plan}</span>
               <span className="text-brand-slate">{s._count} activas · USD {s._sum.amountUsd || 0}/mes</span>
-            </div>
+            </button>
           ))}
         </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
-        <div className="card p-4"><p className="text-xs text-brand-slate">Consultas cobradas este mes</p><p className="text-lg font-bold text-brand-dark">{data.leadsCount} · USD {data.leadsRevenue}</p></div>
-        <div className="card p-4"><p className="text-xs text-brand-slate">Perfiles destacados activos</p><p className="text-lg font-bold text-brand-dark">{data.boostsCount}</p></div>
+        <button onClick={() => onNavigateToEmpresas({ leadsMonth: true })} className="card p-4 text-left hover:shadow-md transition-shadow">
+          <p className="text-xs text-brand-slate">Consultas cobradas este mes</p>
+          <p className="text-lg font-bold text-brand-dark">{data.leadsCount} · USD {data.leadsRevenue}</p>
+        </button>
+        <button onClick={() => onNavigateToEmpresas({ boosted: true })} className="card p-4 text-left hover:shadow-md transition-shadow">
+          <p className="text-xs text-brand-slate">Perfiles destacados activos</p>
+          <p className="text-lg font-bold text-brand-dark">{data.boostsCount}</p>
+        </button>
       </div>
     </div>
   )

@@ -99,9 +99,11 @@ export default async function adminRoutes(app: FastifyInstance) {
       plan: z.enum(['FREE', 'PROFESSIONAL', 'PREMIUM', 'ENTERPRISE']).optional(),
       verified: z.string().optional(), country: z.string().optional(), search: z.string().optional(), page: z.string().default('1'),
       sort: z.enum(['recent', 'claimed']).optional().default('recent'),
+      boosted: z.string().optional(), leadsMonth: z.string().optional(),
     }).parse(request.query)
 
     const page = parseInt(query.page), limit = 25
+    const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1)
     const where: any = {}
     if (query.plan) where.plan = query.plan
     if (query.verified === 'true') where.isVerified = true
@@ -109,12 +111,23 @@ export default async function adminRoutes(app: FastifyInstance) {
     if (query.country) where.country = query.country
     if (query.search) where.OR = [{ name: { contains: query.search, mode: 'insensitive' } }, { taxId: { contains: query.search } }]
     if (query.sort === 'claimed') where.claimedById = { not: null }
+    if (query.boosted === 'true') where.boosts = { some: { isActive: true } }
+    if (query.leadsMonth === 'true') where.leads = { some: { chargedAt: { gte: startOfMonth } } }
 
     const [companies, total] = await Promise.all([
       prisma.company.findMany({
         where, skip: (page - 1) * limit, take: limit,
         orderBy: query.sort === 'claimed' ? { claimedAt: 'desc' } : { createdAt: 'desc' },
-        include: { category: { select: { name: true, emoji: true } }, owner: { select: { name: true, email: true } }, _count: { select: { reviews: true } } },
+        include: {
+          category: { select: { name: true, emoji: true } }, owner: { select: { name: true, email: true } },
+          _count: {
+            select: {
+              reviews: true,
+              leads: query.leadsMonth === 'true' ? { where: { chargedAt: { gte: startOfMonth } } } : true,
+              boosts: query.boosted === 'true' ? { where: { isActive: true } } : true,
+            },
+          },
+        },
       }),
       prisma.company.count({ where }),
     ])
