@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { admin as adminApi, categories as categoriesApi } from '@/lib/api'
 import { useAuthStore } from '@/lib/store'
+import { COUNTRIES } from '@/lib/countries'
 
 const TABS = [
   { id: 'resumen', label: 'Resumen' },
@@ -418,10 +419,11 @@ function IngresosTab() {
 
 function ColaboradoresTab({ currentUserId }: { currentUserId: string }) {
   const [staff, setStaff] = useState<any[] | null>(null)
-  const [email, setEmail] = useState('')
-  const [newRole, setNewRole] = useState<'ADMIN' | 'COLLABORATOR'>('COLLABORATOR')
+  const [showForm, setShowForm] = useState(false)
+  const [form, setForm] = useState({ name: '', email: '', role: 'COLLABORATOR' as 'ADMIN' | 'COLLABORATOR', country: 'UY', phone: '' })
   const [adding, setAdding] = useState(false)
   const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
   const [busyId, setBusyId] = useState<string | null>(null)
 
   const load = () => adminApi.staff().then((d: any) => setStaff(d.staff)).catch(() => setStaff([]))
@@ -429,9 +431,15 @@ function ColaboradoresTab({ currentUserId }: { currentUserId: string }) {
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault()
-    setError('')
+    setError(''); setNotice('')
     setAdding(true)
-    try { await adminApi.addStaff(email.trim(), newRole); setEmail(''); load() }
+    try {
+      const res: any = await adminApi.inviteStaff({ name: form.name.trim(), email: form.email.trim(), role: form.role, country: form.country, phone: form.phone.trim() || undefined })
+      setForm({ name: '', email: '', role: 'COLLABORATOR', country: 'UY', phone: '' })
+      setShowForm(false)
+      setNotice(res.message)
+      load()
+    }
     catch (e: any) { setError(e.message || 'No se pudo agregar') }
     finally { setAdding(false) }
   }
@@ -451,20 +459,52 @@ function ColaboradoresTab({ currentUserId }: { currentUserId: string }) {
     finally { setBusyId(null) }
   }
 
+  const handleResend = async (id: string) => {
+    setBusyId(id)
+    setNotice('')
+    try { const res: any = await adminApi.resendStaffInvite(id); setNotice(res.message) }
+    catch (e: any) { alert(e.message) }
+    finally { setBusyId(null) }
+  }
+
   return (
     <div className="space-y-6">
       <div className="card p-5">
-        <p className="text-sm font-semibold text-brand-dark mb-1">Agregar administrador o colaborador</p>
-        <p className="text-xs text-brand-slate mb-4">La persona tiene que tener una cuenta creada en Tratto con ese email — buscala primero si no estás segura de que ya se registró.</p>
-        <form onSubmit={handleAdd} className="flex gap-2 flex-wrap">
-          <input type="email" required placeholder="email@ejemplo.com" className="input text-sm flex-1 min-w-[200px]" value={email} onChange={(e) => setEmail(e.target.value)} />
-          <select className="input text-sm w-auto" value={newRole} onChange={(e) => setNewRole(e.target.value as 'ADMIN' | 'COLLABORATOR')}>
-            <option value="COLLABORATOR">Colaborador</option>
-            <option value="ADMIN">Administrador</option>
-          </select>
-          <button type="submit" disabled={adding} className="btn-secondary text-sm py-2 px-4 disabled:opacity-50">Agregar</button>
-        </form>
-        {error && <p className="text-xs text-brand-red mt-2">{error}</p>}
+        <div className="flex items-center justify-between mb-1">
+          <p className="text-sm font-semibold text-brand-dark">Administradores y colaboradores</p>
+          {!showForm && <button onClick={() => setShowForm(true)} className="btn-secondary text-xs py-1.5 px-3"><i className="ti ti-plus" /> Agregar colaborador</button>}
+        </div>
+
+        {notice && <p className="text-xs text-brand-green-text bg-brand-green-dim rounded-lg px-3 py-2 mt-3">{notice}</p>}
+
+        {showForm && (
+          <form onSubmit={handleAdd} className="space-y-3 mt-4 border-t border-gray-100 pt-4">
+            <p className="text-xs text-brand-slate">Cargá sus datos y le mandamos un email para que active su cuenta con su propia contraseña. Si el email ya tiene cuenta en Tratto, le damos acceso directo (sin invitación).</p>
+            <div className="grid sm:grid-cols-2 gap-3">
+              <div><label className="label">Nombre</label><input required placeholder="Nombre y apellido" className="input text-sm" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} /></div>
+              <div><label className="label">Email</label><input type="email" required placeholder="email@ejemplo.com" className="input text-sm" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} /></div>
+              <div>
+                <label className="label">Rol</label>
+                <select className="input text-sm" value={form.role} onChange={(e) => setForm((f) => ({ ...f, role: e.target.value as 'ADMIN' | 'COLLABORATOR' }))}>
+                  <option value="COLLABORATOR">Colaborador (moderación)</option>
+                  <option value="ADMIN">Administrador (acceso total)</option>
+                </select>
+              </div>
+              <div>
+                <label className="label">País</label>
+                <select className="input text-sm" value={form.country} onChange={(e) => setForm((f) => ({ ...f, country: e.target.value }))}>
+                  {COUNTRIES.map((c) => <option key={c.code} value={c.code}>{c.flag} {c.name}</option>)}
+                </select>
+              </div>
+              <div><label className="label">Teléfono (opcional)</label><input placeholder="Ej: 099123456" className="input text-sm" value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} /></div>
+            </div>
+            {error && <p className="text-xs text-brand-red">{error}</p>}
+            <div className="flex gap-2">
+              <button type="submit" disabled={adding} className="btn-primary text-sm py-2 px-4 disabled:opacity-50">{adding ? 'Enviando...' : 'Agregar y enviar invitación'}</button>
+              <button type="button" onClick={() => { setShowForm(false); setError('') }} className="text-xs text-brand-slate hover:underline">Cancelar</button>
+            </div>
+          </form>
+        )}
       </div>
 
       {!staff ? <Loading /> : (
@@ -472,10 +512,14 @@ function ColaboradoresTab({ currentUserId }: { currentUserId: string }) {
           {staff.map((s) => (
             <div key={s.id} className="card p-4 flex items-center justify-between gap-3 flex-wrap">
               <div className="min-w-0">
-                <p className="text-sm font-semibold text-brand-dark truncate">{s.name} {s.id === currentUserId && <span className="text-brand-slate font-normal">(vos)</span>}</p>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="text-sm font-semibold text-brand-dark truncate">{s.name} {s.id === currentUserId && <span className="text-brand-slate font-normal">(vos)</span>}</p>
+                  {s.pending && <span className="text-xs px-2 py-0.5 rounded-full bg-brand-amber-dim text-brand-amber flex-shrink-0">Invitación pendiente</span>}
+                </div>
                 <p className="text-xs text-brand-slate truncate">{s.email}</p>
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
+                {s.pending && <button onClick={() => handleResend(s.id)} disabled={busyId === s.id} className="text-xs text-brand-green hover:underline disabled:opacity-50">Reenviar invitación</button>}
                 <select
                   value={s.role}
                   disabled={busyId === s.id}

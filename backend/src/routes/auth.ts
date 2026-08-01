@@ -6,6 +6,7 @@ import { requireAuth } from '../middleware/auth'
 import { authRateLimit, passwordResetRateLimit } from '../middleware/rateLimits'
 import { sendVerificationEmail, verifyEmailToken, resendVerificationEmail } from '../services/emailVerification'
 import { requestPasswordReset, resetPasswordWithToken } from '../services/passwordReset'
+import { activateStaffAccount } from '../services/staffInvite'
 import { getValidCategorySlugs } from '../services/categories'
 
 const registerSchema = z.object({
@@ -202,6 +203,31 @@ export default async function authRoutes(app: FastifyInstance) {
     if (!result.success) return reply.status(400).send({ error: true, message: result.message })
 
     return reply.send({ message: result.message })
+  })
+
+  // Activación de cuentas de administrador/colaborador creadas desde el panel —
+  // consume el token de invitación, setea la contraseña elegida y loguea de una.
+  app.post('/activate-staff', { config: { rateLimit: passwordResetRateLimit } }, async (request, reply) => {
+    const body = z.object({ token: z.string().min(1), password: z.string().min(8) }).safeParse(request.body)
+    if (!body.success) return reply.status(400).send({ error: true, message: 'Datos inválidos', details: body.error.issues })
+
+    const result = await activateStaffAccount(body.data.token, body.data.password)
+    if (!result.success) return reply.status(400).send({ error: true, message: result.message })
+
+    const token = app.jwt.sign(
+      { userId: result.user.id, role: result.user.role },
+      { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+    )
+
+    return reply.send({
+      message: result.message,
+      token,
+      user: {
+        id: result.user.id, email: result.user.email, name: result.user.name, role: result.user.role,
+        country: result.user.country, city: result.user.city, phone: result.user.phone, avatarUrl: result.user.avatarUrl,
+        isVerified: result.user.isVerified, isPro: result.user.isPro,
+      },
+    })
   })
 
   app.patch('/me', { preHandler: requireAuth }, async (request, reply) => {

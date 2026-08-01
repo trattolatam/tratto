@@ -128,6 +128,14 @@ model User {
   passwordResetToken      String?
   passwordResetExpiresAt  DateTime?
 
+  // Invitación a administrador/colaborador — la cuenta se crea de entrada
+  // (sin contraseña utilizable) cuando otro admin la agrega desde el panel,
+  // y la persona la activa eligiendo su propia contraseña con este token.
+  staffInviteToken       String?
+  staffInviteExpiresAt   DateTime?
+  staffInvitedById       String?
+  staffActivatedAt       DateTime?
+
   // Datos de segmentación para publicidad — opcionales, se piden después del
   // registro (no en el formulario en sí, para no perder gente por fricción).
   // targetingAskedAt queda seteado apenas pasó por esa pantalla, haya

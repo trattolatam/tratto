@@ -27,6 +27,8 @@ export const auth = {
     apiFetch<{ message: string }>('/api/auth/forgot-password', { method: 'POST', body: JSON.stringify({ email }) }),
   resetPassword: (token: string, newPassword: string) =>
     apiFetch<{ message: string }>('/api/auth/reset-password', { method: 'POST', body: JSON.stringify({ token, newPassword }) }),
+  activateStaff: (token: string, password: string) =>
+    apiFetch<{ message: string; token: string; user: any }>('/api/auth/activate-staff', { method: 'POST', body: JSON.stringify({ token, password }) }),
   updateTargeting: (body: { ageRange?: string; gender?: string; interests?: string[]; incomeLevel?: string }) =>
     apiFetch<{ user: any }>('/api/auth/targeting', { method: 'PATCH', body: JSON.stringify(body) }),
   skipTargeting: () => apiFetch<{ ok: boolean }>('/api/auth/targeting/skip', { method: 'POST' }),
@@ -223,7 +225,9 @@ export const admin = {
   categorySuggestions: (status?: string) => apiFetch<{ suggestions: any[] }>(`/api/admin/category-suggestions${status ? `?status=${status}` : ''}`),
   resolveCategorySuggestion: (id: string, action: 'approve' | 'reject', categoryId?: string) => apiFetch(`/api/admin/category-suggestions/${id}/resolve`, { method: 'POST', body: JSON.stringify({ action, categoryId }) }),
   staff: () => apiFetch<{ staff: any[] }>('/api/admin/staff'),
-  addStaff: (email: string, role: 'ADMIN' | 'COLLABORATOR') => apiFetch(`/api/admin/staff`, { method: 'POST', body: JSON.stringify({ email, role }) }),
+  inviteStaff: (body: { name: string; email: string; role: 'ADMIN' | 'COLLABORATOR'; country: string; phone?: string }) =>
+    apiFetch<{ user: any; message: string }>(`/api/admin/staff`, { method: 'POST', body: JSON.stringify(body) }),
+  resendStaffInvite: (id: string) => apiFetch<{ message: string }>(`/api/admin/staff/${id}/resend-invite`, { method: 'POST' }),
   updateStaffRole: (id: string, role: 'ADMIN' | 'COLLABORATOR') => apiFetch(`/api/admin/staff/${id}`, { method: 'PATCH', body: JSON.stringify({ role }) }),
   removeStaff: (id: string) => apiFetch(`/api/admin/staff/${id}`, { method: 'DELETE' }),
 }

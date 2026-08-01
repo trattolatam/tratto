@@ -1,9 +1,12 @@
 import { FastifyInstance } from 'fastify'
 import { z } from 'zod'
+import bcrypt from 'bcryptjs'
+import crypto from 'crypto'
 import { prisma } from '../lib/prisma'
 import { requireAdmin, requireStaff } from '../middleware/auth'
 import { cancelSubscriptionImmediately } from '../services/payments/stripe'
 import { notifyStaff } from '../services/notifications'
+import { sendStaffInviteEmail } from '../services/staffInvite'
 
 export default async function adminRoutes(app: FastifyInstance) {
   app.addHook('preHandler', requireStaff)
@@ -269,34 +272,74 @@ export default async function adminRoutes(app: FastifyInstance) {
   app.get('/staff', { preHandler: requireAdmin }, async (_request, reply) => {
     const staff = await prisma.user.findMany({
       where: { role: { in: ['ADMIN', 'COLLABORATOR'] } },
-      select: { id: true, name: true, email: true, role: true, createdAt: true },
+      select: { id: true, name: true, email: true, role: true, createdAt: true, staffInviteExpiresAt: true, staffActivatedAt: true },
       orderBy: [{ role: 'asc' }, { createdAt: 'asc' }],
     })
-    return reply.send({ staff })
+    // "Pendiente" = todavía tiene una invitación sin consumir (le mandamos el
+    // email de activación y no entró todavía). Se limpia sola al activar.
+    const withStatus = staff.map((s) => ({ ...s, pending: !!s.staffInviteExpiresAt }))
+    return reply.send({ staff: withStatus })
   })
 
   app.post('/staff', { preHandler: requireAdmin }, async (request, reply) => {
-    const body = z.object({ email: z.string().email(), role: z.enum(['ADMIN', 'COLLABORATOR']) }).parse(request.body)
+    const body = z.object({
+      name: z.string().min(2), email: z.string().email(), role: z.enum(['ADMIN', 'COLLABORATOR']),
+      country: z.string().min(2), phone: z.string().optional(),
+    }).safeParse(request.body)
+    if (!body.success) return reply.status(400).send({ error: true, message: body.error.issues[0]?.message || 'Datos inválidos' })
 
-    const user = await prisma.user.findUnique({ where: { email: body.email } })
-    if (!user) {
-      return reply.status(404).send({ error: true, message: 'No existe ninguna cuenta con ese email. La persona tiene que registrarse en Tratto primero, y después la agregás desde acá.' })
+    const { name, email, role, country, phone } = body.data
+    const roleLabel = role === 'ADMIN' ? 'administrador' : 'colaborador'
+
+    const existing = await prisma.user.findUnique({ where: { email } })
+
+    if (existing) {
+      if (existing.role === 'ADMIN' || existing.role === 'COLLABORATOR') {
+        return reply.status(409).send({ error: true, message: 'Esa persona ya es administrador o colaborador' })
+      }
+      // Ya tenía cuenta en Tratto (como usuario o empresa) — le damos acceso directo,
+      // ya puede entrar con su contraseña de siempre, sin necesitar activación.
+      const updated = await prisma.user.update({ where: { id: existing.id }, data: { role } })
+      notifyStaff(
+        `Te agregaron como ${roleLabel} en Tratto`,
+        `<p style="font-size:16px;color:#0f172a;margin:0 0 12px;">Ahora sos ${roleLabel} de Tratto</p>
+         <p style="font-size:14px;color:#475569;margin:0 0 20px;">Ya podés entrar al panel de administrador con tu cuenta (${existing.email}) y empezar a moderar.</p>`,
+        { onlyEmails: [existing.email] }
+      ).catch(() => {})
+      return reply.send({
+        user: { id: updated.id, name: updated.name, email: updated.email, role: updated.role, pending: false },
+        message: `${updated.name} ya tenía cuenta en Tratto — le dimos acceso directo, ya puede entrar al panel.`,
+      })
     }
-    if (user.role === 'ADMIN' || user.role === 'COLLABORATOR') {
-      return reply.status(409).send({ error: true, message: 'Esa persona ya es administrador o colaborador' })
+
+    // No tenía cuenta — la creamos con los datos que cargaste, sin contraseña
+    // utilizable todavía (nadie la conoce), y le mandamos el link para que
+    // active la cuenta eligiendo la suya propia.
+    const placeholderHash = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 12)
+    const created = await prisma.user.create({
+      data: { name, email, country, phone, role, passwordHash: placeholderHash, isVerified: true, staffInvitedById: request.user.userId },
+    })
+
+    await sendStaffInviteEmail(created.id, created.email, created.name, roleLabel).catch((err) => app.log.error(`Error enviando invitación de staff: ${err.message}`))
+
+    return reply.send({
+      user: { id: created.id, name: created.name, email: created.email, role: created.role, pending: true },
+      message: `Le mandamos un email a ${created.email} para que active su cuenta.`,
+    })
+  })
+
+  app.post('/staff/:id/resend-invite', { preHandler: requireAdmin }, async (request, reply) => {
+    const { id } = request.params as { id: string }
+    const target = await prisma.user.findUnique({ where: { id } })
+    if (!target || (target.role !== 'ADMIN' && target.role !== 'COLLABORATOR')) {
+      return reply.status(404).send({ error: true, message: 'No encontrado' })
     }
-
-    const updated = await prisma.user.update({ where: { id: user.id }, data: { role: body.role } })
-
-    const roleLabel = body.role === 'ADMIN' ? 'administrador' : 'colaborador'
-    notifyStaff(
-      `Te agregaron como ${roleLabel} en Tratto`,
-      `<p style="font-size:16px;color:#0f172a;margin:0 0 12px;">Ahora sos ${roleLabel} de Tratto</p>
-       <p style="font-size:14px;color:#475569;margin:0 0 20px;">Ya podés entrar al panel de administrador con tu cuenta (${user.email}) y empezar a moderar.</p>`,
-      { onlyEmails: [user.email] }
-    ).catch(() => {})
-
-    return reply.send({ user: { id: updated.id, name: updated.name, email: updated.email, role: updated.role } })
+    if (!target.staffInviteExpiresAt) {
+      return reply.status(400).send({ error: true, message: 'Esa cuenta ya está activa, no tiene una invitación pendiente' })
+    }
+    const roleLabel = target.role === 'ADMIN' ? 'administrador' : 'colaborador'
+    await sendStaffInviteEmail(target.id, target.email, target.name, roleLabel)
+    return reply.send({ message: `Invitación reenviada a ${target.email}` })
   })
 
   app.patch('/staff/:id', { preHandler: requireAdmin }, async (request, reply) => {
