@@ -26,11 +26,22 @@ export default async function adminRoutes(app: FastifyInstance) {
     const subscriptions = await prisma.subscription.findMany({ where: { status: 'ACTIVE' }, select: { amountUsd: true } })
     const mrr = subscriptions.reduce((sum, s) => sum + s.amountUsd, 0)
 
-    const recentActivity = await prisma.review.findMany({
+    const recentReviews = await prisma.review.findMany({
       where: { createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } },
       orderBy: { createdAt: 'desc' }, take: 10,
       include: { company: { select: { name: true, id: true } }, user: { select: { name: true } } },
     })
+
+    const recentClaims = await prisma.company.findMany({
+      where: { claimedAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } },
+      orderBy: { claimedAt: 'desc' }, take: 10,
+      select: { id: true, name: true, claimedAt: true, owner: { select: { name: true, email: true } } },
+    })
+
+    const recentActivity = [
+      ...recentReviews.map((r) => ({ type: 'review' as const, id: r.id, date: r.createdAt, user: r.user, company: r.company })),
+      ...recentClaims.map((c) => ({ type: 'claim' as const, id: c.id, date: c.claimedAt as Date, user: c.owner, company: { id: c.id, name: c.name } })),
+    ].sort((a, b) => b.date.getTime() - a.date.getTime()).slice(0, 10)
 
     return reply.send({
       stats: {
@@ -63,6 +74,7 @@ export default async function adminRoutes(app: FastifyInstance) {
     const query = z.object({
       plan: z.enum(['FREE', 'PROFESSIONAL', 'PREMIUM', 'ENTERPRISE']).optional(),
       verified: z.string().optional(), country: z.string().optional(), search: z.string().optional(), page: z.string().default('1'),
+      sort: z.enum(['recent', 'claimed']).optional().default('recent'),
     }).parse(request.query)
 
     const page = parseInt(query.page), limit = 25
@@ -72,10 +84,12 @@ export default async function adminRoutes(app: FastifyInstance) {
     if (query.verified === 'false') where.isVerified = false
     if (query.country) where.country = query.country
     if (query.search) where.OR = [{ name: { contains: query.search, mode: 'insensitive' } }, { taxId: { contains: query.search } }]
+    if (query.sort === 'claimed') where.claimedById = { not: null }
 
     const [companies, total] = await Promise.all([
       prisma.company.findMany({
-        where, skip: (page - 1) * limit, take: limit, orderBy: { createdAt: 'desc' },
+        where, skip: (page - 1) * limit, take: limit,
+        orderBy: query.sort === 'claimed' ? { claimedAt: 'desc' } : { createdAt: 'desc' },
         include: { category: { select: { name: true, emoji: true } }, owner: { select: { name: true, email: true } }, _count: { select: { reviews: true } } },
       }),
       prisma.company.count({ where }),

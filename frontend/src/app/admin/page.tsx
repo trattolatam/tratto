@@ -90,9 +90,17 @@ function ResumenTab({ onNavigate }: { onNavigate: (t: Tab) => void }) {
         ) : (
           <div className="space-y-2">
             {data.recentActivity.map((r: any) => (
-              <div key={r.id} className="flex items-center justify-between text-xs border-t border-gray-50 pt-2 first:border-0 first:pt-0">
-                <span className="text-brand-dark">{r.user.name} reseñó <strong>{r.company.name}</strong></span>
-                <span className="text-brand-slate">{new Date(r.createdAt).toLocaleString('es-AR')}</span>
+              <div
+                key={`${r.type}-${r.id}`}
+                onClick={r.type === 'claim' ? () => onNavigate('empresas') : undefined}
+                className={`flex items-center justify-between text-xs border-t border-gray-50 pt-2 first:border-0 first:pt-0 ${r.type === 'claim' ? 'cursor-pointer hover:text-brand-dark' : ''}`}
+              >
+                <span className="text-brand-dark">
+                  {r.type === 'claim'
+                    ? <>{r.user?.name || 'Alguien'} reclamó <strong>{r.company.name}</strong> <span className="text-brand-amber font-semibold">· nuevo reclamo</span></>
+                    : <>{r.user.name} reseñó <strong>{r.company.name}</strong></>}
+                </span>
+                <span className="text-brand-slate flex-shrink-0 ml-2">{new Date(r.date).toLocaleString('es-AR')}</span>
               </div>
             ))}
           </div>
@@ -155,12 +163,13 @@ function ReseñasTab() {
 
 function EmpresasTab() {
   const [search, setSearch] = useState('')
+  const [sort, setSort] = useState<'recent' | 'claimed'>('recent')
   const [data, setData] = useState<{ companies: any[]; pagination: any } | null>(null)
   const [loading, setLoading] = useState(false)
   const [busyId, setBusyId] = useState<string | null>(null)
 
-  const load = () => { setLoading(true); adminApi.companies(search ? { search } : {}).then(setData).finally(() => setLoading(false)) }
-  useEffect(() => { load() }, [])
+  const load = () => { setLoading(true); adminApi.companies({ ...(search ? { search } : {}), sort }).then(setData).finally(() => setLoading(false)) }
+  useEffect(() => { load() }, [sort])
 
   const handleSearch = (e: React.FormEvent) => { e.preventDefault(); load() }
 
@@ -186,6 +195,12 @@ function EmpresasTab() {
         <button type="submit" className="btn-secondary text-sm py-2 px-4">Buscar</button>
       </form>
 
+      <div className="flex gap-2">
+        {([{ id: 'recent', label: 'Más recientes' }, { id: 'claimed', label: 'Reclamadas recientemente' }] as const).map((s) => (
+          <button key={s.id} onClick={() => setSort(s.id)} className={`text-xs py-1.5 px-3 rounded-full border transition-all ${sort === s.id ? 'bg-brand-green-dim border-brand-green text-brand-green-text font-semibold' : 'border-gray-200 text-brand-slate'}`}>{s.label}</button>
+        ))}
+      </div>
+
       {loading ? <Loading /> : !data || data.companies.length === 0 ? (
         <div className="card p-8 text-center text-sm text-brand-slate">No se encontraron empresas.</div>
       ) : (
@@ -198,7 +213,7 @@ function EmpresasTab() {
                   <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-brand-slate flex-shrink-0">{c.plan}</span>
                   {c.isVerified && <span className="text-xs px-2 py-0.5 rounded-full bg-brand-green-dim text-brand-green flex-shrink-0">Verificada</span>}
                 </div>
-                <p className="text-xs text-brand-slate truncate">{c.category?.name} · {c.owner?.email || 'sin reclamar'} · {c._count.reviews} reseñas</p>
+                <p className="text-xs text-brand-slate truncate">{c.category?.name} · {c.owner?.email || 'sin reclamar'} · {c._count.reviews} reseñas{sort === 'claimed' && c.claimedAt ? ` · reclamada el ${new Date(c.claimedAt).toLocaleDateString('es-AR')}` : ''}</p>
               </div>
               <div className="flex gap-2 flex-shrink-0">
                 <button onClick={() => handleVerify(c.id, !c.isVerified)} disabled={busyId === c.id} className="text-xs text-brand-green hover:underline disabled:opacity-50">{c.isVerified ? 'Quitar verificación' : 'Verificar'}</button>
