@@ -76,6 +76,9 @@ export function Navbar() {
                       {user.role === 'BUSINESS' && (
                         <Link href="/panel" onClick={() => setUserMenuOpen(false)} className="md:hidden w-full flex items-center gap-2 px-3 py-2 text-xs text-brand-dark hover:bg-gray-50 text-left"><i className="ti ti-layout-dashboard text-sm" /> Mi panel</Link>
                       )}
+                      {user.role === 'ADMIN' && (
+                        <Link href="/admin" onClick={() => setUserMenuOpen(false)} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-brand-dark hover:bg-gray-50 text-left"><i className="ti ti-shield-lock text-sm" /> Panel de admin</Link>
+                      )}
                       <button onClick={handleLogout} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-brand-red hover:bg-red-50 text-left"><i className="ti ti-logout text-sm" /> Cerrar sesión</button>
                     </div>
                   </div>

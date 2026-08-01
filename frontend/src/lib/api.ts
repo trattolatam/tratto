@@ -214,5 +214,9 @@ export const admin = {
   revenue: () => apiFetch<any>('/api/admin/revenue'),
   moderateReview: (id: string, status: 'APPROVED' | 'REJECTED', note?: string) => apiFetch(`/api/reviews/${id}/moderate`, { method: 'PATCH', body: JSON.stringify({ status, note }) }),
   verifyCompany: (id: string, verified: boolean) => apiFetch(`/api/admin/companies/${id}/verify`, { method: 'PATCH', body: JSON.stringify({ verified }) }),
+  suspendCompany: (id: string) => apiFetch(`/api/admin/companies/${id}/suspend`, { method: 'PATCH' }),
   moderateAd: (id: string, status: 'ACTIVE' | 'REJECTED', note?: string) => apiFetch(`/api/ads/${id}/moderate`, { method: 'PATCH', body: JSON.stringify({ status, note }) }),
+  pendingAds: () => apiFetch<{ ads: any[] }>('/api/ads/pending'),
+  claimDisputes: (status?: string) => apiFetch<{ disputes: any[] }>(`/api/admin/claim-disputes${status ? `?status=${status}` : ''}`),
+  resolveClaimDispute: (id: string, action: 'approve' | 'reject', note?: string) => apiFetch(`/api/admin/claim-disputes/${id}/resolve`, { method: 'POST', body: JSON.stringify({ action, note }) }),
 }

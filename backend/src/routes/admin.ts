@@ -165,15 +165,15 @@ export default async function adminRoutes(app: FastifyInstance) {
     const now = new Date()
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
 
-    const [subscriptionsByPlan, adsRevenue, leadsRevenue, boostsRevenue] = await Promise.all([
+    const [subscriptionsByPlan, adsMonthRevenueAgg, leadsRevenue, boostsRevenue] = await Promise.all([
       prisma.subscription.groupBy({ by: ['plan'], where: { status: 'ACTIVE' }, _count: true, _sum: { amountUsd: true } }),
-      prisma.adEvent.count({ where: { type: 'click', createdAt: { gte: startOfMonth } } }),
+      prisma.adEvent.aggregate({ where: { createdAt: { gte: startOfMonth }, costUsd: { not: null } }, _sum: { costUsd: true } }),
       prisma.lead.aggregate({ where: { chargedAt: { gte: startOfMonth } }, _sum: { amountUsd: true }, _count: true }),
       prisma.profileBoost.count({ where: { createdAt: { gte: startOfMonth }, isActive: true } }),
     ])
 
     const mrr = subscriptionsByPlan.reduce((sum, s) => sum + (s._sum.amountUsd || 0), 0)
-    const adsMonthRevenue = adsRevenue * 0.35
+    const adsMonthRevenue = adsMonthRevenueAgg._sum.costUsd || 0
 
     return reply.send({
       subscriptions: subscriptionsByPlan, mrr: Math.round(mrr), arr: Math.round(mrr * 12), adsRevenue: Math.round(adsMonthRevenue),

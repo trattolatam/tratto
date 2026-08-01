@@ -502,6 +502,15 @@ export default async function adRoutes(app: FastifyInstance) {
     return reply.send({ account, message: `Saldo recargado: USD ${body.data.amountUsd}` })
   })
 
+  app.get('/pending', { preHandler: requireAdmin }, async (_request, reply) => {
+    const ads = await prisma.ad.findMany({
+      where: { status: 'PENDING' },
+      orderBy: { createdAt: 'asc' },
+      include: { adAccount: { select: { companyName: true, userId: true } }, targetCategories: { include: { category: true } } },
+    })
+    return reply.send({ ads })
+  })
+
   app.patch('/:id/moderate', { preHandler: requireAdmin }, async (request, reply) => {
     const { id } = request.params as { id: string }
     const body = z.object({ status: z.enum(['ACTIVE', 'REJECTED']), note: z.string().optional() }).safeParse(request.body)

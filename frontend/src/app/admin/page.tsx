@@ -1,0 +1,314 @@
+'use client'
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { admin as adminApi } from '@/lib/api'
+import { useAuthStore } from '@/lib/store'
+
+const TABS = [
+  { id: 'resumen', label: 'Resumen' },
+  { id: 'reseñas', label: 'Reseñas' },
+  { id: 'empresas', label: 'Empresas' },
+  { id: 'anuncios', label: 'Anuncios' },
+  { id: 'denuncias', label: 'Denuncias' },
+  { id: 'ingresos', label: 'Ingresos' },
+] as const
+type Tab = typeof TABS[number]['id']
+
+export default function AdminPage() {
+  const { user, authChecked } = useAuthStore()
+  const router = useRouter()
+  const [tab, setTab] = useState<Tab>('resumen')
+
+  useEffect(() => {
+    if (!authChecked) return
+    if (!user || user.role !== 'ADMIN') { router.push('/'); return }
+  }, [authChecked, user])
+
+  if (!user || user.role !== 'ADMIN') return null
+
+  return (
+    <div className="max-w-5xl mx-auto px-4 py-8">
+      <h1 className="text-2xl font-bold text-brand-dark mb-1">Panel de administrador</h1>
+      <p className="text-sm text-brand-slate mb-6">Moderación, empresas, anuncios e ingresos de Tratto.</p>
+
+      <div className="flex gap-1 border-b border-gray-100 mb-6 overflow-x-auto">
+        {TABS.map((t) => (
+          <button key={t.id} onClick={() => setTab(t.id)} className={`text-sm px-4 py-2.5 border-b-2 whitespace-nowrap transition-colors ${tab === t.id ? 'border-brand-green text-brand-dark font-semibold' : 'border-transparent text-brand-slate hover:text-brand-dark'}`}>{t.label}</button>
+        ))}
+      </div>
+
+      {tab === 'resumen' && <ResumenTab />}
+      {tab === 'reseñas' && <ReseñasTab />}
+      {tab === 'empresas' && <EmpresasTab />}
+      {tab === 'anuncios' && <AnunciosTab />}
+      {tab === 'denuncias' && <DenunciasTab />}
+      {tab === 'ingresos' && <IngresosTab />}
+    </div>
+  )
+}
+
+function ResumenTab() {
+  const [data, setData] = useState<any>(null)
+  useEffect(() => { adminApi.dashboard().then(setData).catch(() => {}) }, [])
+  if (!data) return <Loading />
+
+  const cards = [
+    { label: 'Empresas totales', value: data.stats.totalCompanies, sub: `+${data.stats.newCompaniesMonth} este mes` },
+    { label: 'Usuarios totales', value: data.stats.totalUsers, sub: `+${data.stats.newUsersMonth} este mes` },
+    { label: 'Reseñas pendientes', value: data.stats.pendingReviews, sub: `${data.stats.reportedReviews} reportadas`, warn: data.stats.pendingReviews > 0 },
+    { label: 'Anuncios pendientes', value: data.stats.pendingAds, warn: data.stats.pendingAds > 0 },
+    { label: 'Suscripciones activas', value: data.stats.activeSubscriptions },
+    { label: 'MRR', value: `USD ${data.stats.mrr}` },
+    { label: 'Reseñas verificadas', value: `${data.stats.verifiedPct}%`, sub: `${data.stats.verifiedReviews} de ${data.stats.totalReviews}` },
+  ]
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+        {cards.map((c) => (
+          <div key={c.label} className={`card p-4 ${c.warn ? 'border border-brand-amber/30 bg-brand-amber-dim/20' : ''}`}>
+            <p className="text-xs text-brand-slate">{c.label}</p>
+            <p className="text-xl font-bold text-brand-dark mt-1">{c.value}</p>
+            {c.sub && <p className="text-xs text-brand-slate mt-0.5">{c.sub}</p>}
+          </div>
+        ))}
+      </div>
+
+      <div className="card p-5">
+        <p className="text-sm font-semibold text-brand-dark mb-3">Actividad de las últimas 24hs</p>
+        {data.recentActivity.length === 0 ? (
+          <p className="text-xs text-brand-slate">Sin actividad reciente.</p>
+        ) : (
+          <div className="space-y-2">
+            {data.recentActivity.map((r: any) => (
+              <div key={r.id} className="flex items-center justify-between text-xs border-t border-gray-50 pt-2 first:border-0 first:pt-0">
+                <span className="text-brand-dark">{r.user.name} reseñó <strong>{r.company.name}</strong></span>
+                <span className="text-brand-slate">{new Date(r.createdAt).toLocaleString('es-AR')}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function ReseñasTab() {
+  const [status, setStatus] = useState<'PENDING' | 'REPORTED' | 'APPROVED' | 'REJECTED'>('PENDING')
+  const [data, setData] = useState<{ reviews: any[]; pagination: any } | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [busyId, setBusyId] = useState<string | null>(null)
+
+  const load = () => { setLoading(true); adminApi.reviews({ status }).then(setData).finally(() => setLoading(false)) }
+  useEffect(() => { load() }, [status])
+
+  const handleModerate = async (id: string, approve: boolean) => {
+    setBusyId(id)
+    try { await adminApi.moderateReview(id, approve ? 'APPROVED' : 'REJECTED'); load() }
+    catch (e) { console.error(e) }
+    finally { setBusyId(null) }
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex gap-2 flex-wrap">
+        {(['PENDING', 'REPORTED', 'APPROVED', 'REJECTED'] as const).map((s) => (
+          <button key={s} onClick={() => setStatus(s)} className={`text-xs py-1.5 px-3 rounded-full border transition-all ${status === s ? 'bg-brand-green-dim border-brand-green text-brand-green-text font-semibold' : 'border-gray-200 text-brand-slate'}`}>{{ PENDING: 'Pendientes', REPORTED: 'Reportadas', APPROVED: 'Aprobadas', REJECTED: 'Rechazadas' }[s]}</button>
+        ))}
+      </div>
+
+      {loading ? <Loading /> : !data || data.reviews.length === 0 ? (
+        <div className="card p-8 text-center text-sm text-brand-slate">No hay reseñas en este estado.</div>
+      ) : (
+        <div className="space-y-3">
+          {data.reviews.map((r: any) => (
+            <div key={r.id} className="card p-4">
+              <div className="flex items-center justify-between mb-1">
+                <p className="text-sm font-semibold text-brand-dark">{r.user.name} → {r.company.name}</p>
+                <span className="text-brand-amber text-xs">{'★'.repeat(r.rating)}</span>
+              </div>
+              <p className="text-xs text-brand-slate mb-2">{r.user.email} · {r.company.city}, {r.company.country} · {new Date(r.createdAt).toLocaleDateString('es-AR')}</p>
+              {r.title && <p className="text-sm font-medium text-brand-dark">{r.title}</p>}
+              <p className="text-sm text-brand-slate mt-1">{r.body}</p>
+              {(status === 'PENDING' || status === 'REPORTED') && (
+                <div className="flex gap-2 mt-3">
+                  <button onClick={() => handleModerate(r.id, true)} disabled={busyId === r.id} className="btn-secondary text-xs py-1.5 px-3 disabled:opacity-50">Aprobar</button>
+                  <button onClick={() => handleModerate(r.id, false)} disabled={busyId === r.id} className="text-xs text-brand-red hover:underline">Rechazar</button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function EmpresasTab() {
+  const [search, setSearch] = useState('')
+  const [data, setData] = useState<{ companies: any[]; pagination: any } | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [busyId, setBusyId] = useState<string | null>(null)
+
+  const load = () => { setLoading(true); adminApi.companies(search ? { search } : {}).then(setData).finally(() => setLoading(false)) }
+  useEffect(() => { load() }, [])
+
+  const handleSearch = (e: React.FormEvent) => { e.preventDefault(); load() }
+
+  const handleVerify = async (id: string, verified: boolean) => {
+    setBusyId(id)
+    try { await adminApi.verifyCompany(id, verified); load() }
+    catch (e: any) { alert(e.message) }
+    finally { setBusyId(null) }
+  }
+
+  const handleSuspend = async (id: string, name: string) => {
+    if (!confirm(`¿Suspender a "${name}"? Se le ocultan las reseñas aprobadas y se cancela su suscripción.`)) return
+    setBusyId(id)
+    try { await adminApi.suspendCompany(id); load() }
+    catch (e: any) { alert(e.message) }
+    finally { setBusyId(null) }
+  }
+
+  return (
+    <div className="space-y-4">
+      <form onSubmit={handleSearch} className="flex gap-2">
+        <input placeholder="Buscar por nombre o RUT..." className="input text-sm flex-1" value={search} onChange={(e) => setSearch(e.target.value)} />
+        <button type="submit" className="btn-secondary text-sm py-2 px-4">Buscar</button>
+      </form>
+
+      {loading ? <Loading /> : !data || data.companies.length === 0 ? (
+        <div className="card p-8 text-center text-sm text-brand-slate">No se encontraron empresas.</div>
+      ) : (
+        <div className="space-y-2">
+          {data.companies.map((c: any) => (
+            <div key={c.id} className="card p-4 flex items-center justify-between gap-3 flex-wrap">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-semibold text-brand-dark truncate">{c.name}</p>
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-brand-slate flex-shrink-0">{c.plan}</span>
+                  {c.isVerified && <span className="text-xs px-2 py-0.5 rounded-full bg-brand-green-dim text-brand-green flex-shrink-0">Verificada</span>}
+                </div>
+                <p className="text-xs text-brand-slate truncate">{c.category?.name} · {c.owner?.email || 'sin reclamar'} · {c._count.reviews} reseñas</p>
+              </div>
+              <div className="flex gap-2 flex-shrink-0">
+                <button onClick={() => handleVerify(c.id, !c.isVerified)} disabled={busyId === c.id} className="text-xs text-brand-green hover:underline disabled:opacity-50">{c.isVerified ? 'Quitar verificación' : 'Verificar'}</button>
+                <button onClick={() => handleSuspend(c.id, c.name)} disabled={busyId === c.id} className="text-xs text-brand-red hover:underline disabled:opacity-50">Suspender</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function AnunciosTab() {
+  const [ads, setAds] = useState<any[] | null>(null)
+  const [busyId, setBusyId] = useState<string | null>(null)
+
+  const load = () => adminApi.pendingAds().then((d: any) => setAds(d.ads)).catch(() => setAds([]))
+  useEffect(() => { load() }, [])
+
+  const handleModerate = async (id: string, approve: boolean) => {
+    setBusyId(id)
+    try { await adminApi.moderateAd(id, approve ? 'ACTIVE' : 'REJECTED'); load() }
+    catch (e) { console.error(e) }
+    finally { setBusyId(null) }
+  }
+
+  if (!ads) return <Loading />
+  if (ads.length === 0) return <div className="card p-8 text-center text-sm text-brand-slate">No hay anuncios pendientes de revisión.</div>
+
+  return (
+    <div className="space-y-3">
+      {ads.map((ad) => (
+        <div key={ad.id} className="card p-4 flex gap-4">
+          <img src={ad.imageUrls?.[0]} alt={ad.title} className="w-20 h-20 rounded-lg object-cover flex-shrink-0 bg-gray-100" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-brand-dark">{ad.title}</p>
+            <p className="text-xs text-brand-slate mb-1">{ad.adAccount.companyName} · {ad.model} · USD {ad.dailyBudget}/día</p>
+            <p className="text-xs text-brand-slate mb-2">{ad.description}</p>
+            <p className="text-xs text-brand-slate mb-3">Rubros: {ad.targetCategories.map((tc: any) => tc.category.name).join(', ')} · Países: {ad.targetCountries.join(', ')}</p>
+            <div className="flex gap-2">
+              <button onClick={() => handleModerate(ad.id, true)} disabled={busyId === ad.id} className="btn-secondary text-xs py-1.5 px-3 disabled:opacity-50">Aprobar</button>
+              <button onClick={() => handleModerate(ad.id, false)} disabled={busyId === ad.id} className="text-xs text-brand-red hover:underline">Rechazar</button>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function DenunciasTab() {
+  const [disputes, setDisputes] = useState<any[] | null>(null)
+  const [busyId, setBusyId] = useState<string | null>(null)
+
+  const load = () => adminApi.claimDisputes('PENDING').then((d: any) => setDisputes(d.disputes)).catch(() => setDisputes([]))
+  useEffect(() => { load() }, [])
+
+  const handleResolve = async (id: string, action: 'approve' | 'reject') => {
+    setBusyId(id)
+    try { await adminApi.resolveClaimDispute(id, action); load() }
+    catch (e) { console.error(e) }
+    finally { setBusyId(null) }
+  }
+
+  if (!disputes) return <Loading />
+  if (disputes.length === 0) return <div className="card p-8 text-center text-sm text-brand-slate">No hay denuncias pendientes.</div>
+
+  return (
+    <div className="space-y-3">
+      {disputes.map((d) => (
+        <div key={d.id} className="card p-4">
+          <p className="text-sm font-semibold text-brand-dark">{d.company.name}</p>
+          <p className="text-xs text-brand-slate mb-2">Reclamado por {d.company.owner?.email} · Denunciado por {d.disputedBy.name} ({d.disputedBy.email})</p>
+          <p className="text-sm text-brand-dark mb-3">{d.reason}</p>
+          <div className="flex gap-2">
+            <button onClick={() => handleResolve(d.id, 'approve')} disabled={busyId === d.id} className="btn-secondary text-xs py-1.5 px-3 disabled:opacity-50">Aprobar denuncia (revocar reclamo)</button>
+            <button onClick={() => handleResolve(d.id, 'reject')} disabled={busyId === d.id} className="text-xs text-brand-slate hover:underline">Rechazar denuncia</button>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function IngresosTab() {
+  const [data, setData] = useState<any>(null)
+  useEffect(() => { adminApi.revenue().then(setData).catch(() => {}) }, [])
+  if (!data) return <Loading />
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="card p-4"><p className="text-xs text-brand-slate">MRR</p><p className="text-xl font-bold text-brand-dark">USD {data.mrr}</p></div>
+        <div className="card p-4"><p className="text-xs text-brand-slate">ARR</p><p className="text-xl font-bold text-brand-dark">USD {data.arr}</p></div>
+        <div className="card p-4"><p className="text-xs text-brand-slate">Ads este mes</p><p className="text-xl font-bold text-brand-dark">USD {data.adsRevenue}</p></div>
+        <div className="card p-4 bg-brand-green-dim"><p className="text-xs text-brand-slate">Total del mes</p><p className="text-xl font-bold text-brand-green">USD {data.totalMonthRevenue}</p></div>
+      </div>
+
+      <div className="card p-5">
+        <p className="text-sm font-semibold text-brand-dark mb-3">Suscripciones activas por plan</p>
+        <div className="space-y-2">
+          {data.subscriptions.map((s: any) => (
+            <div key={s.plan} className="flex items-center justify-between text-sm border-t border-gray-50 pt-2 first:border-0 first:pt-0">
+              <span className="text-brand-dark">{s.plan}</span>
+              <span className="text-brand-slate">{s._count} activas · USD {s._sum.amountUsd || 0}/mes</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div className="card p-4"><p className="text-xs text-brand-slate">Consultas cobradas este mes</p><p className="text-lg font-bold text-brand-dark">{data.leadsCount} · USD {data.leadsRevenue}</p></div>
+        <div className="card p-4"><p className="text-xs text-brand-slate">Perfiles destacados activos</p><p className="text-lg font-bold text-brand-dark">{data.boostsCount}</p></div>
+      </div>
+    </div>
+  )
+}
+
+function Loading() {
+  return <div className="text-center py-12"><i className="ti ti-loader-2 animate-spin text-2xl text-brand-slate" /></div>
+}
