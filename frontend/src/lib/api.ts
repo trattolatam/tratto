@@ -209,6 +209,7 @@ export const upload = {
 
 export const admin = {
   dashboard: () => apiFetch<any>('/api/admin/dashboard'),
+  pendingCounts: () => apiFetch<{ pendingReviews: number; reportedReviews: number; pendingAds: number; pendingDisputes: number; pendingCategorySuggestions: number; total: number }>('/api/admin/pending-counts'),
   reviews: (params?: any) => apiFetch<any>(`/api/admin/reviews?${new URLSearchParams(params).toString()}`),
   companies: (params?: any) => apiFetch<any>(`/api/admin/companies?${new URLSearchParams(params).toString()}`),
   revenue: () => apiFetch<any>('/api/admin/revenue'),

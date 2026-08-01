@@ -10,7 +10,7 @@ export default async function adminRoutes(app: FastifyInstance) {
   app.get('/dashboard', async (_request, reply) => {
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
 
-    const [totalCompanies, newCompaniesMonth, totalUsers, newUsersMonth, pendingReviews, reportedReviews, pendingAds, activeSubscriptions, totalReviews, verifiedReviews] = await Promise.all([
+    const [totalCompanies, newCompaniesMonth, totalUsers, newUsersMonth, pendingReviews, reportedReviews, pendingAds, activeSubscriptions, totalReviews, verifiedReviews, pendingDisputes, pendingCategorySuggestions] = await Promise.all([
       prisma.company.count(),
       prisma.company.count({ where: { createdAt: { gte: thirtyDaysAgo } } }),
       prisma.user.count(),
@@ -21,6 +21,8 @@ export default async function adminRoutes(app: FastifyInstance) {
       prisma.subscription.count({ where: { status: 'ACTIVE' } }),
       prisma.review.count({ where: { status: 'APPROVED' } }),
       prisma.review.count({ where: { status: 'APPROVED', isVerified: true } }),
+      prisma.claimDispute.count({ where: { status: 'PENDING' } }),
+      prisma.categorySuggestion.count({ where: { status: 'PENDING' } }),
     ])
 
     const subscriptions = await prisma.subscription.findMany({ where: { status: 'ACTIVE' }, select: { amountUsd: true } })
@@ -47,9 +49,23 @@ export default async function adminRoutes(app: FastifyInstance) {
       stats: {
         totalCompanies, newCompaniesMonth, totalUsers, newUsersMonth, pendingReviews, reportedReviews, pendingAds, activeSubscriptions,
         totalReviews, verifiedReviews, verifiedPct: totalReviews > 0 ? Math.round((verifiedReviews / totalReviews) * 100) : 0, mrr: Math.round(mrr),
+        pendingDisputes, pendingCategorySuggestions,
       },
       recentActivity,
     })
+  })
+
+  // Conteos livianos para mostrar badges (navbar, pestañas) sin traer todo el dashboard.
+  app.get('/pending-counts', async (_request, reply) => {
+    const [pendingReviews, reportedReviews, pendingAds, pendingDisputes, pendingCategorySuggestions] = await Promise.all([
+      prisma.review.count({ where: { status: 'PENDING' } }),
+      prisma.review.count({ where: { status: 'REPORTED' } }),
+      prisma.ad.count({ where: { status: 'PENDING' } }),
+      prisma.claimDispute.count({ where: { status: 'PENDING' } }),
+      prisma.categorySuggestion.count({ where: { status: 'PENDING' } }),
+    ])
+    const total = pendingReviews + reportedReviews + pendingAds + pendingDisputes + pendingCategorySuggestions
+    return reply.send({ pendingReviews, reportedReviews, pendingAds, pendingDisputes, pendingCategorySuggestions, total })
   })
 
   app.get('/reviews', async (request, reply) => {

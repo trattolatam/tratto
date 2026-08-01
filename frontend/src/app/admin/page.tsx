@@ -19,6 +19,15 @@ export default function AdminPage() {
   const { user, authChecked } = useAuthStore()
   const router = useRouter()
   const [tab, setTab] = useState<Tab>('resumen')
+  const [counts, setCounts] = useState<{ pendingReviews: number; reportedReviews: number; pendingAds: number; pendingDisputes: number; pendingCategorySuggestions: number } | null>(null)
+
+  const loadCounts = () => adminApi.pendingCounts().then(setCounts).catch(() => {})
+  useEffect(() => {
+    if (!authChecked || !user || user.role !== 'ADMIN') return
+    loadCounts()
+    const interval = setInterval(loadCounts, 60000) // refresca solo, sin que el admin tenga que recargar la página
+    return () => clearInterval(interval)
+  }, [authChecked, user])
 
   useEffect(() => {
     if (!authChecked) return
@@ -27,23 +36,36 @@ export default function AdminPage() {
 
   if (!user || user.role !== 'ADMIN') return null
 
+  const badgeFor: Partial<Record<Tab, number>> = counts ? {
+    reseñas: counts.pendingReviews + counts.reportedReviews,
+    anuncios: counts.pendingAds,
+    denuncias: counts.pendingDisputes,
+    rubros: counts.pendingCategorySuggestions,
+  } : {}
+
   return (
     <div className="max-w-5xl mx-auto px-4 py-8">
       <h1 className="text-2xl font-bold text-brand-dark mb-1">Panel de administrador</h1>
       <p className="text-sm text-brand-slate mb-6">Moderación, empresas, anuncios e ingresos de Tratto.</p>
 
       <div className="flex gap-1 border-b border-gray-100 mb-6 overflow-x-auto">
-        {TABS.map((t) => (
-          <button key={t.id} onClick={() => setTab(t.id)} className={`text-sm px-4 py-2.5 border-b-2 whitespace-nowrap transition-colors ${tab === t.id ? 'border-brand-green text-brand-dark font-semibold' : 'border-transparent text-brand-slate hover:text-brand-dark'}`}>{t.label}</button>
-        ))}
+        {TABS.map((t) => {
+          const count = badgeFor[t.id]
+          return (
+            <button key={t.id} onClick={() => setTab(t.id)} className={`relative text-sm px-4 py-2.5 border-b-2 whitespace-nowrap transition-colors ${tab === t.id ? 'border-brand-green text-brand-dark font-semibold' : 'border-transparent text-brand-slate hover:text-brand-dark'}`}>
+              {t.label}
+              {!!count && <span className="ml-1.5 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-brand-red text-white text-[10px] font-bold align-middle">{count > 99 ? '99+' : count}</span>}
+            </button>
+          )
+        })}
       </div>
 
       {tab === 'resumen' && <ResumenTab onNavigate={setTab} />}
-      {tab === 'reseñas' && <ReseñasTab />}
+      {tab === 'reseñas' && <ReseñasTab onChanged={loadCounts} />}
       {tab === 'empresas' && <EmpresasTab />}
-      {tab === 'anuncios' && <AnunciosTab />}
-      {tab === 'denuncias' && <DenunciasTab />}
-      {tab === 'rubros' && <RubrosTab />}
+      {tab === 'anuncios' && <AnunciosTab onChanged={loadCounts} />}
+      {tab === 'denuncias' && <DenunciasTab onChanged={loadCounts} />}
+      {tab === 'rubros' && <RubrosTab onChanged={loadCounts} />}
       {tab === 'ingresos' && <IngresosTab />}
     </div>
   )
@@ -62,6 +84,8 @@ function ResumenTab({ onNavigate }: { onNavigate: (t: Tab) => void }) {
     { label: 'Suscripciones activas', value: data.stats.activeSubscriptions, tab: 'ingresos' },
     { label: 'MRR', value: `USD ${data.stats.mrr}`, tab: 'ingresos' },
     { label: 'Reseñas verificadas', value: `${data.stats.verifiedPct}%`, sub: `${data.stats.verifiedReviews} de ${data.stats.totalReviews}`, tab: 'reseñas' },
+    { label: 'Denuncias pendientes', value: data.stats.pendingDisputes, warn: data.stats.pendingDisputes > 0, tab: 'denuncias' },
+    { label: 'Rubros por revisar', value: data.stats.pendingCategorySuggestions, warn: data.stats.pendingCategorySuggestions > 0, tab: 'rubros' },
   ]
 
   return (
@@ -110,7 +134,7 @@ function ResumenTab({ onNavigate }: { onNavigate: (t: Tab) => void }) {
   )
 }
 
-function ReseñasTab() {
+function ReseñasTab({ onChanged }: { onChanged: () => void }) {
   const [status, setStatus] = useState<'PENDING' | 'REPORTED' | 'APPROVED' | 'REJECTED'>('PENDING')
   const [data, setData] = useState<{ reviews: any[]; pagination: any } | null>(null)
   const [loading, setLoading] = useState(false)
@@ -121,7 +145,7 @@ function ReseñasTab() {
 
   const handleModerate = async (id: string, approve: boolean) => {
     setBusyId(id)
-    try { await adminApi.moderateReview(id, approve ? 'APPROVED' : 'REJECTED'); load() }
+    try { await adminApi.moderateReview(id, approve ? 'APPROVED' : 'REJECTED'); load(); onChanged() }
     catch (e) { console.error(e) }
     finally { setBusyId(null) }
   }
@@ -227,7 +251,7 @@ function EmpresasTab() {
   )
 }
 
-function AnunciosTab() {
+function AnunciosTab({ onChanged }: { onChanged: () => void }) {
   const [ads, setAds] = useState<any[] | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
 
@@ -236,7 +260,7 @@ function AnunciosTab() {
 
   const handleModerate = async (id: string, approve: boolean) => {
     setBusyId(id)
-    try { await adminApi.moderateAd(id, approve ? 'ACTIVE' : 'REJECTED'); load() }
+    try { await adminApi.moderateAd(id, approve ? 'ACTIVE' : 'REJECTED'); load(); onChanged() }
     catch (e) { console.error(e) }
     finally { setBusyId(null) }
   }
@@ -265,7 +289,7 @@ function AnunciosTab() {
   )
 }
 
-function DenunciasTab() {
+function DenunciasTab({ onChanged }: { onChanged: () => void }) {
   const [disputes, setDisputes] = useState<any[] | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
 
@@ -274,7 +298,7 @@ function DenunciasTab() {
 
   const handleResolve = async (id: string, action: 'approve' | 'reject') => {
     setBusyId(id)
-    try { await adminApi.resolveClaimDispute(id, action); load() }
+    try { await adminApi.resolveClaimDispute(id, action); load(); onChanged() }
     catch (e) { console.error(e) }
     finally { setBusyId(null) }
   }
@@ -299,7 +323,7 @@ function DenunciasTab() {
   )
 }
 
-function RubrosTab() {
+function RubrosTab({ onChanged }: { onChanged: () => void }) {
   const [suggestions, setSuggestions] = useState<any[] | null>(null)
   const [categoryOptions, setCategoryOptions] = useState<any[]>([])
   const [busyId, setBusyId] = useState<string | null>(null)
@@ -313,14 +337,14 @@ function RubrosTab() {
 
   const handleApprove = async (id: string) => {
     setBusyId(id)
-    try { await adminApi.resolveCategorySuggestion(id, 'approve', pickExisting[id] || undefined); load() }
+    try { await adminApi.resolveCategorySuggestion(id, 'approve', pickExisting[id] || undefined); load(); onChanged() }
     catch (e: any) { alert(e.message) }
     finally { setBusyId(null) }
   }
 
   const handleReject = async (id: string) => {
     setBusyId(id)
-    try { await adminApi.resolveCategorySuggestion(id, 'reject'); load() }
+    try { await adminApi.resolveCategorySuggestion(id, 'reject'); load(); onChanged() }
     catch (e: any) { alert(e.message) }
     finally { setBusyId(null) }
   }
