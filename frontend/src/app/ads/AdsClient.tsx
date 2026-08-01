@@ -126,7 +126,7 @@ export default function AdsClient() {
                         </div>
                       )}
                       {ad.rejectionNote && <p className="text-xs text-brand-red mt-2">Motivo del rechazo: {ad.rejectionNote}</p>}
-                      <div className="flex gap-3 mt-3">
+                      <div className="flex gap-3 mt-3 flex-wrap">
                         {(ad.status === 'ACTIVE' || ad.status === 'PAUSED') && (
                           <button onClick={() => handleToggleStatus(ad.id)} disabled={togglingId === ad.id} className="text-xs text-brand-green hover:underline disabled:opacity-50">{ad.status === 'ACTIVE' ? 'Pausar' : 'Reanudar'}</button>
                         )}
@@ -211,9 +211,9 @@ function StatsPanel() {
             <div className="space-y-2">
               <p className="text-xs font-semibold text-brand-slate uppercase tracking-wide">Por anuncio</p>
               {stats.byAd.map((a) => (
-                <div key={a.adId} className="flex items-center justify-between text-xs border-t border-gray-50 pt-2">
+                <div key={a.adId} className="flex flex-col sm:flex-row sm:items-center sm:justify-between text-xs border-t border-gray-50 pt-2 gap-1">
                   <span className="text-brand-dark font-medium truncate">{a.title}</span>
-                  <span className="text-brand-slate flex-shrink-0 ml-2">{a.impressions} vistas · {a.clicks} clics · {a.ctr}% CTR · USD {a.spend.toFixed(2)}</span>
+                  <span className="text-brand-slate sm:flex-shrink-0 sm:ml-2">{a.impressions} vistas · {a.clicks} clics · {a.ctr}% CTR · USD {a.spend.toFixed(2)}</span>
                 </div>
               ))}
             </div>
