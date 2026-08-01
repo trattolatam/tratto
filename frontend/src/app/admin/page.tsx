@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { admin as adminApi } from '@/lib/api'
+import { admin as adminApi, categories as categoriesApi } from '@/lib/api'
 import { useAuthStore } from '@/lib/store'
 
 const TABS = [
@@ -10,6 +10,7 @@ const TABS = [
   { id: 'empresas', label: 'Empresas' },
   { id: 'anuncios', label: 'Anuncios' },
   { id: 'denuncias', label: 'Denuncias' },
+  { id: 'rubros', label: 'Rubros sugeridos' },
   { id: 'ingresos', label: 'Ingresos' },
 ] as const
 type Tab = typeof TABS[number]['id']
@@ -42,6 +43,7 @@ export default function AdminPage() {
       {tab === 'empresas' && <EmpresasTab />}
       {tab === 'anuncios' && <AnunciosTab />}
       {tab === 'denuncias' && <DenunciasTab />}
+      {tab === 'rubros' && <RubrosTab />}
       {tab === 'ingresos' && <IngresosTab />}
     </div>
   )
@@ -268,6 +270,58 @@ function DenunciasTab() {
           <div className="flex gap-2">
             <button onClick={() => handleResolve(d.id, 'approve')} disabled={busyId === d.id} className="btn-secondary text-xs py-1.5 px-3 disabled:opacity-50">Aprobar denuncia (revocar reclamo)</button>
             <button onClick={() => handleResolve(d.id, 'reject')} disabled={busyId === d.id} className="text-xs text-brand-slate hover:underline">Rechazar denuncia</button>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function RubrosTab() {
+  const [suggestions, setSuggestions] = useState<any[] | null>(null)
+  const [categoryOptions, setCategoryOptions] = useState<any[]>([])
+  const [busyId, setBusyId] = useState<string | null>(null)
+  const [pickExisting, setPickExisting] = useState<Record<string, string>>({})
+
+  const load = () => adminApi.categorySuggestions('PENDING').then((d: any) => setSuggestions(d.suggestions)).catch(() => setSuggestions([]))
+  useEffect(() => {
+    load()
+    categoriesApi.list().then((d: any) => setCategoryOptions(d.categories)).catch(() => {})
+  }, [])
+
+  const handleApprove = async (id: string) => {
+    setBusyId(id)
+    try { await adminApi.resolveCategorySuggestion(id, 'approve', pickExisting[id] || undefined); load() }
+    catch (e: any) { alert(e.message) }
+    finally { setBusyId(null) }
+  }
+
+  const handleReject = async (id: string) => {
+    setBusyId(id)
+    try { await adminApi.resolveCategorySuggestion(id, 'reject'); load() }
+    catch (e: any) { alert(e.message) }
+    finally { setBusyId(null) }
+  }
+
+  if (!suggestions) return <Loading />
+  if (suggestions.length === 0) return <div className="card p-8 text-center text-sm text-brand-slate">No hay rubros sugeridos pendientes.</div>
+
+  return (
+    <div className="space-y-3">
+      <p className="text-xs text-brand-slate">Cuando una empresa se registra con un rubro que no existe todavía en Tratto, queda acá esperando que se decida si se crea como rubro nuevo o si en realidad corresponde a uno que ya existe.</p>
+      {suggestions.map((s) => (
+        <div key={s.id} className="card p-4">
+          <p className="text-sm font-semibold text-brand-dark">{s.company.name}</p>
+          <p className="text-xs text-brand-slate mb-2">{s.company.city}, {s.company.country} · sugirió: <strong className="text-brand-dark">"{s.suggestedName}"</strong></p>
+          <div className="flex items-center gap-2 flex-wrap">
+            <button onClick={() => handleApprove(s.id)} disabled={busyId === s.id} className="btn-secondary text-xs py-1.5 px-3 disabled:opacity-50">
+              {pickExisting[s.id] ? 'Asignar a ese rubro' : `Crear rubro nuevo "${s.suggestedName}"`}
+            </button>
+            <select className="input text-xs py-1.5 w-48" value={pickExisting[s.id] || ''} onChange={(e) => setPickExisting((prev) => ({ ...prev, [s.id]: e.target.value }))}>
+              <option value="">— o asignar a uno existente —</option>
+              {categoryOptions.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+            <button onClick={() => handleReject(s.id)} disabled={busyId === s.id} className="text-xs text-brand-red hover:underline">Rechazar</button>
           </div>
         </div>
       ))}

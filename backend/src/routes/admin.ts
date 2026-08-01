@@ -161,6 +161,54 @@ export default async function adminRoutes(app: FastifyInstance) {
     return reply.send({ dispute: updated })
   })
 
+  // ─── Rubros sugeridos por empresas (categoría nueva que no existía) ───────
+  app.get('/category-suggestions', async (request, reply) => {
+    const query = z.object({ status: z.enum(['PENDING', 'APPROVED', 'REJECTED']).default('PENDING') }).parse(request.query)
+    const suggestions = await prisma.categorySuggestion.findMany({
+      where: { status: query.status },
+      orderBy: { createdAt: 'asc' },
+      include: { company: { select: { id: true, name: true, slug: true, city: true, country: true, category: { select: { name: true, slug: true } } } } },
+    })
+    return reply.send({ suggestions })
+  })
+
+  app.post('/category-suggestions/:id/resolve', async (request, reply) => {
+    const { id } = request.params as { id: string }
+    const body = z.object({ action: z.enum(['approve', 'reject']), categoryId: z.string().uuid().optional() }).safeParse(request.body)
+    if (!body.success) return reply.status(400).send({ error: true, message: 'Datos inválidos' })
+
+    const suggestion = await prisma.categorySuggestion.findUnique({ where: { id } })
+    if (!suggestion) return reply.status(404).send({ error: true, message: 'Sugerencia no encontrada' })
+    if (suggestion.status !== 'PENDING') return reply.status(400).send({ error: true, message: 'Esta sugerencia ya fue resuelta' })
+
+    if (body.data.action === 'approve') {
+      let categoryId = body.data.categoryId
+
+      if (!categoryId) {
+        // Sin elegir una categoría existente: se crea una nueva con el nombre
+        // que sugirió la empresa. Reutiliza el slug si por casualidad ya
+        // existe una igual (evita duplicados con el mismo nombre).
+        const slug = suggestion.suggestedName.toLowerCase().normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
+        const category = await prisma.category.upsert({
+          where: { slug },
+          update: {},
+          create: { name: suggestion.suggestedName, slug, emoji: '🏷️', isHidden: false },
+        })
+        categoryId = category.id
+      }
+
+      await prisma.company.update({ where: { id: suggestion.companyId }, data: { categoryId } })
+    }
+
+    const updated = await prisma.categorySuggestion.update({
+      where: { id },
+      data: { status: body.data.action === 'approve' ? 'APPROVED' : 'REJECTED', reviewedAt: new Date() },
+    })
+
+    return reply.send({ suggestion: updated })
+  })
+
   app.get('/revenue', async (_request, reply) => {
     const now = new Date()
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)

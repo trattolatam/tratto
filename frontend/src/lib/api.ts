@@ -219,4 +219,6 @@ export const admin = {
   pendingAds: () => apiFetch<{ ads: any[] }>('/api/ads/pending'),
   claimDisputes: (status?: string) => apiFetch<{ disputes: any[] }>(`/api/admin/claim-disputes${status ? `?status=${status}` : ''}`),
   resolveClaimDispute: (id: string, action: 'approve' | 'reject', note?: string) => apiFetch(`/api/admin/claim-disputes/${id}/resolve`, { method: 'POST', body: JSON.stringify({ action, note }) }),
+  categorySuggestions: (status?: string) => apiFetch<{ suggestions: any[] }>(`/api/admin/category-suggestions${status ? `?status=${status}` : ''}`),
+  resolveCategorySuggestion: (id: string, action: 'approve' | 'reject', categoryId?: string) => apiFetch(`/api/admin/category-suggestions/${id}/resolve`, { method: 'POST', body: JSON.stringify({ action, categoryId }) }),
 }
