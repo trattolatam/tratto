@@ -11,6 +11,7 @@ import authRoutes from './routes/auth'
 import companyRoutes from './routes/companies'
 import reviewRoutes from './routes/reviews'
 import categoryRoutes from './routes/categories'
+import statsRoutes from './routes/stats'
 import adRoutes from './routes/ads'
 import adminRoutes from './routes/admin'
 import uploadRoutes from './routes/uploads'
@@ -49,6 +50,7 @@ async function start() {
   app.register(companyRoutes,      { prefix: '/api/companies' })
   app.register(reviewRoutes,       { prefix: '/api/reviews' })
   app.register(categoryRoutes,     { prefix: '/api/categories' })
+  app.register(statsRoutes,        { prefix: '/api/stats' })
   app.register(subscriptionRoutes, { prefix: '/api/subscriptions' })
   app.register(adRoutes,           { prefix: '/api/ads' })
   app.register(leadRoutes,         { prefix: '/api/leads' })

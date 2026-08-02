@@ -3,19 +3,35 @@ import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Tratto — Reseñas verificadas para LATAM', description: 'Encontrá los mejores electricistas, plomeros, peluquerías y profesionales con reseñas verificadas con comprobante.' }
 
-const STATS = [
-  { value: '12.847', label: 'Empresas registradas' }, { value: '89.312', label: 'Reseñas verificadas' },
-  { value: '73%', label: 'Con comprobante real' }, { value: '18', label: 'Países LATAM' },
-]
+// Selección editorial de categorías a destacar en la home — el ícono, nombre
+// y cantidad de empresas de cada una se traen reales desde la base, esto solo
+// define cuáles mostrar y en qué orden.
+const FEATURED_SLUGS = ['electricistas', 'plomeria', 'peluquerias', 'estetica', 'psicologos', 'construccion', 'medicos-domicilio', 'escribanos']
 
-const FEATURED_CATEGORIES = [
-  { emoji: '⚡', name: 'Electricistas', slug: 'electricistas', count: 2341 }, { emoji: '🔧', name: 'Plomería', slug: 'plomeria', count: 1876 },
-  { emoji: '✂️', name: 'Peluquerías', slug: 'peluquerias', count: 3102 }, { emoji: '✨', name: 'Clínicas de estética', slug: 'estetica', count: 987 },
-  { emoji: '🧠', name: 'Psicólogos', slug: 'psicologos', count: 987 }, { emoji: '🏗️', name: 'Construcción', slug: 'construccion', count: 4210 },
-  { emoji: '🩺', name: 'Médicos a domicilio', slug: 'medicos-domicilio', count: 634 }, { emoji: '📝', name: 'Escribanos', slug: 'escribanos', count: 521 },
-]
+async function getHomeData() {
+  try {
+    const [statsRes, categoriesRes] = await Promise.all([
+      fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/stats`, { cache: 'no-store' }),
+      fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/categories`, { cache: 'no-store' }),
+    ])
+    const stats = statsRes.ok ? await statsRes.json() : null
+    const categoriesData = categoriesRes.ok ? await categoriesRes.json() : { categories: [] }
+    const bySlug = new Map(categoriesData.categories.map((c: any) => [c.slug, c]))
+    const featured = FEATURED_SLUGS.map((slug) => bySlug.get(slug)).filter(Boolean) as any[]
+    return { stats, featured }
+  } catch { return { stats: null, featured: [] } }
+}
 
-export default function HomePage() {
+export default async function HomePage() {
+  const { stats, featured } = await getHomeData()
+
+  const STATS = [
+    { value: stats ? stats.totalCompanies.toLocaleString('es-UY') : '—', label: 'Empresas registradas' },
+    { value: stats ? stats.verifiedReviews.toLocaleString('es-UY') : '—', label: 'Reseñas verificadas' },
+    { value: stats ? `${stats.verifiedPct}%` : '—', label: 'Con comprobante real' },
+    { value: '18', label: 'Países LATAM' }, // cobertura declarada, no un conteo en vivo
+  ]
+
   return (
     <>
       <section className="bg-brand-dark text-white">
@@ -73,11 +89,11 @@ export default function HomePage() {
             <Link href="/categorias" className="btn-secondary text-sm py-2 hidden sm:flex">Ver todas <i className="ti ti-arrow-right text-base" /></Link>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {FEATURED_CATEGORIES.map(cat => (
+            {featured.map((cat) => (
               <Link key={cat.slug} href={`/buscar?categoria=${cat.slug}`} className="card card-hover p-4 text-center group">
                 <div className="text-3xl mb-2">{cat.emoji}</div>
                 <div className="text-sm font-semibold text-brand-dark group-hover:text-brand-green transition-colors">{cat.name}</div>
-                <div className="text-xs text-brand-slate mt-0.5">{cat.count.toLocaleString()} empresas</div>
+                <div className="text-xs text-brand-slate mt-0.5">{cat._count.companies.toLocaleString('es-UY')} empresas</div>
               </Link>
             ))}
           </div>
