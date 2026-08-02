@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import type { Metadata } from 'next'
+import { HeroSearch } from '@/components/home/HeroSearch'
 
 export const metadata: Metadata = { title: 'Tratto — Reseñas verificadas para LATAM', description: 'Encontrá los mejores electricistas, plomeros, peluquerías y profesionales con reseñas verificadas con comprobante.' }
 
@@ -43,13 +44,7 @@ export default async function HomePage() {
             </div>
             <h1 className="text-4xl md:text-5xl font-bold tracking-tight leading-tight mb-4">Encontrá quién <span className="text-brand-green">realmente</span> cumple en LATAM</h1>
             <p className="text-white/60 text-lg mb-8 leading-relaxed">Reseñas verificadas con factura, recibo o comprobante. No palabras — evidencia real.</p>
-            <div className="flex gap-2 max-w-lg mx-auto mb-10">
-              <div className="relative flex-1">
-                <i className="ti ti-search absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-base" />
-                <input type="text" placeholder="¿Qué servicio buscás?" className="w-full pl-10 pr-4 py-3 rounded-lg bg-white text-brand-dark placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green/40" />
-              </div>
-              <Link href="/buscar" className="btn-primary px-5 py-3 text-sm"><i className="ti ti-search text-base" />Buscar</Link>
-            </div>
+            <HeroSearch />
             <div className="flex flex-wrap justify-center gap-2">
               {['Electricistas', 'Plomeros', 'Peluquerías', 'Psicólogos', 'Escribanos'].map(c => (
                 <Link key={c} href={`/buscar?q=${c.toLowerCase()}`} className="text-xs text-white/50 hover:text-brand-green border border-white/10 hover:border-brand-green/40 rounded-full px-3 py-1 transition-colors">{c}</Link>
