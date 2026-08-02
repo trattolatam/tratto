@@ -2,9 +2,14 @@ import { FastifyInstance } from 'fastify'
 import { prisma } from '../lib/prisma'
 
 export default async function categoryRoutes(app: FastifyInstance) {
-  app.get('/', async (_req, reply) => {
+  app.get('/', async (req, reply) => {
+    // includeHidden=true trae también las categorías todavía no lanzadas
+    // (fase 2, isHidden=true) — las usa la pantalla de "Todas las categorías"
+    // para mostrarlas como "Próximamente". Nadie más la pide, así que el resto
+    // de los formularios (registro, targeting de ads) siguen sin ofrecerlas.
+    const { includeHidden } = req.query as { includeHidden?: string }
     const cats = await prisma.category.findMany({
-      where: { isHidden: false },
+      where: includeHidden === 'true' ? {} : { isHidden: false },
       orderBy: [{ phase: 'asc' }, { priority: 'desc' }, { name: 'asc' }],
       include: { _count: { select: { companies: true } } },
     })

@@ -115,7 +115,7 @@ export const reviews = {
   report: (reviewId: string, reason: string) => apiFetch(`/api/reviews/${reviewId}/report`, { method: 'POST', body: JSON.stringify({ reason }) }),
 }
 
-export const categories = { list: () => apiFetch<{ categories: any[] }>('/api/categories') }
+export const categories = { list: (includeHidden?: boolean) => apiFetch<{ categories: any[] }>(`/api/categories${includeHidden ? '?includeHidden=true' : ''}`) }
 
 export const leads = {
   create: (body: any) => apiFetch('/api/leads', { method: 'POST', body: JSON.stringify(body) }),
@@ -223,7 +223,10 @@ export const admin = {
   claimDisputes: (status?: string) => apiFetch<{ disputes: any[] }>(`/api/admin/claim-disputes${status ? `?status=${status}` : ''}`),
   resolveClaimDispute: (id: string, action: 'approve' | 'reject', note?: string) => apiFetch(`/api/admin/claim-disputes/${id}/resolve`, { method: 'POST', body: JSON.stringify({ action, note }) }),
   categorySuggestions: (status?: string) => apiFetch<{ suggestions: any[] }>(`/api/admin/category-suggestions${status ? `?status=${status}` : ''}`),
-  resolveCategorySuggestion: (id: string, action: 'approve' | 'reject', categoryId?: string) => apiFetch(`/api/admin/category-suggestions/${id}/resolve`, { method: 'POST', body: JSON.stringify({ action, categoryId }) }),
+  resolveCategorySuggestion: (id: string, action: 'approve' | 'reject', categoryId?: string, emoji?: string) => apiFetch(`/api/admin/category-suggestions/${id}/resolve`, { method: 'POST', body: JSON.stringify({ action, categoryId, emoji }) }),
+  categories: () => apiFetch<{ categories: any[] }>('/api/admin/categories'),
+  updateCategory: (id: string, body: { emoji?: string; isHidden?: boolean; phase?: number; priority?: boolean }) =>
+    apiFetch<{ category: any }>(`/api/admin/categories/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
   staff: () => apiFetch<{ staff: any[] }>('/api/admin/staff'),
   inviteStaff: (body: { name: string; email: string; role: 'ADMIN' | 'COLLABORATOR'; country: string; phone?: string }) =>
     apiFetch<{ user: any; message: string }>(`/api/admin/staff`, { method: 'POST', body: JSON.stringify(body) }),

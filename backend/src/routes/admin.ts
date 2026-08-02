@@ -225,7 +225,7 @@ export default async function adminRoutes(app: FastifyInstance) {
 
   app.post('/category-suggestions/:id/resolve', async (request, reply) => {
     const { id } = request.params as { id: string }
-    const body = z.object({ action: z.enum(['approve', 'reject']), categoryId: z.string().uuid().optional() }).safeParse(request.body)
+    const body = z.object({ action: z.enum(['approve', 'reject']), categoryId: z.string().uuid().optional(), emoji: z.string().min(1).max(4).optional() }).safeParse(request.body)
     if (!body.success) return reply.status(400).send({ error: true, message: 'Datos inválidos' })
 
     const suggestion = await prisma.categorySuggestion.findUnique({ where: { id } })
@@ -244,7 +244,7 @@ export default async function adminRoutes(app: FastifyInstance) {
         const category = await prisma.category.upsert({
           where: { slug },
           update: {},
-          create: { name: suggestion.suggestedName, slug, emoji: '🏷️', isHidden: false },
+          create: { name: suggestion.suggestedName, slug, emoji: body.data.emoji || '🏷️', isHidden: false },
         })
         categoryId = category.id
       }
@@ -258,6 +258,29 @@ export default async function adminRoutes(app: FastifyInstance) {
     })
 
     return reply.send({ suggestion: updated })
+  })
+
+  // ─── Gestión de categorías (activar fase 2, ícono, etc.) — solo ADMIN ───
+  app.get('/categories', { preHandler: requireAdmin }, async (_request, reply) => {
+    const categories = await prisma.category.findMany({
+      orderBy: [{ phase: 'asc' }, { priority: 'desc' }, { name: 'asc' }],
+      include: { _count: { select: { companies: true } } },
+    })
+    return reply.send({ categories })
+  })
+
+  app.patch('/categories/:id', { preHandler: requireAdmin }, async (request, reply) => {
+    const { id } = request.params as { id: string }
+    const body = z.object({
+      emoji: z.string().min(1).max(4).optional(),
+      isHidden: z.boolean().optional(),
+      phase: z.number().int().min(1).max(9).optional(),
+      priority: z.boolean().optional(),
+    }).safeParse(request.body)
+    if (!body.success) return reply.status(400).send({ error: true, message: 'Datos inválidos' })
+
+    const updated = await prisma.category.update({ where: { id }, data: body.data })
+    return reply.send({ category: updated })
   })
 
   app.get('/revenue', { preHandler: requireAdmin }, async (_request, reply) => {

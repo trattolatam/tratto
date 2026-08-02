@@ -12,6 +12,7 @@ const TABS = [
   { id: 'anuncios', label: 'Anuncios' },
   { id: 'denuncias', label: 'Denuncias' },
   { id: 'rubros', label: 'Rubros sugeridos' },
+  { id: 'categorias', label: 'Categorías', adminOnly: true },
   { id: 'ingresos', label: 'Ingresos', adminOnly: true },
   { id: 'colaboradores', label: 'Colaboradores', adminOnly: true },
 ] as const
@@ -79,6 +80,7 @@ export default function AdminPage() {
       {tab === 'anuncios' && <AnunciosTab onChanged={loadCounts} />}
       {tab === 'denuncias' && <DenunciasTab onChanged={loadCounts} />}
       {tab === 'rubros' && <RubrosTab onChanged={loadCounts} />}
+      {tab === 'categorias' && isAdmin && <CategoriasTab />}
       {tab === 'ingresos' && isAdmin && <IngresosTab onNavigateToEmpresas={goToEmpresas} />}
       {tab === 'colaboradores' && isAdmin && <ColaboradoresTab currentUserId={user!.id} />}
     </div>
@@ -369,6 +371,7 @@ function RubrosTab({ onChanged }: { onChanged: () => void }) {
   const [categoryOptions, setCategoryOptions] = useState<any[]>([])
   const [busyId, setBusyId] = useState<string | null>(null)
   const [pickExisting, setPickExisting] = useState<Record<string, string>>({})
+  const [emoji, setEmoji] = useState<Record<string, string>>({})
 
   const load = () => adminApi.categorySuggestions('PENDING').then((d: any) => setSuggestions(d.suggestions)).catch(() => setSuggestions([]))
   useEffect(() => {
@@ -378,7 +381,7 @@ function RubrosTab({ onChanged }: { onChanged: () => void }) {
 
   const handleApprove = async (id: string) => {
     setBusyId(id)
-    try { await adminApi.resolveCategorySuggestion(id, 'approve', pickExisting[id] || undefined); load(); onChanged() }
+    try { await adminApi.resolveCategorySuggestion(id, 'approve', pickExisting[id] || undefined, pickExisting[id] ? undefined : (emoji[id] || undefined)); load(); onChanged() }
     catch (e: any) { alert(e.message) }
     finally { setBusyId(null) }
   }
@@ -401,6 +404,14 @@ function RubrosTab({ onChanged }: { onChanged: () => void }) {
           <p className="text-sm font-semibold text-brand-dark">{s.company.name}</p>
           <p className="text-xs text-brand-slate mb-2">{s.company.city}, {s.company.country} · sugirió: <strong className="text-brand-dark">"{s.suggestedName}"</strong></p>
           <div className="flex items-center gap-2 flex-wrap">
+            {!pickExisting[s.id] && (
+              <input
+                maxLength={4} placeholder="🏷️" value={emoji[s.id] || ''}
+                onChange={(e) => setEmoji((prev) => ({ ...prev, [s.id]: e.target.value }))}
+                title="Ícono de la tarjeta (opcional — si lo dejás vacío, usa uno genérico)"
+                className="input text-sm w-14 text-center py-1.5"
+              />
+            )}
             <button onClick={() => handleApprove(s.id)} disabled={busyId === s.id} className="btn-secondary text-xs py-1.5 px-3 disabled:opacity-50">
               {pickExisting[s.id] ? 'Asignar a ese rubro' : `Crear rubro nuevo "${s.suggestedName}"`}
             </button>
@@ -409,6 +420,72 @@ function RubrosTab({ onChanged }: { onChanged: () => void }) {
               {categoryOptions.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
             <button onClick={() => handleReject(s.id)} disabled={busyId === s.id} className="text-xs text-brand-red hover:underline">Rechazar</button>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function CategoriasTab() {
+  const [categories, setCategories] = useState<any[] | null>(null)
+  const [busyId, setBusyId] = useState<string | null>(null)
+  const [editingEmoji, setEditingEmoji] = useState<Record<string, string>>({})
+
+  const load = () => adminApi.categories().then((d: any) => setCategories(d.categories)).catch(() => setCategories([]))
+  useEffect(() => { load() }, [])
+
+  const handleToggleHidden = async (id: string, isHidden: boolean) => {
+    setBusyId(id)
+    try { await adminApi.updateCategory(id, { isHidden: !isHidden }); load() }
+    catch (e: any) { alert(e.message) }
+    finally { setBusyId(null) }
+  }
+
+  const handleSaveEmoji = async (id: string) => {
+    const value = editingEmoji[id]
+    if (!value) return
+    setBusyId(id)
+    try { await adminApi.updateCategory(id, { emoji: value }); setEditingEmoji((prev) => { const next = { ...prev }; delete next[id]; return next }); load() }
+    catch (e: any) { alert(e.message) }
+    finally { setBusyId(null) }
+  }
+
+  if (!categories) return <Loading />
+
+  const byPhase = categories.reduce((acc: Record<number, any[]>, c) => { (acc[c.phase] ||= []).push(c); return acc }, {})
+
+  return (
+    <div className="space-y-6">
+      <p className="text-xs text-brand-slate">Las categorías con "Activa" ya son visibles y buscables en tratto.lat/categorias, y elegibles al registrar una empresa. Las que dicen "Oculta" aparecen ahí como "Próximamente" — activalas cuando estén listas para lanzar.</p>
+      {Object.keys(byPhase).sort((a, b) => Number(a) - Number(b)).map((phase) => (
+        <div key={phase}>
+          <p className="text-xs font-semibold text-brand-slate uppercase tracking-wider mb-2">Fase {phase}</p>
+          <div className="space-y-2">
+            {byPhase[Number(phase)].map((c) => (
+              <div key={c.id} className="card p-3 flex items-center justify-between gap-3 flex-wrap">
+                <div className="flex items-center gap-3 min-w-0">
+                  <input
+                    maxLength={4}
+                    value={editingEmoji[c.id] ?? c.emoji}
+                    onChange={(e) => setEditingEmoji((prev) => ({ ...prev, [c.id]: e.target.value }))}
+                    onBlur={() => editingEmoji[c.id] !== undefined && editingEmoji[c.id] !== c.emoji && handleSaveEmoji(c.id)}
+                    className="input text-lg w-12 text-center py-1"
+                    title="Ícono de la tarjeta — escribí un emoji y salí del campo para guardarlo"
+                  />
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-brand-dark truncate">{c.name}</p>
+                    <p className="text-xs text-brand-slate truncate">{c._count.companies} empresas{c.priority ? ' · prioritaria' : ''}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <span className={`text-xs px-2 py-0.5 rounded-full ${c.isHidden ? 'bg-gray-100 text-brand-slate' : 'bg-brand-green-dim text-brand-green'}`}>{c.isHidden ? 'Oculta' : 'Activa'}</span>
+                  <button onClick={() => handleToggleHidden(c.id, c.isHidden)} disabled={busyId === c.id} className={`text-xs hover:underline disabled:opacity-50 ${c.isHidden ? 'text-brand-green' : 'text-brand-red'}`}>
+                    {c.isHidden ? 'Activar' : 'Ocultar'}
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       ))}
