@@ -274,16 +274,36 @@ export default async function adminRoutes(app: FastifyInstance) {
       name: z.string().min(2), emoji: z.string().min(1).max(4),
       phase: z.number().int().min(1).max(9).default(1),
       isHidden: z.boolean().default(false), priority: z.boolean().default(false),
+      force: z.boolean().default(false), // ya vio el aviso de "parecida" y quiere crearla igual
     }).safeParse(request.body)
     if (!body.success) return reply.status(400).send({ error: true, message: body.error.issues[0]?.message || 'Datos inválidos' })
 
-    const { name, emoji, phase, isHidden, priority } = body.data
+    const { name, emoji, phase, isHidden, priority, force } = body.data
 
     // Si ya existe una categoría con ese nombre (sin importar mayúsculas), no
     // se crea una segunda — se avisa cuál es la que ya existe.
     const existing = await prisma.category.findFirst({ where: { name: { equals: name, mode: 'insensitive' } } })
     if (existing) {
       return reply.status(409).send({ error: true, message: `Ya existe la categoría "${existing.name}"${existing.isHidden ? ' (está oculta — podés activarla en vez de crear otra)' : ''}.` })
+    }
+
+    // No es el mismo nombre, pero puede ser un caso como "Mecánicos" vs
+    // "Talleres Mecánicos" — comparte una palabra significativa. No lo
+    // bloqueamos (puede ser una categoría distinta a propósito), pero se lo
+    // mostramos al admin para que confirme antes de crear una parecida.
+    if (!force) {
+      const normalize = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      const words = normalize(name).split(/[^a-z0-9]+/).filter((w) => w.length >= 4)
+      if (words.length > 0) {
+        const allCategories = await prisma.category.findMany({ select: { id: true, name: true, isHidden: true } })
+        const similar = allCategories.filter((c) => {
+          const otherWords = normalize(c.name).split(/[^a-z0-9]+/).filter((w) => w.length >= 4)
+          return words.some((w) => otherWords.includes(w))
+        })
+        if (similar.length > 0) {
+          return reply.send({ needsConfirmation: true, similar: similar.map((c) => ({ id: c.id, name: c.name, isHidden: c.isHidden })) })
+        }
+      }
     }
 
     const baseSlug = name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')

@@ -435,23 +435,27 @@ function CategoriasTab() {
   const [form, setForm] = useState({ name: '', emoji: '', phase: 1, isHidden: true })
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState('')
+  const [similar, setSimilar] = useState<any[] | null>(null)
 
   const load = () => adminApi.categories().then((d: any) => setCategories(d.categories)).catch(() => setCategories([]))
   useEffect(() => { load() }, [])
 
-  const handleCreate = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const submitCreate = async (force: boolean) => {
     setError('')
     setCreating(true)
     try {
-      await adminApi.createCategory({ name: form.name.trim(), emoji: form.emoji.trim() || '🏷️', phase: form.phase, isHidden: form.isHidden })
+      const res: any = await adminApi.createCategory({ name: form.name.trim(), emoji: form.emoji.trim() || '🏷️', phase: form.phase, isHidden: form.isHidden, force })
+      if (res.needsConfirmation) { setSimilar(res.similar); return }
       setForm({ name: '', emoji: '', phase: 1, isHidden: true })
       setShowForm(false)
+      setSimilar(null)
       load()
     }
     catch (e: any) { setError(e.message || 'No se pudo crear') }
     finally { setCreating(false) }
   }
+
+  const handleCreate = async (e: React.FormEvent) => { e.preventDefault(); await submitCreate(false) }
 
   const handleToggleHidden = async (id: string, isHidden: boolean) => {
     setBusyId(id)
@@ -485,7 +489,7 @@ function CategoriasTab() {
         {showForm && (
           <form onSubmit={handleCreate} className="space-y-3 mt-4 border-t border-gray-100 pt-4">
             <div className="grid sm:grid-cols-[1fr_80px_120px] gap-3">
-              <div><label className="label">Nombre</label><input required placeholder="Ej: Jardineros" className="input text-sm" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} /></div>
+              <div><label className="label">Nombre</label><input required placeholder="Ej: Jardineros" className="input text-sm" value={form.name} onChange={(e) => { setForm((f) => ({ ...f, name: e.target.value })); setSimilar(null) }} /></div>
               <div><label className="label">Ícono</label><input maxLength={4} placeholder="🌱" className="input text-sm text-center" value={form.emoji} onChange={(e) => setForm((f) => ({ ...f, emoji: e.target.value }))} /></div>
               <div>
                 <label className="label">Fase</label>
@@ -501,10 +505,24 @@ function CategoriasTab() {
               Activarla ya (si la dejás sin marcar, nace oculta como "Próximamente")
             </label>
             {error && <p className="text-xs text-brand-red">{error}</p>}
-            <div className="flex gap-2">
-              <button type="submit" disabled={creating} className="btn-primary text-sm py-2 px-4 disabled:opacity-50">{creating ? 'Creando...' : 'Crear categoría'}</button>
-              <button type="button" onClick={() => { setShowForm(false); setError('') }} className="text-xs text-brand-slate hover:underline">Cancelar</button>
-            </div>
+            {similar ? (
+              <div className="bg-brand-amber-dim border border-brand-amber/30 rounded-lg p-3 text-xs text-brand-dark">
+                <p className="font-semibold mb-1">Ya hay {similar.length === 1 ? 'una categoría parecida' : 'categorías parecidas'}:</p>
+                <ul className="list-disc list-inside mb-2">
+                  {similar.map((c) => <li key={c.id}>{c.name}{c.isHidden ? ' (oculta)' : ''}</li>)}
+                </ul>
+                <p className="mb-2">¿Seguro que "{form.name.trim()}" es un rubro distinto y no lo mismo con otro nombre?</p>
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => submitCreate(true)} disabled={creating} className="btn-secondary text-xs py-1.5 px-3 disabled:opacity-50">Sí, crear igual</button>
+                  <button type="button" onClick={() => setSimilar(null)} className="text-xs text-brand-slate hover:underline">Mejor no</button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                <button type="submit" disabled={creating} className="btn-primary text-sm py-2 px-4 disabled:opacity-50">{creating ? 'Creando...' : 'Crear categoría'}</button>
+                <button type="button" onClick={() => { setShowForm(false); setError(''); setSimilar(null) }} className="text-xs text-brand-slate hover:underline">Cancelar</button>
+              </div>
+            )}
           </form>
         )}
       </div>
