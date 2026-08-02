@@ -278,11 +278,19 @@ export default async function adminRoutes(app: FastifyInstance) {
     if (!body.success) return reply.status(400).send({ error: true, message: body.error.issues[0]?.message || 'Datos inválidos' })
 
     const { name, emoji, phase, isHidden, priority } = body.data
+
+    // Si ya existe una categoría con ese nombre (sin importar mayúsculas), no
+    // se crea una segunda — se avisa cuál es la que ya existe.
+    const existing = await prisma.category.findFirst({ where: { name: { equals: name, mode: 'insensitive' } } })
+    if (existing) {
+      return reply.status(409).send({ error: true, message: `Ya existe la categoría "${existing.name}"${existing.isHidden ? ' (está oculta — podés activarla en vez de crear otra)' : ''}.` })
+    }
+
     const baseSlug = name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
     if (!baseSlug) return reply.status(400).send({ error: true, message: 'Ese nombre no genera una URL válida — probá con otro' })
 
-    // Si el slug ya existe (nombre repetido o muy parecido), le suma un número
-    // en vez de fallar con un error de la base que no diría nada al admin.
+    // El slug también puede colisionar con nombres distintos que normalizan
+    // igual (ej. con/sin tildes) — ahí sí le suma un número en vez de fallar.
     let slug = baseSlug
     let n = 2
     while (await prisma.category.findUnique({ where: { slug } })) { slug = `${baseSlug}-${n}`; n++ }
