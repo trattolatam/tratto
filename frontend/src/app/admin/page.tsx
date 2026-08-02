@@ -431,9 +431,27 @@ function CategoriasTab() {
   const [categories, setCategories] = useState<any[] | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [editingEmoji, setEditingEmoji] = useState<Record<string, string>>({})
+  const [showForm, setShowForm] = useState(false)
+  const [form, setForm] = useState({ name: '', emoji: '', phase: 1, isHidden: true })
+  const [creating, setCreating] = useState(false)
+  const [error, setError] = useState('')
 
   const load = () => adminApi.categories().then((d: any) => setCategories(d.categories)).catch(() => setCategories([]))
   useEffect(() => { load() }, [])
+
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError('')
+    setCreating(true)
+    try {
+      await adminApi.createCategory({ name: form.name.trim(), emoji: form.emoji.trim() || '🏷️', phase: form.phase, isHidden: form.isHidden })
+      setForm({ name: '', emoji: '', phase: 1, isHidden: true })
+      setShowForm(false)
+      load()
+    }
+    catch (e: any) { setError(e.message || 'No se pudo crear') }
+    finally { setCreating(false) }
+  }
 
   const handleToggleHidden = async (id: string, isHidden: boolean) => {
     setBusyId(id)
@@ -457,7 +475,40 @@ function CategoriasTab() {
 
   return (
     <div className="space-y-6">
-      <p className="text-xs text-brand-slate">Las categorías con "Activa" ya son visibles y buscables en tratto.lat/categorias, y elegibles al registrar una empresa. Las que dicen "Oculta" aparecen ahí como "Próximamente" — activalas cuando estén listas para lanzar.</p>
+      <div className="card p-5">
+        <div className="flex items-center justify-between">
+          <p className="text-sm font-semibold text-brand-dark">Categorías</p>
+          {!showForm && <button onClick={() => setShowForm(true)} className="btn-secondary text-xs py-1.5 px-3"><i className="ti ti-plus" /> Nueva categoría</button>}
+        </div>
+        <p className="text-xs text-brand-slate mt-1">Las que están "Activa" ya son visibles y buscables en tratto.lat/categorias, y elegibles al registrar una empresa. Las "Oculta" aparecen ahí como "Próximamente" — activalas cuando estén listas para lanzar.</p>
+
+        {showForm && (
+          <form onSubmit={handleCreate} className="space-y-3 mt-4 border-t border-gray-100 pt-4">
+            <div className="grid sm:grid-cols-[1fr_80px_120px] gap-3">
+              <div><label className="label">Nombre</label><input required placeholder="Ej: Jardineros" className="input text-sm" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} /></div>
+              <div><label className="label">Ícono</label><input maxLength={4} placeholder="🌱" className="input text-sm text-center" value={form.emoji} onChange={(e) => setForm((f) => ({ ...f, emoji: e.target.value }))} /></div>
+              <div>
+                <label className="label">Fase</label>
+                <select className="input text-sm" value={form.phase} onChange={(e) => setForm((f) => ({ ...f, phase: Number(e.target.value) }))}>
+                  <option value={1}>Fase 1</option>
+                  <option value={2}>Fase 2</option>
+                  <option value={3}>Fase 3</option>
+                </select>
+              </div>
+            </div>
+            <label className="flex items-center gap-2 text-xs text-brand-slate">
+              <input type="checkbox" checked={!form.isHidden} onChange={(e) => setForm((f) => ({ ...f, isHidden: !e.target.checked }))} />
+              Activarla ya (si la dejás sin marcar, nace oculta como "Próximamente")
+            </label>
+            {error && <p className="text-xs text-brand-red">{error}</p>}
+            <div className="flex gap-2">
+              <button type="submit" disabled={creating} className="btn-primary text-sm py-2 px-4 disabled:opacity-50">{creating ? 'Creando...' : 'Crear categoría'}</button>
+              <button type="button" onClick={() => { setShowForm(false); setError('') }} className="text-xs text-brand-slate hover:underline">Cancelar</button>
+            </div>
+          </form>
+        )}
+      </div>
+
       {Object.keys(byPhase).sort((a, b) => Number(a) - Number(b)).map((phase) => (
         <div key={phase}>
           <p className="text-xs font-semibold text-brand-slate uppercase tracking-wider mb-2">Fase {phase}</p>

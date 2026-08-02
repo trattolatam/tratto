@@ -269,6 +269,28 @@ export default async function adminRoutes(app: FastifyInstance) {
     return reply.send({ categories })
   })
 
+  app.post('/categories', { preHandler: requireAdmin }, async (request, reply) => {
+    const body = z.object({
+      name: z.string().min(2), emoji: z.string().min(1).max(4),
+      phase: z.number().int().min(1).max(9).default(1),
+      isHidden: z.boolean().default(false), priority: z.boolean().default(false),
+    }).safeParse(request.body)
+    if (!body.success) return reply.status(400).send({ error: true, message: body.error.issues[0]?.message || 'Datos inválidos' })
+
+    const { name, emoji, phase, isHidden, priority } = body.data
+    const baseSlug = name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
+    if (!baseSlug) return reply.status(400).send({ error: true, message: 'Ese nombre no genera una URL válida — probá con otro' })
+
+    // Si el slug ya existe (nombre repetido o muy parecido), le suma un número
+    // en vez de fallar con un error de la base que no diría nada al admin.
+    let slug = baseSlug
+    let n = 2
+    while (await prisma.category.findUnique({ where: { slug } })) { slug = `${baseSlug}-${n}`; n++ }
+
+    const category = await prisma.category.create({ data: { name, slug, emoji, phase, isHidden, priority } })
+    return reply.send({ category: { ...category, _count: { companies: 0 } } })
+  })
+
   app.patch('/categories/:id', { preHandler: requireAdmin }, async (request, reply) => {
     const { id } = request.params as { id: string }
     const body = z.object({
